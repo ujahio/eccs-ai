@@ -46,11 +46,13 @@ Single-context repo. Read `PRD.md` for product scope and `DESIGN.md` for UI rule
 - Pin dependencies versions
 - caching when necessary
 - start with one local stage and inform the user of the manual steps to implement
+- Testing selectors must use `data-testid` first. Use stable `id` attributes as a close second when a test id would duplicate an existing semantic anchor. Avoid relying on visible text, ARIA roles, CSS classes, or layout structure for automated test targeting unless no stable selector is available.
 
 ## UI DESIGN
 
 - Always follow the UI design system when creating or reviewing components or pages.
 - Design System: @DESIGN.md
+- All images used by components must live under `public/images` and be referenced from that public path. If an image starts elsewhere, move it into `public/images` before using it in UI code.
 
 ## RESPONSES
 

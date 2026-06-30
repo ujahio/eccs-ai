@@ -29,9 +29,9 @@ Core product areas visible in the grid:
 | App Canvas      | `#F8FAFB`                   | Page background, dashboard canvas, form sections              |
 | Soft Section    | `#F2F7F8`                   | Light marketing sections and subtle content bands             |
 | Border Gray     | `#E5EBEF`                   | Card borders, dividers, input strokes, table lines            |
-| Muted Gray      | `#8B98A3`                   | Body copy, metadata, placeholders, secondary labels           |
+| Muted Gray      | `#4B5A67`                   | Body copy, metadata, placeholders, secondary labels           |
 | Disabled Gray   | `#C8D0D6`                   | Disabled labels, inactive buttons, low-priority icons         |
-| Primary Text    | `#2E3F50`                   | Headings, titles, navigation, important labels                |
+| Primary Text    | `#223244`                   | Headings, titles, navigation, important labels                |
 | Primary Action  | `#2F4358`                   | Filled CTA buttons, sticky action bars, active tab underlines |
 | Action Hover    | `#253647`                   | Hover/pressed state for primary actions                       |
 | Brand Teal      | `#159A9C`                   | Logo mark, brand detail, selected accents                     |
@@ -47,7 +47,7 @@ Use the palette semantically. Most screens should be white, pale gray, dark slat
 
 ## 3. Typography Rules
 
-Use a clean geometric/product sans-serif. The XD screens read closest to Montserrat, Avenir, or Inter. Use `Inter` as the implementation default unless the brand font is known.
+Use `Nunito Sans` as the implementation default for the entire application. If the primary font is unavailable, use `Montserrat`, `Avenir`, or `Inter` as ordered fallback options before system sans-serif fonts.
 
 | Style            | Desktop Size | Mobile Size | Weight | Line Height | Usage                                      |
 | ---------------- | -----------: | ----------: | -----: | ----------: | ------------------------------------------ |
@@ -70,6 +70,7 @@ Typography rules:
 - Keep letter spacing neutral; do not over-track labels.
 - Long clinical/case text should be readable, with comfortable line height and constrained width.
 - Mobile screens should prioritize legibility and avoid tiny paragraphs below 12px.
+- Body copy must stay dark enough for comfortable reading. Use `Primary Text` for high-emphasis copy and the darker `Muted Gray` token only for secondary text; do not use pale gray for paragraphs or instructional copy.
 
 ## 4. Component Stylings
 
@@ -172,11 +173,11 @@ Avoid heavy shadows. If a component needs separation, first use spacing and a bo
 
 **Do**
 
-- use images in the `images` directory. Do not use generate AI generated images.
+- use images in the `public/images` directory. Move component-used assets there before referencing them. Do not use generate AI generated images.
 - Use dark slate for primary actions and active states.
 - Keep teal/mint accents sparse and meaningful.
 - Build screens from white panels, thin borders, and clear typography.
-- Use real clinical imagery on marketing pages, preferably rounded only slightly.
+- Use real clinical imagery on marketing pages, preferably rounded only slightly. Do not add decorative white backgrounds or white borders around marketing images; let image assets sit directly on the section canvas unless the image is part of a true card or certificate preview.
 - Keep workflows linear with clear next/previous actions.
 - Use centered success states with a mint check icon.
 - Keep student case-reading and CME flows calm and readable.
@@ -221,13 +222,13 @@ Responsive rules:
 
 Quick color reference:
 
-- Primary text: `#2E3F50`
+- Primary text: `#223244`
 - Primary action: `#2F4358`
 - Brand teal: `#159A9C`
 - Success mint: `#40DDB5`
 - Background canvas: `#F8FAFB`
 - Surface: `#FFFFFF`
 - Border: `#E5EBEF`
-- Muted text: `#8B98A3`
+- Muted text: `#4B5A67`
 - Error: `#D85B5B`
 - Overlay: `rgba(47, 64, 80, 0.72)`
