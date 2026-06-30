@@ -5,9 +5,9 @@
   --color-app-canvas: #f8fafb;
   --color-soft-section: #f2f7f8;
   --color-border-gray: #e5ebef;
-  --color-muted-gray: #8b98a3;
+  --color-muted-gray: #4b5a67;
   --color-disabled-gray: #c8d0d6;
-  --color-primary-text: #2e3f50;
+  --color-primary-text: #223244;
   --color-primary-action: #2f4358;
   --color-action-hover: #253647;
   --color-brand-teal: #159a9c;
@@ -16,7 +16,7 @@
   --color-error-red: #d85b5b;
   --color-warning-gold: #f3b64b;
   --shadow-soft: 0 8px 24px rgba(47, 64, 80, 0.06);
-  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-nunito-sans), "Nunito Sans", Montserrat, Avenir, Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
 * {
@@ -30,7 +30,7 @@ html {
 body {
   margin: 0;
   background: #f8fafb;
-  color: #2e3f50;
+  color: #223244;
   font-family: var(--font-sans);
 }
 
