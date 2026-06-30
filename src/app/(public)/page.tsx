@@ -59,7 +59,49 @@ export default function Home() {
 							How It Works
 						</a>
 					</div>
-					<div className="flex items-center gap-3">
+					<details className="relative md:hidden">
+						<summary
+							aria-label="Open navigation menu"
+							className="flex h-9 w-11 cursor-pointer list-none items-center justify-center rounded border border-border-gray bg-white text-primary-text transition hover:border-primary-action focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal [&::-webkit-details-marker]:hidden"
+							data-testid="mobile-nav-toggle"
+						>
+							<span className="grid gap-1" aria-hidden="true">
+								<span className="h-0.5 w-5 bg-current" />
+								<span className="h-0.5 w-5 bg-current" />
+								<span className="h-0.5 w-5 bg-current" />
+							</span>
+						</summary>
+						<div className="absolute right-0 top-11 z-10 grid w-48 gap-1 rounded border border-border-gray bg-white p-2 text-xs font-semibold uppercase shadow-soft">
+							<Link className="px-3 py-2 transition hover:text-brand-teal" href="/">
+								Home
+							</Link>
+							<Link
+								className="px-3 py-2 transition hover:text-brand-teal"
+								href="/faculty"
+							>
+								Faculty
+							</Link>
+							<a
+								className="px-3 py-2 transition hover:text-brand-teal"
+								href="#workflow"
+							>
+								How It Works
+							</a>
+							<Link
+								className="px-3 py-2 transition hover:text-brand-teal"
+								href="/login"
+							>
+								Log in
+							</Link>
+							<Link
+								className="px-3 py-2 transition hover:text-brand-teal"
+								href="/register"
+							>
+								Get started
+							</Link>
+						</div>
+					</details>
+					<div className="hidden items-center gap-3 md:flex">
 						<ButtonLink href="/login" size="sm" variant="secondary">
 							Log in
 						</ButtonLink>
@@ -70,24 +112,24 @@ export default function Home() {
 				</nav>
 			</header>
 
-      <section
-        className="mx-auto grid w-full max-w-7xl items-center gap-14 px-6 py-16 md:grid-cols-[1.05fr_1fr] lg:gap-16 lg:py-24"
-        data-testid="home-hero"
-      >
-        <div>
-          <h1
-            className="text-4xl font-bold leading-tight md:text-5xl"
-            data-testid="home-heading"
-          >
-            Welcome to e-Clinical Cases Solutions
-          </h1>
-          <div
-            className="mt-8 grid gap-5 text-base leading-7 text-muted-gray md:text-lg md:leading-8"
-            data-testid="home-intro-copy"
-          >
-            {introParagraphs.map((paragraph) => (
-              <p key={paragraph}>{paragraph}</p>
-            ))}
+			<section
+				className="mx-auto grid w-full max-w-7xl items-center gap-14 px-6 py-16 md:grid-cols-[1.05fr_1fr] lg:gap-16 lg:py-24"
+				data-testid="home-hero"
+			>
+				<div>
+					<h1
+						className="text-4xl font-bold leading-tight md:text-5xl"
+						data-testid="home-heading"
+					>
+						Welcome to e-Clinical Cases Solutions
+					</h1>
+					<div
+						className="mt-8 grid gap-5 text-base leading-7 text-muted-gray md:text-lg md:leading-8"
+						data-testid="home-intro-copy"
+					>
+						{introParagraphs.map((paragraph) => (
+							<p key={paragraph}>{paragraph}</p>
+						))}
 					</div>
 					<div className="mt-8 flex flex-col gap-3 sm:flex-row">
 						<ButtonLink data-testid="home-hero-get-started" href="/register">
@@ -96,8 +138,8 @@ export default function Home() {
 					</div>
 				</div>
 
-				<div className="grid min-h-[520px] grid-cols-[1fr_0.58fr] items-stretch gap-6">
-					<div className="relative mt-8 min-h-[420px] overflow-hidden rounded">
+				<div className="hidden min-h-130 grid-cols-[1fr_0.58fr] items-stretch gap-6 sm:grid">
+					<div className="relative mt-8 min-h-105 overflow-hidden rounded">
 						<Image
 							src="/images/femaledoctor.png"
 							alt="Laboratory medicine clinician"
@@ -108,7 +150,7 @@ export default function Home() {
 						/>
 					</div>
 					<div className="grid gap-6">
-						<div className="relative min-h-[320px] overflow-hidden rounded">
+						<div className="relative min-h-80 overflow-hidden rounded">
 							<Image
 								src="/images/maledoctor3.png"
 								alt="Clinical educator"
@@ -117,7 +159,7 @@ export default function Home() {
 								sizes="(min-width: 768px) 18vw, 48vw"
 							/>
 						</div>
-						<div className="relative min-h-[170px] overflow-hidden rounded">
+						<div className="relative min-h-42.5 overflow-hidden rounded">
 							<Image
 								src="/images/femaleassistant.png"
 								alt="Clinical laboratory assistant using a microscope"
@@ -130,23 +172,23 @@ export default function Home() {
 				</div>
 			</section>
 
-      <section
-        id="objectives"
-        className="border-y border-border-gray bg-soft-section"
-        data-testid="objectives-section"
-      >
-        <div className="mx-auto grid w-full max-w-7xl items-center gap-14 px-6 py-16 md:grid-cols-[1.08fr_0.92fr] lg:gap-16">
-          <div>
-            <h2
-              className="text-3xl font-bold leading-tight"
-              data-testid="objectives-heading"
-            >
-              Objectives
-            </h2>
-            <div className="mt-8 grid gap-5" data-testid="objectives-list">
-              {objectives.map((objective) => (
-                <p
-                  className="border-l-2 border-brand-teal pl-5 text-base leading-7 text-muted-gray md:text-lg md:leading-8"
+			<section
+				id="objectives"
+				className="border-y border-border-gray bg-soft-section"
+				data-testid="objectives-section"
+			>
+				<div className="mx-auto grid w-full max-w-7xl items-center gap-14 px-6 py-16 md:grid-cols-[1.08fr_0.92fr] lg:gap-16">
+					<div>
+						<h2
+							className="text-3xl font-bold leading-tight"
+							data-testid="objectives-heading"
+						>
+							Objectives
+						</h2>
+						<div className="mt-8 grid gap-5" data-testid="objectives-list">
+							{objectives.map((objective) => (
+								<p
+									className="border-l-2 border-brand-teal pl-5 text-base leading-7 text-muted-gray md:text-lg md:leading-8"
 									key={objective}
 								>
 									{objective}
@@ -161,7 +203,7 @@ export default function Home() {
 							Get started
 						</ButtonLink>
 					</div>
-					<div className="relative min-h-[380px] overflow-hidden rounded">
+					<div className="relative hidden min-h-95 overflow-hidden rounded sm:block">
 						<Image
 							src="/images/masked-doctor.png"
 							alt="Masked laboratory medicine clinician"
@@ -173,18 +215,22 @@ export default function Home() {
 				</div>
 			</section>
 
-      <section id="workflow" className="bg-white" data-testid="workflow-section">
-        <div className="mx-auto grid w-full max-w-7xl gap-12 px-6 py-14 lg:grid-cols-[1.08fr_0.86fr] lg:gap-16">
-          <div>
-            <p className="text-sm font-semibold uppercase text-brand-teal">
-              How It Works
-            </p>
-            <h2
-              className="mt-3 text-3xl font-bold leading-tight"
-              data-testid="workflow-heading"
-            >
-              A static walkthrough of the student learning path
-            </h2>
+			<section
+				id="workflow"
+				className="bg-white"
+				data-testid="workflow-section"
+			>
+				<div className="mx-auto grid w-full max-w-7xl gap-12 px-6 py-14 lg:grid-cols-[1.08fr_0.86fr] lg:gap-16">
+					<div>
+						<p className="text-sm font-semibold uppercase text-brand-teal">
+							How It Works
+						</p>
+						<h2
+							className="mt-3 text-3xl font-bold leading-tight"
+							data-testid="workflow-heading"
+						>
+							A static walkthrough of the student learning path
+						</h2>
 						<div className="mt-8 grid gap-4">
 							{workflowSteps.map((step, index) => (
 								<div
