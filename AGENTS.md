@@ -1,5 +1,19 @@
 # CRITICAL RULES - MUST FOLLOW
 
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs are tracked in GitHub Issues for `otktechnologies/eccs-ai`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the default five-label triage vocabulary. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context repo. Read `PRD.md` for product scope and `DESIGN.md` for UI rules before planning implementation work. See `docs/agents/domain.md`.
+
 ## Implementation Details
 
 ### Tech Stack
@@ -73,10 +87,6 @@ SST dev locally after authenticating to AWS.
 ### Github Authentication
 
 - For any task that requires Github authentication or reading of .github or related files, ask the user before performing the task. Explain if necessary why authentication is needed. Do not perform any github actions.
-
-### Github Operations
-
-- Do not commit or push branches. The user should.
 
 ## SST
 

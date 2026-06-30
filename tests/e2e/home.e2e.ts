@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
 
-test("home page responds", async ({ request }) => {
-  const response = await request.get("/");
+const shellRoutes = ["/", "/student", "/teacher"];
 
-  expect(response.ok()).toBe(true);
-});
+for (const route of shellRoutes) {
+  test(`${route} responds`, async ({ request }) => {
+    const response = await request.get(route);
+
+    expect(response.ok()).toBe(true);
+  });
+}

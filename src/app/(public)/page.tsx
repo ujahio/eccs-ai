@@ -1,6 +1,6 @@
 import Image from "next/image";
-import logo from "../../images/logo.png";
-import medicalTeam from "../../images/medstaff.jpg";
+import logo from "../../../images/logo.png";
+import medicalTeam from "../../../images/medstaff.jpg";
 
 const platformHighlights = [
   "Structured clinical case delivery",
@@ -46,10 +46,16 @@ export default function Home() {
             student learning, and preserving continuing education records.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <a className="inline-flex h-11 items-center justify-center rounded bg-primary-action px-6 text-sm font-bold uppercase text-white transition hover:bg-action-hover" href="#overview">
+            <a
+              className="inline-flex h-11 items-center justify-center rounded bg-primary-action px-6 text-sm font-bold uppercase text-white transition hover:bg-action-hover"
+              href="#overview"
+            >
               Get started
             </a>
-            <a className="inline-flex h-11 items-center justify-center rounded border border-border-gray bg-white px-6 text-sm font-bold uppercase text-primary-text transition hover:border-primary-action" href="#workflow">
+            <a
+              className="inline-flex h-11 items-center justify-center rounded border border-border-gray bg-white px-6 text-sm font-bold uppercase text-primary-text transition hover:border-primary-action"
+              href="#workflow"
+            >
               View workflow
             </a>
           </div>
