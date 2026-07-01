@@ -1,6 +1,6 @@
-import { userPool, userPoolClient } from "./auth";
-import { registrationWorkflowTable, userProfileTable } from "./tables";
-import { transactionalEmail } from "./email";
+const auth = await import("./auth");
+const tables = await import("./tables");
+const email = await import("./email");
 
 export const registrationCleanupJob = new sst.aws.CronV2(
 	"RegistrationCleanupJob",
@@ -9,11 +9,11 @@ export const registrationCleanupJob = new sst.aws.CronV2(
 		function: {
 			handler: "src/features/auth/registration/cleanup.handler",
 			link: [
-				userPool,
-				userPoolClient,
-				registrationWorkflowTable,
-				userProfileTable,
-				transactionalEmail
+				auth.userPool,
+				auth.userPoolClient,
+				tables.registrationWorkflowTable,
+				tables.userProfileTable,
+				email.transactionalEmail
 			]
 		}
 	}

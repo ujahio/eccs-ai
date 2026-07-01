@@ -6,6 +6,28 @@
 
 declare module "sst" {
   export interface Resource {
+    "AuthUserPool": {
+      "id": string
+      "type": "sst.aws.CognitoUserPool"
+    }
+    "AuthUserPoolClient": {
+      "id": string
+      "secret": string
+      "type": "sst.aws.CognitoUserPoolClient"
+    }
+    "RegistrationWorkflowTable": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
+    "TransactionalEmail": {
+      "configSet": string
+      "sender": string
+      "type": "sst.aws.Email"
+    }
+    "UserProfileTable": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
     "eccsfeweb": {
       "type": "sst.aws.Nextjs"
       "url": string
