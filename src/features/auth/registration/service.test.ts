@@ -242,9 +242,9 @@ describe("RegistrationService", () => {
 		const result = await service.registerStudent(validInput);
 
 		expect(result).toMatchObject({
-			status: "resend_rate_limited",
+			status: "resend_blocked",
 			message:
-				"A verification email was sent recently. Please check your inbox before requesting another."
+				"Maximum requests reached. Try again after the verification link expires."
 		});
 		expect(email.sent).toHaveLength(1);
 	});

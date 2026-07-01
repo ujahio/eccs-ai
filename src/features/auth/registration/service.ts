@@ -23,7 +23,7 @@ export type RegistrationServiceResult =
 			message: string;
 	  }
 	| {
-			status: "resend_rate_limited";
+			status: "resend_blocked";
 			message: string;
 	  }
 	| {
@@ -280,9 +280,9 @@ export class RegistrationService {
 
 		if (sendCount >= this.config.maxSendsPerWindow) {
 			return {
-				status: "resend_rate_limited",
+				status: "resend_blocked",
 				message:
-					"A verification email was sent recently. Please check your inbox before requesting another."
+					"Maximum requests reached. Try again after the verification link expires."
 			};
 		}
 

@@ -225,7 +225,51 @@ test.describe("Student registration and email verification", () => {
 		await page.getByTestId("register-submit").click();
 
 		await expect(page.getByTestId("register-resend-notice")).toHaveText(
-			"A verification email was sent recently. Please check your inbox before requesting another."
+			"Maximum requests reached. Try again after the verification link expires."
+		);
+	});
+
+	test("registration remains blocked after rate limit until verification expires", async ({
+		page
+	}) => {
+		const email = uniqueEmail();
+
+		await page.goto("/register");
+
+		for (let i = 0; i < 3; i++) {
+			await page.getByTestId("register-first-name").fill(
+				validRegistration.firstName
+			);
+			await page.getByTestId("register-last-name").fill(
+				validRegistration.lastName
+			);
+			await page.getByTestId("register-email").fill(email);
+			await page.getByTestId("register-password").fill(
+				validRegistration.password
+			);
+			await page.getByTestId("register-submit").click();
+
+			await expect(
+				page.getByTestId("register-success-message")
+			).toBeVisible();
+		}
+
+		await page.getByTestId("register-first-name").fill(validRegistration.firstName);
+		await page.getByTestId("register-last-name").fill(validRegistration.lastName);
+		await page.getByTestId("register-email").fill(email);
+		await page.getByTestId("register-password").fill(validRegistration.password);
+		await page.getByTestId("register-submit").click();
+
+		await expect(page.getByTestId("register-resend-notice")).toBeVisible();
+
+		await page.getByTestId("register-first-name").fill(validRegistration.firstName);
+		await page.getByTestId("register-last-name").fill(validRegistration.lastName);
+		await page.getByTestId("register-email").fill(email);
+		await page.getByTestId("register-password").fill(validRegistration.password);
+		await page.getByTestId("register-submit").click();
+
+		await expect(page.getByTestId("register-resend-notice")).toHaveText(
+			"Maximum requests reached. Try again after the verification link expires."
 		);
 	});
 });

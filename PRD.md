@@ -152,9 +152,9 @@ Feedback is shown to the teacher with the student's name in v1.
 3. Verification links expire after 24 hours.
 4. Login is blocked until verification succeeds, with short messaging that the user must verify their email before signing in.
 5. After successful verification, the user is sent to login. No automatic session starts.
-6. If the same email registers again while an active verification exists, do not create a duplicate account or registration. Treat the request as a rate-limited verification email resend and show a short notice that a verification email was sent.
-7. Repeated verification email sends are rate-limited per email to protect users from inbox spam and reduce abuse.
-8. Expired, unverified pending registrations are deleted automatically by a scheduled cleanup job.
+6. If the same email registers again while an active verification exists, do not create a duplicate account or registration. Treat the request as a rate-limited verification email resend.
+7. Verification email resends are rate-limited to protect users from inbox spam. After the rate limit is reached, the user must wait for the 24-hour verification window to expire before they can attempt to register with that email again.
+8. Expired, unverified pending registrations are deleted automatically by a scheduled cleanup job, which frees the email for a fresh registration attempt.
 
 **Email change flow:**
 
@@ -204,8 +204,8 @@ Feedback is shown to the teacher with the student's name in v1.
 
 - **Deadline passes mid-quiz:** Strict cutoff. Once the deadline passes, all student operations on the case stop immediately, including in-progress quiz attempts.
 - **Multi-tab quiz submission:** Unique constraint on `certificates (student_id, case_id)` prevents duplicate certificate records.
-- **Repeated pending registration:** A repeated registration attempt for an active pending email does not create another account. It may send another verification email only within rate limits.
-- **Expired registration verification:** Expired, unverified pending registrations are cleaned up automatically. A new registration with the same email can start after the previous pending verification expires or is cleaned up.
+- **Repeated pending registration:** A repeated registration attempt for an active pending email does not create another account. It may send another verification email only within rate limits. Once the rate limit is reached, the user must wait for the pending verification to expire (24 hours) before attempting to register with that email again.
+- **Expired registration verification:** Expired, unverified pending registrations are cleaned up automatically. A new registration with the same email can start only after the previous pending verification expires or is cleaned up — hitting the resend rate limit does not reset the 24-hour verification window.
 
 ### Certificates
 

@@ -29,7 +29,7 @@ export async function submitRegistrationForm(
 		};
 	}
 
-	if (result.status === "resend_rate_limited") {
+	if (result.status === "resend_blocked") {
 		return {
 			status: "notice",
 			message: result.message,
