@@ -90,6 +90,10 @@ SST dev locally after authenticating to AWS.
 
 - For any task that requires Github authentication or reading of .github or related files, ask the user before performing the task. Explain if necessary why authentication is needed. Do not perform any github actions.
 
+### Branch, PR, And Issue Closeout Workflow
+
+- Follow the branch, PR, and issue closeout conventions in `docs/agents/issue-tracker.md`.
+
 ## SST
 
 SST component files must live under `infra/` and be imported from inside
