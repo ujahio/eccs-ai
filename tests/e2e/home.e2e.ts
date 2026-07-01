@@ -38,13 +38,13 @@ test("public marketing page shows ECCS content and entry navigation", async ({
 
   await page.getByTestId("home-hero-get-started").click();
   await expect(page).toHaveURL(/\/register$/);
-  await expect(page.getByTestId("register-heading")).toHaveText(
-    "Create an account"
-  );
+  await expect(page.getByTestId("register-submit")).toHaveText("Continue");
 
   await page.getByTestId("register-login-link").click();
   await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByTestId("login-heading")).toHaveText("Log in");
+  await expect(page.getByTestId("login-heading")).toHaveText(
+    "Sign in to Your Account"
+  );
 });
 
 test("faculty page shows the standalone faculty profile", async ({ page }) => {
