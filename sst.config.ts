@@ -10,6 +10,10 @@ export default $config({
 		};
 	},
 	async run() {
+		await import("./infra/auth");
+		await import("./infra/tables");
+		await import("./infra/email");
+		await import("./infra/jobs");
 		await import("./infra/nextjs-client");
 	},
 });

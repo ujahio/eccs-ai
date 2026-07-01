@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRightIcon } from "@/components/ui/arrow-right-icon";
-import { Button } from "@/components/ui/button";
+import { submitRegistrationForm } from "@/features/auth/registration/actions";
+import { RegistrationForm } from "@/features/auth/registration/registration-form";
+import { initialRegistrationFormState } from "@/features/auth/registration/state";
 
 export default function RegisterPage() {
 	return (
@@ -19,68 +20,33 @@ export default function RegisterPage() {
 						/>
 					</Link>
 
-					<div className="mt-10 grid gap-5">
-						<div className="grid items-start gap-5 sm:grid-cols-2">
-							<label className="flex flex-col gap-2 text-xs font-medium leading-none text-muted-gray">
-								First Name
-								<input
-									className="h-11 border border-border-gray bg-white px-3 text-sm leading-normal text-primary-text outline-none transition placeholder:text-disabled-gray focus:border-brand-teal"
-									data-testid="register-first-name"
-									placeholder="Jordan"
-									type="text"
-									id="register-first-name"
-								/>
-							</label>
-							<label className="flex flex-col gap-2 text-xs font-medium leading-none text-muted-gray">
-								Last Name
-								<input
-									className="h-11 border border-border-gray bg-white px-3 text-sm leading-normal text-primary-text outline-none transition placeholder:text-disabled-gray focus:border-brand-teal"
-									data-testid="register-last-name"
-									placeholder="Joe"
-									type="text"
-									id="register-last-name"
-								/>
-							</label>
-						</div>
-
-						<label className="grid gap-2 text-xs font-medium text-muted-gray">
-							Email Address
-							<input
-								className="h-11 border border-border-gray bg-white px-3 text-sm text-primary-text outline-none transition placeholder:text-disabled-gray focus:border-brand-teal"
-								data-testid="register-email"
-								placeholder="johndoe@gmail.com"
-								type="email"
-							/>
-						</label>
-						<label className="grid gap-2 text-xs font-medium text-muted-gray">
-							Password
-							<span className="flex h-11 items-center border border-border-gray bg-white focus-within:border-brand-teal">
-								<input
-									className="min-w-0 flex-1 bg-transparent px-3 text-sm text-primary-text outline-none placeholder:text-disabled-gray"
-									data-testid="register-password"
-									placeholder="Password"
-									type="password"
-								/>
-								<button
-									className="h-full px-3 text-[10px] font-bold uppercase text-primary-action"
-									type="button"
-								>
-									Show
-								</button>
-							</span>
-						</label>
+					<div className="mt-9">
+						<h1
+							className="text-lg font-semibold leading-tight"
+							data-testid="register-heading"
+						>
+							Create your student account
+						</h1>
+						<p className="mt-3 text-sm leading-6 text-muted-gray">
+							Verification is required before you can sign in.
+						</p>
 					</div>
 
-					<Button
-						className="group mt-7 w-full justify-start px-5 text-left transition duration-200 hover:-translate-y-0.5 hover:bg-action-hover"
-						data-testid="register-submit"
-						type="button"
-					>
-						<span>Continue</span>
-						<span className="ml-auto transition-transform duration-200 group-hover:translate-x-1">
-							<ArrowRightIcon />
-						</span>
-					</Button>
+					<RegistrationForm
+						action={submitRegistrationForm}
+						initialState={initialRegistrationFormState}
+					/>
+
+					<p className="mt-7 border-t border-border-gray pt-5 text-sm text-muted-gray">
+						Already registered?{" "}
+						<Link
+							className="font-semibold text-primary-text underline"
+							data-testid="register-login-link"
+							href="/login"
+						>
+							Sign in
+						</Link>
+					</p>
 				</div>
 			</section>
 		</main>
