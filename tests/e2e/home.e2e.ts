@@ -60,3 +60,16 @@ test("faculty page shows the standalone faculty profile", async ({ page }) => {
     page.getByTestId("faculty-profile-copy")
   ).toContainText("clinical laboratory medicine spanning over 20 years");
 });
+
+test("public mobile header uses the compact navigation menu", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/faculty");
+
+  await expect(page.getByTestId("mobile-nav-toggle")).toBeVisible();
+  await expect(page.getByTestId("mobile-nav-login")).toBeHidden();
+  await expect(page.getByTestId("mobile-nav-register")).toBeHidden();
+
+  await page.getByTestId("mobile-nav-toggle").click();
+  await expect(page.getByTestId("mobile-nav-login")).toBeVisible();
+  await expect(page.getByTestId("mobile-nav-register")).toBeVisible();
+});

@@ -71,10 +71,18 @@ export function PublicNav({ activePage = "home" }: PublicNavProps) {
             <Link className={mobileLinkClasses} href="/#workflow">
               How It Works
             </Link>
-            <Link className={mobileLinkClasses} href="/login">
+            <Link
+              className={mobileLinkClasses}
+              data-testid="mobile-nav-login"
+              href="/login"
+            >
               Log in
             </Link>
-            <Link className={mobileLinkClasses} href="/register">
+            <Link
+              className={mobileLinkClasses}
+              data-testid="mobile-nav-register"
+              href="/register"
+            >
               Get started
             </Link>
           </div>
