@@ -23,7 +23,7 @@ Single-context repo. Read `PRD.md` for product scope and `DESIGN.md` for UI rule
 - **Full-stack TypeScript** using React.js and Next.js
 - **UI/UX** with tailwind, radix-ui
 - **SST ION** to write components to deploy AWS (other). Do not use any other SDK or IAC.
-- **EMAIL Services** AWS SES (via SST) for production and MailSurp for testing email client
+- **EMAIL Services** Resend for production and MailSurp for testing email client
 - **Client Authentication** with better-auth (no database, use cognito for user management)
 - **AWS** for backend resources
 - **DynamoDB** use SST
