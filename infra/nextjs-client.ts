@@ -1,5 +1,5 @@
 const auth = await import("./auth");
-const email = await import("./email");
+const secrets = await import("./secrets");
 const tables = await import("./tables");
 
 export const client = new sst.aws.Nextjs("eccsfeweb", {
@@ -7,9 +7,9 @@ export const client = new sst.aws.Nextjs("eccsfeweb", {
 	link: [
 		auth.userPool,
 		auth.userPoolClient,
+		secrets.resendApiKey,
 		tables.registrationWorkflowTable,
 		tables.userProfileTable,
-		email.transactionalEmail
 	],
 	dev: {
 		command: "bunx next dev -p 3001",

@@ -1,6 +1,6 @@
 const auth = await import("./auth");
+const secrets = await import("./secrets");
 const tables = await import("./tables");
-const email = await import("./email");
 
 export const registrationCleanupJob = new sst.aws.CronV2(
 	"RegistrationCleanupJob",
@@ -11,10 +11,10 @@ export const registrationCleanupJob = new sst.aws.CronV2(
 			link: [
 				auth.userPool,
 				auth.userPoolClient,
+				secrets.resendApiKey,
 				tables.registrationWorkflowTable,
 				tables.userProfileTable,
-				email.transactionalEmail
-			]
-		}
-	}
+			],
+		},
+	},
 );

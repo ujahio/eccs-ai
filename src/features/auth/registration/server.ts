@@ -2,7 +2,7 @@ import "server-only";
 
 import { CognitoAuthAdapter } from "@/lib/aws/cognito";
 import { DynamoAuthRepository } from "@/lib/aws/dynamodb";
-import { SesRegistrationEmailSender } from "@/lib/aws/email";
+import { ResendRegistrationEmailSender } from "@/lib/aws/email";
 import { getAuthResources } from "@/lib/aws/resources";
 import { isE2EMode, getE2EAdapters } from "@/lib/e2e/in-memory-auth";
 import { RegistrationService } from "./service";
@@ -31,7 +31,10 @@ export function createRegistrationService() {
 		resources.userPoolId,
 		resources.userPoolClientId,
 	);
-	const email = new SesRegistrationEmailSender(resources.emailSender);
+	const email = new ResendRegistrationEmailSender(
+		resources.emailSender,
+		resources.resendApiKey,
+	);
 
 	return new RegistrationService({
 		repository,
