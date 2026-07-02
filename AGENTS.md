@@ -2,6 +2,12 @@
 
 ## Agent skills
 
+### Environment
+
+Keep secrets local. Do not commit and environment variable starting with `.env.*` unless `.env.sample`.
+
+Read `.env.sample` for required local environment varibales.
+
 ### Issue tracker
 
 Issues and PRDs are tracked in GitHub Issues for `otktechnologies/eccs-ai`. See `docs/agents/issue-tracker.md`.
@@ -79,7 +85,7 @@ When you need to search for up to date documentation, use `context7` tools.
 
 ## Runtime
 
-Use `bun` and `bunx` for all runtime commands.
+Use `bun` and/or `bunx` (whichever is appropriate) for runtime commands.
 
 Do not run `sst dev` or `bun run dev` from the agent shell. The user will run
 SST dev locally after authenticating to AWS.
@@ -88,7 +94,7 @@ SST dev locally after authenticating to AWS.
 
 ### Github Authentication
 
-- For any task that requires Github authentication or reading of .github or related files, ask the user before performing the task. Explain if necessary why authentication is needed. Do not perform any github actions.
+- For any task that requires Github authentication or reading of .github or related files, ask the user before performing the task. Explain if necessary why authentication is needed. Do not perform any github actions without asking first.
 
 ### Branch, PR, And Issue Closeout Workflow
 
