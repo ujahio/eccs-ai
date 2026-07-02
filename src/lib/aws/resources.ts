@@ -42,12 +42,11 @@ export function getAuthResources() {
 			"UserProfileTable.name",
 		),
 		emailSender:
-			process.env.ECCS_EMAIL_SENDER ?? "no-reply@eccs-online.xyz",
+			process.env.ECCS_EMAIL_SENDER ?? "no-reply@contact.eccs-online.xyz",
 		resendApiKey: required(
 			linkedResources.ResendApiKey?.value ?? process.env.RESEND_API_KEY,
 			"ResendApiKey.value",
 		),
-		appBaseUrl:
-			process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001",
+		appBaseUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001",
 	};
 }

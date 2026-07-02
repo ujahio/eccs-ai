@@ -27,9 +27,6 @@ export default function RegisterPage() {
 						>
 							Create your student account
 						</h1>
-						<p className="mt-3 text-sm leading-6 text-muted-gray">
-							Verification is required before you can sign in.
-						</p>
 					</div>
 
 					<RegistrationForm
