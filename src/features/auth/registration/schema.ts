@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export type RegistrationInput = {
 	firstName: string;
 	lastName: string;
@@ -8,6 +10,12 @@ export type RegistrationInput = {
 export type RegistrationFieldErrors = Partial<
 	Record<keyof RegistrationInput, string>
 >;
+
+export type PasswordRequirement = {
+	id: "minimumLength" | "lowercase" | "number";
+	label: string;
+	isMet: (password: string) => boolean;
+};
 
 export type ParsedRegistrationInput =
 	| {
@@ -21,58 +29,112 @@ export type ParsedRegistrationInput =
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+export const PASSWORD_REQUIREMENTS: PasswordRequirement[] = [
+	{
+		id: "minimumLength",
+		label: "At least 8 characters",
+		isMet: (password) => password.length >= 8
+	},
+	{
+		id: "lowercase",
+		label: "At least one lowercase letter",
+		isMet: (password) => /[a-z]/.test(password)
+	},
+	{
+		id: "number",
+		label: "At least one number",
+		isMet: (password) => /\d/.test(password)
+	}
+];
+
+const registrationSchema = z.object({
+	firstName: z
+		.string()
+		.trim()
+		.min(1, { message: "Enter your first name." })
+		.max(80, { message: "First name must be 80 characters or fewer." }),
+	lastName: z
+		.string()
+		.trim()
+		.min(1, { message: "Enter your last name." })
+		.max(80, { message: "Last name must be 80 characters or fewer." }),
+	email: z
+		.string()
+		.trim()
+		.min(1, { message: "Enter your email address." })
+		.refine((email) => EMAIL_PATTERN.test(normalizeEmail(email)), {
+			message: "Enter a valid email address."
+		}),
+	password: z
+		.string()
+		.refine(
+			(password) => failedPasswordRequirements(password).length === 0,
+			{
+				message: "Password does not meet requirements."
+			}
+		)
+});
+
 export function normalizeEmail(email: string) {
 	return email.trim().toLowerCase();
+}
+
+export function failedPasswordRequirements(password: string) {
+	return PASSWORD_REQUIREMENTS.filter((requirement) => !requirement.isMet(password));
 }
 
 export function parseRegistrationInput(
 	input: RegistrationInput
 ): ParsedRegistrationInput {
-	const firstName = input.firstName.trim();
-	const lastName = input.lastName.trim();
-	const email = input.email.trim();
-	const emailNormalized = normalizeEmail(email);
-	const password = input.password;
-	const fieldErrors: RegistrationFieldErrors = {};
+	const parsed = registrationSchema.safeParse(input);
+	const missingPasswordRequirements = failedPasswordRequirements(input.password);
 
-	if (!firstName) {
-		fieldErrors.firstName = "Enter your first name.";
-	} else if (firstName.length > 80) {
-		fieldErrors.firstName = "First name must be 80 characters or fewer.";
-	}
-
-	if (!lastName) {
-		fieldErrors.lastName = "Enter your last name.";
-	} else if (lastName.length > 80) {
-		fieldErrors.lastName = "Last name must be 80 characters or fewer.";
-	}
-
-	if (!email) {
-		fieldErrors.email = "Enter your email address.";
-	} else if (!EMAIL_PATTERN.test(emailNormalized)) {
-		fieldErrors.email = "Enter a valid email address.";
-	}
-
-	if (password.length < 8) {
-		fieldErrors.password = "Password must be at least 8 characters.";
-	} else if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-		fieldErrors.password = "Password must include a letter and a number.";
-	}
-
-	if (Object.keys(fieldErrors).length > 0) {
+	if (!parsed.success) {
+		const fieldErrors = zodErrorToFieldErrors(parsed.error);
+		if (missingPasswordRequirements.length > 0) {
+			fieldErrors.password = passwordRequirementMessage(
+				missingPasswordRequirements
+			);
+		}
 		return { success: false, fieldErrors };
 	}
 
 	return {
 		success: true,
 		data: {
-			firstName,
-			lastName,
-			email,
-			emailNormalized,
-			password
+			firstName: parsed.data.firstName,
+			lastName: parsed.data.lastName,
+			email: parsed.data.email,
+			emailNormalized: normalizeEmail(parsed.data.email),
+			password: parsed.data.password
 		}
 	};
+}
+
+function zodErrorToFieldErrors(
+	error: z.ZodError<RegistrationInput>
+): RegistrationFieldErrors {
+	const fieldErrors: RegistrationFieldErrors = {};
+
+	for (const issue of error.issues) {
+		const field = issue.path[0];
+		if (
+			field === "firstName" ||
+			field === "lastName" ||
+			field === "email" ||
+			field === "password"
+		) {
+			fieldErrors[field] ??= issue.message;
+		}
+	}
+
+	return fieldErrors;
+}
+
+function passwordRequirementMessage(requirements: PasswordRequirement[]) {
+	return `Password is missing: ${requirements
+		.map((requirement) => requirement.label.toLowerCase())
+		.join(", ")}.`;
 }
 
 export function registrationInputFromFormData(

@@ -38,7 +38,7 @@ test.describe("Student registration and email verification", () => {
 			"Enter your email address."
 		);
 		await expect(page.getByTestId("register-password-error")).toHaveText(
-			"Password must be at least 8 characters."
+			"Password is missing: at least 8 characters, at least one lowercase letter, at least one number."
 		);
 	});
 
@@ -76,11 +76,20 @@ test.describe("Student registration and email verification", () => {
 		await page.getByTestId("register-submit").click();
 
 		await expect(page.getByTestId("register-password-error")).toHaveText(
-			"Password must be at least 8 characters."
+			"Password is missing: at least 8 characters."
 		);
+		await expect(
+			page.getByTestId("register-password-requirement-minimumLength")
+		).toHaveText("Required: At least 8 characters");
+		await expect(
+			page.getByTestId("register-password-requirement-lowercase")
+		).toHaveCount(0);
+		await expect(
+			page.getByTestId("register-password-requirement-number")
+		).toHaveCount(0);
 	});
 
-	test("shows validation error for password without letter and number", async ({
+	test("shows validation error for password without lowercase letter", async ({
 		page
 	}) => {
 		await page.goto("/register");
@@ -88,11 +97,25 @@ test.describe("Student registration and email verification", () => {
 		await page.getByTestId("register-first-name").fill(validRegistration.firstName);
 		await page.getByTestId("register-last-name").fill(validRegistration.lastName);
 		await page.getByTestId("register-email").fill(uniqueEmail());
-		await page.getByTestId("register-password").fill("12345678");
+		await page.getByTestId("register-password").fill("PASSWORD1");
 		await page.getByTestId("register-submit").click();
 
 		await expect(page.getByTestId("register-password-error")).toHaveText(
-			"Password must include a letter and a number."
+			"Password is missing: at least one lowercase letter."
+		);
+	});
+
+	test("shows validation error for password without number", async ({ page }) => {
+		await page.goto("/register");
+
+		await page.getByTestId("register-first-name").fill(validRegistration.firstName);
+		await page.getByTestId("register-last-name").fill(validRegistration.lastName);
+		await page.getByTestId("register-email").fill(uniqueEmail());
+		await page.getByTestId("register-password").fill("casework");
+		await page.getByTestId("register-submit").click();
+
+		await expect(page.getByTestId("register-password-error")).toHaveText(
+			"Password is missing: at least one number."
 		);
 	});
 
