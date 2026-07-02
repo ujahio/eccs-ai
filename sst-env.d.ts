@@ -19,10 +19,9 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Dynamo"
     }
-    "TransactionalEmail": {
-      "configSet": string
-      "sender": string
-      "type": "sst.aws.Email"
+    "ResendApiKey": {
+      "type": "sst.sst.Secret"
+      "value": string
     }
     "UserProfileTable": {
       "name": string
