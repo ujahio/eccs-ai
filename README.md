@@ -30,7 +30,7 @@ Keep secrets local. Do not commit `.env.local` or real credentials.
 
 Required local conventions:
 
-- `SST_STAGE=local`
+- `SST_STAGE=..`
 - `BETTER_AUTH_SECRET` is a local-only secret.
 - `BETTER_AUTH_URL=http://localhost:3001` for local Next.js development.
 - `MAILSURP_API_KEY` and `MAILSURP_INBOX_ID` are used for local email testing.
