@@ -35,7 +35,7 @@ bun run test:e2e
 bun run build
 ```
 
-The dev script runs `sst dev --stage local` and starts Next.js as the child app
+The dev script runs `sst dev --stage localdev` and starts Next.js as the child app
 on `http://localhost:3001`.
 Do not run `next dev` by itself for normal local development.
 
@@ -47,7 +47,7 @@ Before running SST locally:
 
 1. Confirm AWS OIDC authentication is configured for the app environment.
 2. Bootstrap or initialize SST only through SST's supported workflow.
-3. Run local infrastructure commands with `--stage local`.
+3. Run local infrastructure commands with `--stage localdev`.
 4. Configure Resend API credentials and sender/domain verification for production stages.
 5. Configure MailSurp credentials locally for test email flows.
 

@@ -1,3 +1,5 @@
+import type { PasswordRequirement } from "./schema";
+
 export type RegistrationField = "firstName" | "lastName" | "email" | "password";
 
 export type RegistrationFormValues = Record<RegistrationField, string>;
@@ -7,6 +9,7 @@ export type RegistrationFormState = {
 	message: string;
 	values: RegistrationFormValues;
 	errors: Partial<Record<RegistrationField, string[]>>;
+	failedPasswordRequirementIds: PasswordRequirement["id"][];
 };
 
 export type RegistrationAction = (
@@ -23,5 +26,6 @@ export const initialRegistrationFormState: RegistrationFormState = {
 		email: "",
 		password: ""
 	},
-	errors: {}
+	errors: {},
+	failedPasswordRequirementIds: []
 };

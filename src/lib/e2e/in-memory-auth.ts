@@ -1,3 +1,6 @@
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import type {
 	AuthSessionTokens,
 	LoginIdentityProvider,
@@ -39,10 +42,15 @@ type E2EAuthStoreShape = {
 };
 
 const GLOBAL_KEY = "__E2E_AUTH_STORE__";
+const EMAIL_STORE_PATH =
+	process.env.ECCS_E2E_EMAIL_STORE_PATH ??
+	join(tmpdir(), "eccs-ai-e2e-auth-emails.json");
 
 function getStore(): E2EAuthStoreShape {
-	if (!(globalThis as Record<string, unknown>)[GLOBAL_KEY]) {
-		(globalThis as Record<string, unknown>)[GLOBAL_KEY] = {
+	const processStore = process as NodeJS.Process & Record<string, unknown>;
+
+	if (!processStore[GLOBAL_KEY]) {
+		processStore[GLOBAL_KEY] = {
 			registrations: new Map(),
 			profiles: new Map(),
 			users: new Map(),
@@ -50,11 +58,22 @@ function getStore(): E2EAuthStoreShape {
 		};
 	}
 
-	return (globalThis as Record<string, unknown>)[GLOBAL_KEY] as E2EAuthStoreShape;
+	return processStore[GLOBAL_KEY] as E2EAuthStoreShape;
 }
 
 export function getE2EAuthStore() {
 	return getStore();
+}
+
+export function resetE2EAuthStore() {
+	const store = getStore();
+
+	store.registrations.clear();
+	store.profiles.clear();
+	store.users.clear();
+	store.emails = [];
+
+	rmSync(EMAIL_STORE_PATH, { force: true });
 }
 
 export function isE2EMode(): boolean {
@@ -230,20 +249,45 @@ export class InMemoryEmailSender implements RegistrationEmailSender {
 		verificationUrl: string;
 		expiresInHours: number;
 	}) {
-		getStore().emails.push({
+		const record = {
 			...email,
 			sentAt: Date.now()
-		});
+		};
+
+		getStore().emails.push(record);
+		appendEmailRecord(record);
 	}
 
 	getLastVerificationUrl(emailNormalized: string): string | null {
 		const store = getStore();
-		const record = [...store.emails]
+		const record = [...store.emails, ...readEmailRecords()]
 			.reverse()
 			.find((e) => e.to === emailNormalized);
 
 		return record?.verificationUrl ?? null;
 	}
+}
+
+function readEmailRecords(): E2EEmailRecord[] {
+	try {
+		const raw = readFileSync(EMAIL_STORE_PATH, "utf8");
+		const parsed = JSON.parse(raw);
+
+		return Array.isArray(parsed) ? parsed : [];
+	} catch {
+		return [];
+	}
+}
+
+function appendEmailRecord(record: E2EEmailRecord) {
+	const records = readEmailRecords();
+
+	mkdirSync(dirname(EMAIL_STORE_PATH), { recursive: true });
+	writeFileSync(
+		EMAIL_STORE_PATH,
+		JSON.stringify([...records, record], null, 2),
+		"utf8"
+	);
 }
 
 let sharedIdentity: InMemoryIdentityProvider | undefined;

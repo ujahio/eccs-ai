@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { createRegistrationService } from "./server";
-import { registrationInputFromFormData } from "./schema";
+import {
+	failedPasswordRequirements,
+	registrationInputFromFormData
+} from "./schema";
 import type { RegistrationServiceResult } from "./service";
 import type { RegistrationFormState } from "./state";
 import { submitRegistrationForm } from "./actions";
@@ -10,6 +13,7 @@ vi.mock("./server", () => ({
 	createRegistrationService: vi.fn()
 }));
 vi.mock("./schema", () => ({
+	failedPasswordRequirements: vi.fn(),
 	registrationInputFromFormData: vi.fn()
 }));
 
@@ -17,6 +21,7 @@ const mockedCreateRegistrationService = vi.mocked(createRegistrationService);
 const mockedRegistrationInputFromFormData = vi.mocked(
 	registrationInputFromFormData
 );
+const mockedFailedPasswordRequirements = vi.mocked(failedPasswordRequirements);
 
 const parsedInput = {
 	firstName: "Jordan",
@@ -29,7 +34,8 @@ const previousState: RegistrationFormState = {
 	status: "idle",
 	message: "",
 	values: { firstName: "", lastName: "", email: "", password: "" },
-	errors: {}
+	errors: {},
+	failedPasswordRequirementIds: []
 };
 
 function stubService(result: RegistrationServiceResult) {
@@ -37,6 +43,7 @@ function stubService(result: RegistrationServiceResult) {
 		registerStudent: vi.fn().mockResolvedValue(result)
 	} as never);
 	mockedRegistrationInputFromFormData.mockReturnValue(parsedInput);
+	mockedFailedPasswordRequirements.mockReturnValue([]);
 }
 
 describe("submitRegistrationForm", () => {
@@ -60,7 +67,8 @@ describe("submitRegistrationForm", () => {
 				email: "jordan@example.com",
 				password: ""
 			},
-			errors: {}
+			errors: {},
+			failedPasswordRequirementIds: []
 		});
 	});
 
@@ -73,6 +81,13 @@ describe("submitRegistrationForm", () => {
 				email: "Invalid email."
 			}
 		});
+		mockedFailedPasswordRequirements.mockReturnValue([
+			{
+				id: "minimumLength",
+				label: "At least 8 characters",
+				isMet: vi.fn()
+			}
+		]);
 
 		const result = await submitRegistrationForm(
 			previousState,
@@ -82,17 +97,18 @@ describe("submitRegistrationForm", () => {
 		expect(result).toEqual({
 			status: "error",
 			message: "Fix the errors below.",
-		values: {
-			firstName: "Jordan",
-			lastName: "Adebayo",
-			email: "jordan@example.com",
-			password: ""
-		},
-		errors: {
-			firstName: ["First name is required."],
-			email: ["Invalid email."]
-		}
-	});
+			values: {
+				firstName: "Jordan",
+				lastName: "Adebayo",
+				email: "jordan@example.com",
+				password: ""
+			},
+			errors: {
+				firstName: ["First name is required."],
+				email: ["Invalid email."]
+			},
+			failedPasswordRequirementIds: ["minimumLength"]
+		});
 	});
 
 	it("returns notice state when resend is blocked", async () => {
@@ -115,7 +131,8 @@ describe("submitRegistrationForm", () => {
 				email: "jordan@example.com",
 				password: ""
 			},
-			errors: {}
+			errors: {},
+			failedPasswordRequirementIds: []
 		});
 	});
 
@@ -139,7 +156,8 @@ describe("submitRegistrationForm", () => {
 				email: "jordan@example.com",
 				password: ""
 			},
-			errors: {}
+			errors: {},
+			failedPasswordRequirementIds: []
 		});
 	});
 

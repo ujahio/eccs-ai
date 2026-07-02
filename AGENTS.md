@@ -107,3 +107,10 @@ SST component files must live under `infra/` and be imported from inside
 in `sst.config.ts`, and do not use top-level imports in `sst.config.ts`.
 Component files should instantiate resources as exported constants, for example
 `export const client = new sst.aws.Nextjs(...)`.
+
+Scripts that interact with resources created by SST must be TypeScript files
+under `scripts/` and read linked resource names or IDs from `Resource` imported
+from `sst`. Run those scripts through `sst shell`, for example
+`bunx sst shell --stage localdev -- bun scripts/example.ts`, so linked resources
+are available to the process. Do not duplicate SST resource names in standalone
+environment variables.

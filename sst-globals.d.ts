@@ -1,1 +1,1 @@
-/// <reference path="./.sst/platform/config.d.ts" />
+import "./.sst/platform/config.d.ts";

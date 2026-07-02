@@ -30,6 +30,7 @@
 		"sst.config.ts",
 		"sst-globals.d.ts",
 		"infra/**/*.ts",
+		"scripts/**/*.ts",
 		"src/**/*.ts",
 		"src/**/*.tsx",
 		"tests/**/*.ts",

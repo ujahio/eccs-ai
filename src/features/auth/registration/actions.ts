@@ -1,7 +1,10 @@
 "use server";
 
 import { createRegistrationService } from "./server";
-import { registrationInputFromFormData } from "./schema";
+import {
+	failedPasswordRequirements,
+	registrationInputFromFormData
+} from "./schema";
 import type { RegistrationFormState } from "./state";
 
 export async function submitRegistrationForm(
@@ -25,7 +28,10 @@ export async function submitRegistrationForm(
 			status: "error",
 			message: result.message,
 			values,
-			errors: toFormErrors(result.fieldErrors)
+			errors: toFormErrors(result.fieldErrors),
+			failedPasswordRequirementIds: failedPasswordRequirements(
+				input.password
+			).map((requirement) => requirement.id)
 		};
 	}
 
@@ -34,7 +40,8 @@ export async function submitRegistrationForm(
 			status: "notice",
 			message: result.message,
 			values,
-			errors: {}
+			errors: {},
+			failedPasswordRequirementIds: []
 		};
 	}
 
@@ -43,7 +50,8 @@ export async function submitRegistrationForm(
 			status: "error",
 			message: result.message,
 			values,
-			errors: {}
+			errors: {},
+			failedPasswordRequirementIds: []
 		};
 	}
 
@@ -56,7 +64,8 @@ export async function submitRegistrationForm(
 			email: input.email,
 			password: ""
 		},
-		errors: {}
+		errors: {},
+		failedPasswordRequirementIds: []
 	};
 }
 

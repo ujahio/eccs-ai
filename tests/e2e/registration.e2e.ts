@@ -11,6 +11,9 @@ async function fetchVerificationUrl(
 	const response = await request.get(
 		`/api/e2e/auth/verification-link?email=${encodeURIComponent(email)}`
 	);
+
+	expect(response.ok()).toBe(true);
+
 	const body = await response.json();
 
 	return body.verificationUrl;
@@ -23,6 +26,19 @@ const validRegistration = {
 };
 
 test.describe("Student registration and email verification", () => {
+	test.beforeAll(async ({ request }) => {
+		const response = await request.get("/api/e2e/auth/state");
+
+		expect(response.ok()).toBe(true);
+		expect(response.status()).toBe(200);
+	});
+
+	test.afterEach(async ({ request }) => {
+		const response = await request.delete("/api/e2e/auth/state");
+
+		expect(response.ok()).toBe(true);
+	});
+
 	test("shows validation errors for empty submission", async ({ page }) => {
 		await page.goto("/register");
 
@@ -76,7 +92,7 @@ test.describe("Student registration and email verification", () => {
 		await page.getByTestId("register-submit").click();
 
 		await expect(page.getByTestId("register-password-error")).toHaveText(
-			"Password is missing: at least 8 characters."
+			"Password is missing: at least 8 characters, at least one number."
 		);
 		await expect(
 			page.getByTestId("register-password-requirement-minimumLength")
@@ -86,7 +102,7 @@ test.describe("Student registration and email verification", () => {
 		).toHaveCount(0);
 		await expect(
 			page.getByTestId("register-password-requirement-number")
-		).toHaveCount(0);
+		).toHaveText("Required: At least one number");
 	});
 
 	test("shows validation error for password without lowercase letter", async ({

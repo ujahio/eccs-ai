@@ -5,9 +5,17 @@ import { useActionState, useState } from "react";
 import { ArrowRightIcon } from "@/components/ui/arrow-right-icon";
 import { Button } from "@/components/ui/button";
 import {
+	AuthStatusMessage,
+	PasswordVisibilityToggle,
+	authPasswordInputClasses,
+	fieldError,
+	inputClasses,
+	passwordShellClasses,
+	type StatusTone
+} from "@/features/auth/form-helpers";
+import {
 	initialLoginFormState,
 	type LoginAction,
-	type LoginField,
 	type LoginFormState
 } from "./state";
 
@@ -16,33 +24,6 @@ type LoginFormProps = {
   initialState?: LoginFormState;
 };
 
-const inputBaseClasses =
-  "h-11 w-full border bg-white px-3 text-sm text-primary-text outline-none transition placeholder:text-disabled-gray focus:border-brand-teal";
-
-const passwordShellBaseClasses =
-  "flex h-11 items-center border bg-white transition focus-within:border-brand-teal";
-
-function fieldError(
-  state: LoginFormState,
-  field: LoginField
-): string | undefined {
-  return state.errors[field]?.[0];
-}
-
-function inputClasses(hasError: boolean) {
-  return `${inputBaseClasses} ${
-    hasError ? "border-error-red focus:border-error-red" : "border-border-gray"
-  }`;
-}
-
-function passwordShellClasses(hasError: boolean) {
-  return `${passwordShellBaseClasses} ${
-    hasError
-      ? "border-error-red focus-within:border-error-red"
-      : "border-border-gray"
-  }`;
-}
-
 function StatusMessage({ state }: { state: LoginFormState }) {
   if (!state.message) {
     return null;
@@ -50,28 +31,25 @@ function StatusMessage({ state }: { state: LoginFormState }) {
 
   const isBlocked = state.status === "blocked";
   const isSuccess = state.status === "success";
+  const tone: StatusTone = isSuccess
+    ? "success"
+    : isBlocked
+      ? "warning"
+      : "error";
+  const testId = isSuccess
+    ? "login-success-message"
+    : isBlocked
+      ? "login-blocked-message"
+      : "login-error-message";
 
   return (
-    <p
-      aria-live="polite"
-      className={`mt-6 border px-4 py-3 text-sm leading-6 ${
-        isSuccess
-          ? "border-success-mint bg-success-soft text-primary-text"
-          : isBlocked
-          ? "border-warning-gold bg-app-canvas text-primary-text"
-          : "border-error-red bg-white text-error-red"
-      }`}
-      data-testid={
-        isSuccess
-          ? "login-success-message"
-          : isBlocked
-            ? "login-blocked-message"
-            : "login-error-message"
-      }
+    <AuthStatusMessage
       role={state.status === "error" ? "alert" : "status"}
+      testId={testId}
+      tone={tone}
     >
       {state.message}
-    </p>
+    </AuthStatusMessage>
   );
 }
 
@@ -132,7 +110,7 @@ export function LoginForm({ action, initialState }: LoginFormProps) {
               }
               aria-invalid={Boolean(passwordError)}
               autoComplete="current-password"
-              className="min-w-0 flex-1 bg-transparent px-3 text-sm text-primary-text outline-none placeholder:text-disabled-gray"
+              className={authPasswordInputClasses}
               data-testid="login-password"
               defaultValue={state.values.password}
               id="login-password"
@@ -141,15 +119,11 @@ export function LoginForm({ action, initialState }: LoginFormProps) {
               placeholder="Password"
               type={showPassword ? "text" : "password"}
             />
-            <button
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              className="h-full px-3 text-[10px] font-bold uppercase text-primary-action transition hover:text-brand-teal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal"
-              data-testid="login-password-toggle"
-              onClick={() => setShowPassword((visible) => !visible)}
-              type="button"
-            >
-              {showPassword ? "Hide" : "Show"}
-            </button>
+            <PasswordVisibilityToggle
+              isVisible={showPassword}
+              onToggle={() => setShowPassword((visible) => !visible)}
+              testId="login-password-toggle"
+            />
           </span>
           {passwordError ? (
             <p

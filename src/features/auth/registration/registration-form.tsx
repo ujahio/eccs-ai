@@ -1,13 +1,22 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { ArrowRightIcon } from "@/components/ui/arrow-right-icon";
 import { Button } from "@/components/ui/button";
+import {
+	AuthStatusMessage,
+	PasswordVisibilityToggle,
+	authPasswordInputClasses,
+	fieldError,
+	inputClasses,
+	passwordShellClasses,
+	type StatusTone,
+} from "@/features/auth/form-helpers";
 import { PASSWORD_REQUIREMENTS, failedPasswordRequirements } from "./schema";
+import type { PasswordRequirement } from "./schema";
 import {
 	initialRegistrationFormState,
 	type RegistrationAction,
-	type RegistrationField,
 	type RegistrationFormState,
 } from "./state";
 
@@ -16,42 +25,19 @@ type RegistrationFormProps = {
 	initialState?: RegistrationFormState;
 };
 
-const inputBaseClasses =
-	"h-11 w-full border bg-white px-3 text-sm leading-normal text-primary-text outline-none transition placeholder:text-disabled-gray focus:border-brand-teal";
-
-const passwordShellBaseClasses =
-	"flex h-11 items-center border bg-white transition focus-within:border-brand-teal";
-
-function fieldError(
-	state: RegistrationFormState,
-	field: RegistrationField,
-): string | undefined {
-	return state.errors[field]?.[0];
-}
-
-function inputClasses(hasError: boolean) {
-	return `${inputBaseClasses} ${
-		hasError ? "border-error-red focus:border-error-red" : "border-border-gray"
-	}`;
-}
-
-function passwordShellClasses(hasError: boolean) {
-	return `${passwordShellBaseClasses} ${
-		hasError
-			? "border-error-red focus-within:border-error-red"
-			: "border-border-gray"
-	}`;
-}
-
 function PasswordRequirements({
+	failedRequirementIds,
 	password,
 	showFailed,
 }: {
+	failedRequirementIds?: PasswordRequirement["id"][];
 	password: string;
 	showFailed: boolean;
 }) {
 	const failedIds = new Set(
-		failedPasswordRequirements(password).map((requirement) => requirement.id),
+		password
+			? failedPasswordRequirements(password).map((requirement) => requirement.id)
+			: (failedRequirementIds ?? []),
 	);
 	const failedRequirements = PASSWORD_REQUIREMENTS.filter((requirement) =>
 		failedIds.has(requirement.id),
@@ -70,7 +56,6 @@ function PasswordRequirements({
 			{failedRequirements.map((requirement) => {
 				return (
 					<li
-						aria-invalid
 						className="text-error-red"
 						data-testid={`register-password-requirement-${requirement.id}`}
 						key={requirement.id}
@@ -90,27 +75,86 @@ function StatusMessage({ state }: { state: RegistrationFormState }) {
 
 	const isSuccess = state.status === "success";
 	const isNotice = state.status === "notice";
-	const statusClasses = isSuccess
-		? "border-success-mint bg-success-soft text-primary-text"
+	const tone: StatusTone = isSuccess
+		? "success"
 		: isNotice
-			? "border-warning-gold bg-app-canvas text-primary-text"
-			: "border-error-red bg-white text-error-red";
+			? "warning"
+			: "error";
+	const testId = isSuccess
+		? "register-success-message"
+		: isNotice
+			? "register-resend-notice"
+			: "register-error-message";
 
 	return (
-		<p
-			aria-live="polite"
-			className={`mt-6 border px-4 py-3 text-sm leading-6 ${statusClasses}`}
-			data-testid={
-				isSuccess
-					? "register-success-message"
-					: isNotice
-						? "register-resend-notice"
-						: "register-error-message"
-			}
+		<AuthStatusMessage
 			role={state.status === "error" ? "alert" : "status"}
+			testId={testId}
+			tone={tone}
 		>
 			{state.message}
-		</p>
+		</AuthStatusMessage>
+	);
+}
+
+function PasswordField({
+	failedRequirementIds,
+	passwordError,
+}: {
+	failedRequirementIds: PasswordRequirement["id"][];
+	passwordError?: string;
+}) {
+	const [showPassword, setShowPassword] = useState(false);
+	const [passwordValue, setPasswordValue] = useState("");
+	const showFailedPasswordRequirements = Boolean(passwordError);
+
+	return (
+		<div className="grid gap-2">
+			<label
+				className="text-xs font-medium text-muted-gray"
+				htmlFor="register-password"
+			>
+				Password
+			</label>
+			<span className={passwordShellClasses(Boolean(passwordError))}>
+				<input
+					aria-describedby={
+						passwordError
+							? "register-password-error register-password-requirements"
+							: undefined
+					}
+					aria-invalid={Boolean(passwordError)}
+					autoComplete="new-password"
+					className={authPasswordInputClasses}
+					data-testid="register-password"
+					id="register-password"
+					name="password"
+					onChange={(event) => setPasswordValue(event.target.value)}
+					placeholder="Password"
+					type={showPassword ? "text" : "password"}
+					value={passwordValue}
+				/>
+				<PasswordVisibilityToggle
+					isVisible={showPassword}
+					onToggle={() => setShowPassword((visible) => !visible)}
+					testId="register-password-toggle"
+				/>
+			</span>
+			<PasswordRequirements
+				failedRequirementIds={failedRequirementIds}
+				password={passwordValue}
+				showFailed={showFailedPasswordRequirements}
+			/>
+			{passwordError ? (
+				<p
+					className="text-xs font-medium leading-5 text-error-red"
+					data-testid="register-password-error"
+					id="register-password-error"
+				>
+					{passwordError}
+				</p>
+			) : null}
+		</div>
 	);
 }
 
@@ -118,11 +162,6 @@ export function RegistrationForm({
 	action,
 	initialState,
 }: RegistrationFormProps) {
-	const [showPassword, setShowPassword] = useState(false);
-	const [passwordValue, setPasswordValue] = useState(
-		initialState?.values.password ??
-			initialRegistrationFormState.values.password,
-	);
 	const [state, formAction, isPending] = useActionState(
 		action,
 		initialState ?? initialRegistrationFormState,
@@ -131,13 +170,8 @@ export function RegistrationForm({
 	const lastNameError = fieldError(state, "lastName");
 	const emailError = fieldError(state, "email");
 	const passwordError = fieldError(state, "password");
-	const showFailedPasswordRequirements = Boolean(passwordError);
-
-	useEffect(() => {
-		if (state.status === "success") {
-			setPasswordValue("");
-		}
-	}, [state.status]);
+	const passwordFieldKey =
+		state.status === "success" ? `success-${state.message}` : "editing";
 
 	return (
 		<form action={formAction} className="mt-7" data-testid="register-form">
@@ -239,56 +273,11 @@ export function RegistrationForm({
 					) : null}
 				</div>
 
-				<div className="grid gap-2">
-					<label
-						className="text-xs font-medium text-muted-gray"
-						htmlFor="register-password"
-					>
-						Password
-					</label>
-					<span className={passwordShellClasses(Boolean(passwordError))}>
-						<input
-							aria-describedby={
-								passwordError
-									? "register-password-error register-password-requirements"
-									: undefined
-							}
-							aria-invalid={Boolean(passwordError)}
-							autoComplete="new-password"
-							className="min-w-0 flex-1 bg-transparent px-3 text-sm text-primary-text outline-none placeholder:text-disabled-gray"
-							data-testid="register-password"
-							id="register-password"
-							key={`register-password-${state.status}-${state.message}`}
-							name="password"
-							onChange={(event) => setPasswordValue(event.target.value)}
-							placeholder="Password"
-							type={showPassword ? "text" : "password"}
-							value={passwordValue}
-						/>
-						<button
-							aria-label={showPassword ? "Hide password" : "Show password"}
-							className="h-full px-3 text-[10px] font-bold uppercase text-primary-action transition hover:text-brand-teal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal"
-							data-testid="register-password-toggle"
-							onClick={() => setShowPassword((visible) => !visible)}
-							type="button"
-						>
-							{showPassword ? "Hide" : "Show"}
-						</button>
-					</span>
-					<PasswordRequirements
-						password={passwordValue}
-						showFailed={showFailedPasswordRequirements}
-					/>
-					{passwordError ? (
-						<p
-							className="text-xs font-medium leading-5 text-error-red"
-							data-testid="register-password-error"
-							id="register-password-error"
-						>
-							{passwordError}
-						</p>
-					) : null}
-				</div>
+				<PasswordField
+					key={passwordFieldKey}
+					passwordError={passwordError}
+					failedRequirementIds={state.failedPasswordRequirementIds}
+				/>
 			</div>
 
 			<StatusMessage state={state} />

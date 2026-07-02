@@ -45,7 +45,6 @@ export type VerificationServiceResult =
 export type RegistrationServiceConfig = {
 	appBaseUrl: string;
 	verificationTtlSeconds?: number;
-	resendWindowSeconds?: number;
 	maxSendsPerWindow?: number;
 	now?: () => number;
 	generateToken?: () => string;
@@ -59,7 +58,6 @@ export type RegistrationServiceDependencies = {
 };
 
 const DEFAULT_VERIFICATION_TTL_SECONDS = 24 * 60 * 60;
-const DEFAULT_RESEND_WINDOW_SECONDS = 60 * 60;
 const DEFAULT_MAX_SENDS_PER_WINDOW = 3;
 
 export class RegistrationService {
@@ -80,9 +78,6 @@ export class RegistrationService {
 			verificationTtlSeconds:
 				dependencies.config.verificationTtlSeconds ??
 				DEFAULT_VERIFICATION_TTL_SECONDS,
-			resendWindowSeconds:
-				dependencies.config.resendWindowSeconds ??
-				DEFAULT_RESEND_WINDOW_SECONDS,
 			maxSendsPerWindow:
 				dependencies.config.maxSendsPerWindow ?? DEFAULT_MAX_SENDS_PER_WINDOW,
 			now: dependencies.config.now ?? (() => Math.floor(Date.now() / 1000)),
@@ -163,7 +158,9 @@ export class RegistrationService {
 		await this.sendVerificationEmail({
 			emailNormalized: parsed.data.emailNormalized,
 			firstName: parsed.data.firstName,
-			token
+			token,
+			expiresAt,
+			now
 		});
 
 		return {
@@ -270,13 +267,7 @@ export class RegistrationService {
 		firstName: string
 	): Promise<RegistrationServiceResult> {
 		const now = this.config.now();
-		const shouldResetWindow =
-			now - registration.rateLimitWindowStartedAt >=
-			this.config.resendWindowSeconds;
-		const windowStartedAt = shouldResetWindow
-			? now
-			: registration.rateLimitWindowStartedAt;
-		const sendCount = shouldResetWindow ? 0 : registration.sendCount;
+		const sendCount = registration.sendCount;
 
 		if (sendCount >= this.config.maxSendsPerWindow) {
 			return {
@@ -287,25 +278,26 @@ export class RegistrationService {
 		}
 
 		const token = this.createToken();
-		const expiresAt = now + this.config.verificationTtlSeconds;
 
 		await this.repository.replaceVerificationToken(
 			registration.emailNormalized,
 			{
 				verificationTokenHash: hashVerificationToken(token),
-				expiresAt,
+				expiresAt: registration.expiresAt,
 				sendCount: sendCount + 1,
 				lastSentAt: now,
-				rateLimitWindowStartedAt: windowStartedAt,
+				rateLimitWindowStartedAt: registration.rateLimitWindowStartedAt,
 				updatedAt: now,
-				ttl: expiresAt + 7 * 24 * 60 * 60
+				ttl: registration.ttl
 			}
 		);
 
 		await this.sendVerificationEmail({
 			emailNormalized: registration.emailNormalized,
 			firstName,
-			token
+			token,
+			expiresAt: registration.expiresAt,
+			now
 		});
 
 		return {
@@ -318,13 +310,19 @@ export class RegistrationService {
 		emailNormalized: string;
 		firstName: string;
 		token: string;
+		expiresAt: number;
+		now: number;
 	}) {
 		await this.email.sendRegistrationVerificationEmail({
 			to: input.emailNormalized,
 			firstName: input.firstName,
 			verificationUrl: this.verificationUrl(input.token),
-			expiresInHours: this.config.verificationTtlSeconds / 60 / 60
+			expiresInHours: this.hoursUntil(input.expiresAt, input.now)
 		});
+	}
+
+	private hoursUntil(expiresAt: number, now: number) {
+		return Math.max(1, Math.ceil((expiresAt - now) / 60 / 60));
 	}
 
 	private verificationUrl(token: string) {

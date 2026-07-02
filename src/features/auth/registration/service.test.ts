@@ -145,11 +145,18 @@ class FakeIdentityProvider implements RegistrationIdentityProvider {
 }
 
 class FakeEmailSender implements RegistrationEmailSender {
-	sent: Array<{ to: string; verificationUrl: string }> = [];
+	sent: Array<{
+		to: string;
+		firstName: string;
+		verificationUrl: string;
+		expiresInHours: number;
+	}> = [];
 
 	async sendRegistrationVerificationEmail(email: {
 		to: string;
+		firstName: string;
 		verificationUrl: string;
+		expiresInHours: number;
 	}) {
 		this.sent.push(email);
 	}
@@ -227,11 +234,12 @@ describe("RegistrationService", () => {
 	});
 
 	it("treats duplicate active registrations as resends without mutating name or password", async () => {
-		const { email, identity, repository, service } = createHarness({
+		const { email, identity, repository, service, setNow } = createHarness({
 			tokens: ["first-token", "second-token"]
 		});
 
 		await service.registerStudent(validInput);
+		setNow(2_000);
 		const result = await service.registerStudent({
 			firstName: "Changed",
 			lastName: "Name",
@@ -248,7 +256,13 @@ describe("RegistrationService", () => {
 			firstName: "Jordan",
 			lastName: "Adebayo",
 			sendCount: 2,
+			expiresAt: 87_400,
+			ttl: 692_200,
 			verificationTokenHash: hashVerificationToken("second-token")
+		});
+		expect(email.sent[1]).toMatchObject({
+			firstName: "Changed",
+			expiresInHours: 24
 		});
 	});
 
@@ -267,6 +281,31 @@ describe("RegistrationService", () => {
 				"Maximum requests reached. Try again after the verification link expires."
 		});
 		expect(email.sent).toHaveLength(1);
+	});
+
+	it("keeps resend blocking active until the original verification expires", async () => {
+		const { email, repository, service, setNow } = createHarness({
+			maxSendsPerWindow: 1,
+			tokens: ["first-token", "second-token"]
+		});
+
+		await service.registerStudent(validInput);
+		setNow(5_000);
+		const result = await service.registerStudent(validInput);
+
+		expect(result).toMatchObject({
+			status: "resend_blocked",
+			message:
+				"Maximum requests reached. Try again after the verification link expires."
+		});
+		expect(email.sent).toHaveLength(1);
+		expect(
+			repository.registrations.get("jordan@example.com")
+		).toMatchObject({
+			sendCount: 1,
+			expiresAt: 87_400,
+			ttl: 692_200
+		});
 	});
 
 	it("rejects expired verification tokens", async () => {
@@ -333,7 +372,7 @@ describe("RegistrationService", () => {
 	});
 
 	it("cleans up expired pending registrations and returns the count", async () => {
-		const { identity, repository, service, setNow } = createHarness({
+		const { identity, repository, service } = createHarness({
 			now: 5_000
 		});
 
