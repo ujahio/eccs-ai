@@ -17,21 +17,19 @@ export function createRegistrationService() {
 			email,
 			config: {
 				appBaseUrl:
-					process.env.NEXT_PUBLIC_APP_URL ??
-					process.env.APP_URL ??
-					"http://localhost:3001"
-			}
+					process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001",
+			},
 		});
 	}
 
 	const resources = getAuthResources();
 	const repository = new DynamoAuthRepository(
 		resources.registrationWorkflowTableName,
-		resources.userProfileTableName
+		resources.userProfileTableName,
 	);
 	const identity = new CognitoAuthAdapter(
 		resources.userPoolId,
-		resources.userPoolClientId
+		resources.userPoolClientId,
 	);
 	const email = new SesRegistrationEmailSender(resources.emailSender);
 
@@ -40,7 +38,7 @@ export function createRegistrationService() {
 		identity,
 		email,
 		config: {
-			appBaseUrl: resources.appBaseUrl
-		}
+			appBaseUrl: resources.appBaseUrl,
+		},
 	});
 }

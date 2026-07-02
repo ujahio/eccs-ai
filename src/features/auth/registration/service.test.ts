@@ -18,6 +18,7 @@ class InMemoryRegistrationRepository
 {
 	registrations = new Map<string, PendingRegistrationRecord>();
 	profiles = new Map<string, StudentProfileRecord>();
+	deleteErrors = new Set<string>();
 
 	async getPendingByEmail(emailNormalized: string) {
 		return this.registrations.get(emailNormalized) ?? null;
@@ -99,16 +100,32 @@ class InMemoryRegistrationRepository
 	}
 
 	async deletePendingRegistration(emailNormalized: string) {
+		if (this.deleteErrors.has(emailNormalized)) {
+			throw new Error(`Failed to delete ${emailNormalized}`);
+		}
 		this.registrations.delete(emailNormalized);
 	}
 
-	async recordCleanupFailure() {}
+	cleanupFailures: Array<{
+		emailNormalized: string;
+		attemptedAt: number;
+		error: string;
+	}> = [];
+
+	async recordCleanupFailure(args: {
+		emailNormalized: string;
+		attemptedAt: number;
+		error: string;
+	}) {
+		this.cleanupFailures.push(args);
+	}
 }
 
 class FakeIdentityProvider implements RegistrationIdentityProvider {
 	created: CreatePendingStudentInput[] = [];
 	confirmed: string[] = [];
 	deleted: string[] = [];
+	deleteErrors = new Set<string>();
 
 	async createPendingStudent(input: CreatePendingStudentInput) {
 		this.created.push(input);
@@ -120,6 +137,9 @@ class FakeIdentityProvider implements RegistrationIdentityProvider {
 	}
 
 	async deletePendingStudent(emailNormalized: string) {
+		if (this.deleteErrors.has(emailNormalized)) {
+			throw new Error(`Failed to delete ${emailNormalized}`);
+		}
 		this.deleted.push(emailNormalized);
 	}
 }
@@ -310,5 +330,148 @@ describe("RegistrationService", () => {
 			role: "student",
 			canAccessCases: true
 		});
+	});
+
+	it("cleans up expired pending registrations and returns the count", async () => {
+		const { identity, repository, service, setNow } = createHarness({
+			now: 5_000
+		});
+
+		repository.registrations.set("a@example.com", {
+			emailNormalized: "a@example.com",
+			firstName: "A",
+			lastName: "User",
+			cognitoSub: "sub-a",
+			verificationTokenHash: "hash-a",
+			expiresAt: 4_000,
+			sendCount: 1,
+			lastSentAt: 3_000,
+			rateLimitWindowStartedAt: 3_000,
+			createdAt: 3_000,
+			updatedAt: 3_000,
+			ttl: 4_000,
+			status: "pending"
+		});
+		repository.registrations.set("b@example.com", {
+			emailNormalized: "b@example.com",
+			firstName: "B",
+			lastName: "User",
+			cognitoSub: "sub-b",
+			verificationTokenHash: "hash-b",
+			expiresAt: 6_000,
+			sendCount: 1,
+			lastSentAt: 3_000,
+			rateLimitWindowStartedAt: 3_000,
+			createdAt: 3_000,
+			updatedAt: 3_000,
+			ttl: 6_000,
+			status: "pending"
+		});
+
+		const result = await service.cleanupExpiredPendingRegistrations();
+
+		expect(result).toEqual({ deleted: 1 });
+		expect(identity.deleted).toEqual(["a@example.com"]);
+		expect(repository.registrations.has("a@example.com")).toBe(false);
+		expect(repository.registrations.has("b@example.com")).toBe(true);
+	});
+
+	it("respects the limit parameter", async () => {
+		const { repository, service } = createHarness({ now: 5_000 });
+
+		const makeRecord = (email: string, expiresAt: number): PendingRegistrationRecord => ({
+			emailNormalized: email,
+			firstName: "Test",
+			lastName: "User",
+			cognitoSub: `sub-${email}`,
+			verificationTokenHash: `hash-${email}`,
+			expiresAt,
+			sendCount: 1,
+			lastSentAt: 3_000,
+			rateLimitWindowStartedAt: 3_000,
+			createdAt: 3_000,
+			updatedAt: 3_000,
+			ttl: expiresAt,
+			status: "pending"
+		});
+
+		repository.registrations.set("a@example.com", makeRecord("a@example.com", 2_000));
+		repository.registrations.set("b@example.com", makeRecord("b@example.com", 3_000));
+		repository.registrations.set("c@example.com", makeRecord("c@example.com", 4_000));
+
+		const result = await service.cleanupExpiredPendingRegistrations(2);
+
+		expect(result).toEqual({ deleted: 2 });
+		expect(repository.registrations.size).toBe(1);
+		expect(repository.registrations.has("c@example.com")).toBe(true);
+	});
+
+	it("records cleanup failure when identity delete throws", async () => {
+		const { identity, repository, service } = createHarness({ now: 5_000 });
+		identity.deleteErrors.add("fail@example.com");
+
+		repository.registrations.set("fail@example.com", {
+			emailNormalized: "fail@example.com",
+			firstName: "Fail",
+			lastName: "User",
+			cognitoSub: "sub-fail",
+			verificationTokenHash: "hash-fail",
+			expiresAt: 4_000,
+			sendCount: 1,
+			lastSentAt: 3_000,
+			rateLimitWindowStartedAt: 3_000,
+			createdAt: 3_000,
+			updatedAt: 3_000,
+			ttl: 4_000,
+			status: "pending"
+		});
+
+		const result = await service.cleanupExpiredPendingRegistrations();
+
+		expect(result).toEqual({ deleted: 1 });
+		expect(repository.cleanupFailures).toHaveLength(1);
+		expect(repository.cleanupFailures[0]).toMatchObject({
+			emailNormalized: "fail@example.com",
+			error: "Failed to delete fail@example.com"
+		});
+		expect(repository.registrations.has("fail@example.com")).toBe(true);
+	});
+
+	it("records cleanup failure when repository delete throws", async () => {
+		const { repository, service } = createHarness({ now: 5_000 });
+		repository.deleteErrors.add("repo-fail@example.com");
+
+		repository.registrations.set("repo-fail@example.com", {
+			emailNormalized: "repo-fail@example.com",
+			firstName: "Repo",
+			lastName: "Fail",
+			cognitoSub: "sub-repo-fail",
+			verificationTokenHash: "hash-repo-fail",
+			expiresAt: 4_000,
+			sendCount: 1,
+			lastSentAt: 3_000,
+			rateLimitWindowStartedAt: 3_000,
+			createdAt: 3_000,
+			updatedAt: 3_000,
+			ttl: 4_000,
+			status: "pending"
+		});
+
+		const result = await service.cleanupExpiredPendingRegistrations();
+
+		expect(result).toEqual({ deleted: 1 });
+		expect(repository.cleanupFailures).toHaveLength(1);
+		expect(repository.cleanupFailures[0]).toMatchObject({
+			emailNormalized: "repo-fail@example.com",
+			error: "Failed to delete repo-fail@example.com"
+		});
+	});
+
+	it("returns zero when no expired registrations exist", async () => {
+		const { service } = createHarness({ now: 5_000 });
+
+		const result = await service.cleanupExpiredPendingRegistrations();
+
+		expect(result).toEqual({ deleted: 0 });
 	});
 });
