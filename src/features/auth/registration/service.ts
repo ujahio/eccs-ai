@@ -114,7 +114,6 @@ export class RegistrationService {
 			);
 		}
 
-		const token = this.createToken();
 		const expiresAt = now + this.config.verificationTtlSeconds;
 		const ttl = expiresAt + 7 * 24 * 60 * 60;
 
@@ -125,6 +124,7 @@ export class RegistrationService {
 				lastName: parsed.data.lastName,
 				password: parsed.data.password
 			});
+			const token = this.createToken();
 
 			await this.repository.createPendingRegistration({
 				emailNormalized: parsed.data.emailNormalized,
@@ -141,11 +141,27 @@ export class RegistrationService {
 				ttl,
 				status: "pending"
 			});
+
+			await this.sendVerificationEmail({
+				emailNormalized: parsed.data.emailNormalized,
+				firstName: parsed.data.firstName,
+				token,
+				expiresAt,
+				now
+			});
 		} catch (error) {
 			if (
 				error instanceof StudentAlreadyExistsError ||
 				error instanceof DuplicatePendingRegistrationError
 			) {
+				const pending = await this.repository.getPendingByEmail(
+					parsed.data.emailNormalized
+				);
+
+				if (pending && !pending.consumedAt && pending.expiresAt > now) {
+					return this.handlePendingResend(pending, parsed.data.firstName);
+				}
+
 				return {
 					status: "account_exists",
 					message: "An account already exists for this email. Please sign in."
@@ -154,14 +170,6 @@ export class RegistrationService {
 
 			throw error;
 		}
-
-		await this.sendVerificationEmail({
-			emailNormalized: parsed.data.emailNormalized,
-			firstName: parsed.data.firstName,
-			token,
-			expiresAt,
-			now
-		});
 
 		return {
 			status: "verification_sent",
@@ -202,6 +210,15 @@ export class RegistrationService {
 			};
 		}
 
+		await this.identity.confirmStudentEmail({
+			emailNormalized: registration.emailNormalized,
+			firstName: registration.firstName,
+			lastName: registration.lastName
+		});
+		await this.repository.upsertStudentProfile(
+			this.toStudentProfile(registration, now)
+		);
+
 		try {
 			await this.repository.consumeVerificationToken({
 				emailNormalized: registration.emailNormalized,
@@ -218,15 +235,6 @@ export class RegistrationService {
 
 			throw error;
 		}
-
-		await this.identity.confirmStudentEmail({
-			emailNormalized: registration.emailNormalized,
-			firstName: registration.firstName,
-			lastName: registration.lastName
-		});
-		await this.repository.upsertStudentProfile(
-			this.toStudentProfile(registration, now)
-		);
 
 		return {
 			status: "verified",

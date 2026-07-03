@@ -37,7 +37,8 @@ export class DynamoAuthRepository
 		const response = await this.documentClient.send(
 			new GetCommand({
 				TableName: this.registrationTableName,
-				Key: { emailNormalized }
+				Key: { emailNormalized },
+				ConsistentRead: true
 			})
 		);
 

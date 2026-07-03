@@ -4,6 +4,7 @@ import type {
 	CreatePendingStudentInput,
 	RegistrationIdentityProvider
 } from "./identity";
+import { StudentAlreadyExistsError } from "./identity";
 import type {
 	PendingRegistrationRecord,
 	RegistrationWorkflowRepository,
@@ -19,8 +20,14 @@ class InMemoryRegistrationRepository
 	registrations = new Map<string, PendingRegistrationRecord>();
 	profiles = new Map<string, StudentProfileRecord>();
 	deleteErrors = new Set<string>();
+	stalePendingReads = new Set<string>();
 
 	async getPendingByEmail(emailNormalized: string) {
+		if (this.stalePendingReads.has(emailNormalized)) {
+			this.stalePendingReads.delete(emailNormalized);
+			return null;
+		}
+
 		return this.registrations.get(emailNormalized) ?? null;
 	}
 
@@ -126,13 +133,26 @@ class FakeIdentityProvider implements RegistrationIdentityProvider {
 	confirmed: string[] = [];
 	deleted: string[] = [];
 	deleteErrors = new Set<string>();
+	confirmErrors = new Set<string>();
 
 	async createPendingStudent(input: CreatePendingStudentInput) {
+		if (
+			this.created.some(
+				(created) => created.emailNormalized === input.emailNormalized
+			)
+		) {
+			throw new StudentAlreadyExistsError();
+		}
+
 		this.created.push(input);
 		return { cognitoSub: `sub-${input.emailNormalized}` };
 	}
 
 	async confirmStudentEmail(args: { emailNormalized: string }) {
+		if (this.confirmErrors.has(args.emailNormalized)) {
+			throw new Error(`Failed to confirm ${args.emailNormalized}`);
+		}
+
 		this.confirmed.push(args.emailNormalized);
 	}
 
@@ -266,6 +286,29 @@ describe("RegistrationService", () => {
 		});
 	});
 
+	it("resends when Cognito already has the active pending student", async () => {
+		const { email, identity, repository, service, setNow } = createHarness({
+			tokens: ["first-token", "second-token"]
+		});
+
+		await service.registerStudent(validInput);
+		repository.stalePendingReads.add("jordan@example.com");
+		setNow(2_000);
+
+		const result = await service.registerStudent(validInput);
+
+		expect(result.status).toBe("verification_sent");
+		expect(identity.created).toHaveLength(1);
+		expect(email.sent).toHaveLength(2);
+		expect(
+			repository.registrations.get("jordan@example.com")
+		).toMatchObject({
+			sendCount: 2,
+			expiresAt: 87_400,
+			verificationTokenHash: hashVerificationToken("second-token")
+		});
+	});
+
 	it("rate-limits repeated verification resends", async () => {
 		const { email, service } = createHarness({
 			maxSendsPerWindow: 1,
@@ -369,6 +412,35 @@ describe("RegistrationService", () => {
 			role: "student",
 			canAccessCases: true
 		});
+	});
+
+	it("does not consume the verification token when Cognito confirmation fails", async () => {
+		const { identity, repository, service } = createHarness({ now: 2_000 });
+		identity.confirmErrors.add("jordan@example.com");
+		repository.registrations.set("jordan@example.com", {
+			emailNormalized: "jordan@example.com",
+			firstName: "Jordan",
+			lastName: "Adebayo",
+			cognitoSub: "sub-jordan@example.com",
+			verificationTokenHash: hashVerificationToken("valid-token"),
+			expiresAt: 3_000,
+			sendCount: 1,
+			lastSentAt: 1_000,
+			rateLimitWindowStartedAt: 1_000,
+			createdAt: 1_000,
+			updatedAt: 1_000,
+			ttl: 3_000,
+			status: "pending"
+		});
+
+		await expect(service.verifyEmail("valid-token")).rejects.toThrow(
+			"Failed to confirm jordan@example.com"
+		);
+		const registration = repository.registrations.get("jordan@example.com");
+
+		expect(registration?.consumedAt).toBeUndefined();
+		expect(registration?.status).toBe("pending");
+		expect(repository.profiles.size).toBe(0);
 	});
 
 	it("cleans up expired pending registrations and returns the count", async () => {
