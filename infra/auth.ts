@@ -1,5 +1,3 @@
-import { CognitoUserGroup } from "./components/cognito-user-group";
-
 export const userPool = new sst.aws.CognitoUserPool("AuthUserPool", {
 	usernames: ["email"],
 	transform: {
@@ -32,13 +30,13 @@ export const userPoolClient = userPool.addClient("AuthUserPoolClient", {
 	}
 });
 
-export const studentGroup = new CognitoUserGroup("StudentGroup", {
+export const studentGroup = new aws.cognito.UserGroup("StudentGroup", {
 	userPoolId: userPool.id,
 	name: "student",
 	description: "Student learner accounts"
 });
 
-export const teacherGroup = new CognitoUserGroup("TeacherGroup", {
+export const teacherGroup = new aws.cognito.UserGroup("TeacherGroup", {
 	userPoolId: userPool.id,
 	name: "teacher",
 	description: "Teacher educator accounts"
