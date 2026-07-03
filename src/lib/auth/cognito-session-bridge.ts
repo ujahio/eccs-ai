@@ -4,6 +4,7 @@ import { createAuthEndpoint } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
 import type { BetterAuthPlugin, User } from "better-auth";
 import { z } from "zod";
+import { toFormErrors } from "@/features/auth/form-errors";
 import {
 	InvalidLoginCredentialsError,
 	LoginBlockedUntilVerifiedError,
@@ -289,18 +290,6 @@ function loginRedirectUrl(
 	url.searchParams.set("auth", status);
 
 	return url.toString();
-}
-
-function toFormErrors(
-	fieldErrors: Partial<Record<"email" | "password", string | undefined>>,
-): Partial<Record<"email" | "password", string[]>> {
-	return Object.fromEntries(
-		Object.entries(fieldErrors)
-			.filter((entry): entry is ["email" | "password", string] =>
-				Boolean(entry[1]),
-			)
-			.map(([field, error]) => [field, [error]]),
-	);
 }
 
 function isHtmlFormRequest(headers: Headers) {

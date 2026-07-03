@@ -23,6 +23,7 @@ import type {
 	StudentProfileRecord
 } from "@/features/auth/registration/repository";
 import {
+	VerificationResendLimitExceededError,
 	VerificationTokenAlreadyConsumedError
 } from "@/features/auth/registration/repository";
 
@@ -166,9 +167,9 @@ export class InMemoryRegistrationRepository
 		update: {
 			previousVerificationTokenHash: string;
 			verificationTokenHash: string;
-			sendCount: number;
 			lastSentAt: number;
 			updatedAt: number;
+			maxSendsPerWindow: number;
 		}
 	) {
 		const store = getStore();
@@ -176,6 +177,10 @@ export class InMemoryRegistrationRepository
 
 		if (!existing) {
 			throw new Error("Missing registration");
+		}
+
+		if (existing.sendCount >= update.maxSendsPerWindow) {
+			throw new VerificationResendLimitExceededError();
 		}
 
 		store.registrations.set(emailNormalized, {
@@ -187,7 +192,7 @@ export class InMemoryRegistrationRepository
 				]),
 				update.verificationTokenHash,
 			],
-			sendCount: update.sendCount,
+			sendCount: existing.sendCount + 1,
 			lastSentAt: update.lastSentAt,
 			updatedAt: update.updatedAt,
 		});

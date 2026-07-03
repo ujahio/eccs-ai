@@ -1,6 +1,7 @@
 "use server";
 
 import { createRegistrationService } from "./server";
+import { toFormErrors } from "../form-errors";
 import {
 	failedPasswordRequirements,
 	registrationInputFromFormData
@@ -67,14 +68,4 @@ export async function submitRegistrationForm(
 		errors: {},
 		failedPasswordRequirementIds: []
 	};
-}
-
-function toFormErrors(
-	fieldErrors: Record<string, string | undefined>
-): RegistrationFormState["errors"] {
-	return Object.fromEntries(
-		Object.entries(fieldErrors)
-			.filter((entry): entry is [string, string] => Boolean(entry[1]))
-			.map(([field, error]) => [field, [error]])
-	) as RegistrationFormState["errors"];
 }

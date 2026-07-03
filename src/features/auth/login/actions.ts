@@ -1,6 +1,7 @@
 "use server";
 
 import { createLoginService } from "./server";
+import { toFormErrors } from "../form-errors";
 import { loginInputFromFormData } from "./schema";
 import type { LoginFormState } from "./state";
 
@@ -61,14 +62,4 @@ export async function submitLoginForm(
 		values,
 		errors: {}
 	};
-}
-
-function toFormErrors(
-	fieldErrors: Record<string, string | undefined>
-): LoginFormState["errors"] {
-	return Object.fromEntries(
-		Object.entries(fieldErrors)
-			.filter((entry): entry is [string, string] => Boolean(entry[1]))
-			.map(([field, error]) => [field, [error]])
-	) as LoginFormState["errors"];
 }

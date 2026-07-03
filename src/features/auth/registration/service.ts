@@ -8,6 +8,7 @@ import type {
 } from "./repository";
 import {
 	DuplicatePendingRegistrationError,
+	VerificationResendLimitExceededError,
 	VerificationTokenAlreadyConsumedError
 } from "./repository";
 import {
@@ -279,25 +280,26 @@ export class RegistrationService {
 		const sendCount = registration.sendCount;
 
 		if (sendCount >= this.config.maxSendsPerWindow) {
-			return {
-				status: "resend_blocked",
-				message:
-					"Maximum requests reached. Try again after the verification link expires."
-			};
+			return this.resendBlocked();
 		}
 
 		const token = this.createToken();
 
-		await this.repository.addVerificationToken(
-			registration.emailNormalized,
-			{
+		try {
+			await this.repository.addVerificationToken(registration.emailNormalized, {
 				previousVerificationTokenHash: registration.verificationTokenHash,
 				verificationTokenHash: hashVerificationToken(token),
-				sendCount: sendCount + 1,
 				lastSentAt: now,
-				updatedAt: now
+				updatedAt: now,
+				maxSendsPerWindow: this.config.maxSendsPerWindow
+			});
+		} catch (error) {
+			if (error instanceof VerificationResendLimitExceededError) {
+				return this.resendBlocked();
 			}
-		);
+
+			throw error;
+		}
 
 		await this.sendVerificationEmail({
 			emailNormalized: registration.emailNormalized,
@@ -310,6 +312,14 @@ export class RegistrationService {
 		return {
 			status: "verification_sent",
 			message: "Verification email sent. Please check your inbox."
+		};
+	}
+
+	private resendBlocked(): RegistrationServiceResult {
+		return {
+			status: "resend_blocked",
+			message:
+				"Maximum requests reached. Try again after the verification link expires."
 		};
 	}
 

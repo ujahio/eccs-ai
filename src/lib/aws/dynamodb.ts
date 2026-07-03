@@ -18,6 +18,7 @@ import type {
 } from "@/features/auth/registration/repository";
 import {
 	DuplicatePendingRegistrationError,
+	VerificationResendLimitExceededError,
 	VerificationTokenAlreadyConsumedError
 } from "@/features/auth/registration/repository";
 
@@ -69,35 +70,48 @@ export class DynamoAuthRepository
 		update: {
 			previousVerificationTokenHash: string;
 			verificationTokenHash: string;
-			sendCount: number;
 			lastSentAt: number;
 			updatedAt: number;
+			maxSendsPerWindow: number;
 		}
 	) {
-		await this.documentClient.send(
-			new UpdateCommand({
-				TableName: this.registrationTableName,
-				Key: { emailNormalized },
-				UpdateExpression:
-					[
-						"SET verificationTokenHash = :tokenHash",
-						"verificationTokenHashes = list_append(if_not_exists(verificationTokenHashes, :existingTokenHashes), :newTokenHashes)",
-						"sendCount = :sendCount",
-						"lastSentAt = :lastSentAt",
-						"updatedAt = :updatedAt",
-					].join(", "),
-				ConditionExpression:
-					"attribute_exists(emailNormalized) AND attribute_not_exists(consumedAt)",
-				ExpressionAttributeValues: {
-					":tokenHash": update.verificationTokenHash,
-					":existingTokenHashes": [update.previousVerificationTokenHash],
-					":newTokenHashes": [update.verificationTokenHash],
-					":sendCount": update.sendCount,
-					":lastSentAt": update.lastSentAt,
-					":updatedAt": update.updatedAt
-				}
-			})
-		);
+		try {
+			await this.documentClient.send(
+				new UpdateCommand({
+					TableName: this.registrationTableName,
+					Key: { emailNormalized },
+					UpdateExpression:
+						[
+							"SET verificationTokenHash = :tokenHash",
+							"verificationTokenHashes = list_append(if_not_exists(verificationTokenHashes, :existingTokenHashes), :newTokenHashes)",
+							"sendCount = sendCount + :sendIncrement",
+							"lastSentAt = :lastSentAt",
+							"updatedAt = :updatedAt",
+						].join(", "),
+					ConditionExpression:
+						[
+							"attribute_exists(emailNormalized)",
+							"attribute_not_exists(consumedAt)",
+							"sendCount < :maxSendsPerWindow",
+						].join(" AND "),
+					ExpressionAttributeValues: {
+						":tokenHash": update.verificationTokenHash,
+						":existingTokenHashes": [update.previousVerificationTokenHash],
+						":newTokenHashes": [update.verificationTokenHash],
+						":sendIncrement": 1,
+						":lastSentAt": update.lastSentAt,
+						":updatedAt": update.updatedAt,
+						":maxSendsPerWindow": update.maxSendsPerWindow
+					}
+				})
+			);
+		} catch (error) {
+			if (errorName(error) === "ConditionalCheckFailedException") {
+				throw new VerificationResendLimitExceededError();
+			}
+
+			throw error;
+		}
 	}
 
 	async findPendingByTokenHash(verificationTokenHash: string) {

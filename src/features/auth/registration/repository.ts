@@ -47,6 +47,13 @@ export class VerificationTokenAlreadyConsumedError extends Error {
 	}
 }
 
+export class VerificationResendLimitExceededError extends Error {
+	constructor() {
+		super("The verification resend limit has been reached.");
+		this.name = "VerificationResendLimitExceededError";
+	}
+}
+
 export interface RegistrationWorkflowRepository {
 	getPendingByEmail(
 		emailNormalized: string
@@ -57,9 +64,9 @@ export interface RegistrationWorkflowRepository {
 		update: {
 			previousVerificationTokenHash: string;
 			verificationTokenHash: string;
-			sendCount: number;
 			lastSentAt: number;
 			updatedAt: number;
+			maxSendsPerWindow: number;
 		}
 	): Promise<void>;
 	findPendingByTokenHash(

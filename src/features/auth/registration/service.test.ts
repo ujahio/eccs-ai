@@ -10,7 +10,10 @@ import type {
 	RegistrationWorkflowRepository,
 	StudentProfileRecord
 } from "./repository";
-import { VerificationTokenAlreadyConsumedError } from "./repository";
+import {
+	VerificationResendLimitExceededError,
+	VerificationTokenAlreadyConsumedError
+} from "./repository";
 import { RegistrationService } from "./service";
 import { hashVerificationToken } from "./tokens";
 
@@ -40,15 +43,19 @@ class InMemoryRegistrationRepository
 		update: {
 			previousVerificationTokenHash: string;
 			verificationTokenHash: string;
-			sendCount: number;
 			lastSentAt: number;
 			updatedAt: number;
+			maxSendsPerWindow: number;
 		}
 	) {
 		const existing = this.registrations.get(emailNormalized);
 
 		if (!existing) {
 			throw new Error("Missing registration");
+		}
+
+		if (existing.sendCount >= update.maxSendsPerWindow) {
+			throw new VerificationResendLimitExceededError();
 		}
 
 		this.registrations.set(emailNormalized, {
@@ -60,7 +67,7 @@ class InMemoryRegistrationRepository
 				]),
 				update.verificationTokenHash,
 			],
-			sendCount: update.sendCount,
+			sendCount: existing.sendCount + 1,
 			lastSentAt: update.lastSentAt,
 			updatedAt: update.updatedAt,
 		});
@@ -357,6 +364,27 @@ describe("RegistrationService", () => {
 		});
 
 		await service.registerStudent(validInput);
+		const result = await service.registerStudent(validInput);
+
+		expect(result).toMatchObject({
+			status: "resend_blocked",
+			message:
+				"Maximum requests reached. Try again after the verification link expires."
+		});
+		expect(email.sent).toHaveLength(1);
+	});
+
+	it("blocks resend when a concurrent update consumes the final send slot", async () => {
+		const { email, repository, service } = createHarness({
+			maxSendsPerWindow: 2,
+			tokens: ["first-token", "second-token"]
+		});
+
+		await service.registerStudent(validInput);
+		repository.addVerificationToken = async () => {
+			throw new VerificationResendLimitExceededError();
+		};
+
 		const result = await service.registerStudent(validInput);
 
 		expect(result).toMatchObject({
