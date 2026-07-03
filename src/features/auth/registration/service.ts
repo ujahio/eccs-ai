@@ -104,7 +104,7 @@ export class RegistrationService {
 		);
 
 		if (existing && !existing.consumedAt && existing.expiresAt > now) {
-			return this.handlePendingResend(existing, parsed.data.firstName);
+			return this.handlePendingResend(existing);
 		}
 
 		if (existing && !existing.consumedAt && existing.expiresAt <= now) {
@@ -125,13 +125,15 @@ export class RegistrationService {
 				password: parsed.data.password
 			});
 			const token = this.createToken();
+			const tokenHash = hashVerificationToken(token);
 
 			await this.repository.createPendingRegistration({
 				emailNormalized: parsed.data.emailNormalized,
 				firstName: parsed.data.firstName,
 				lastName: parsed.data.lastName,
 				cognitoSub: pendingStudent.cognitoSub,
-				verificationTokenHash: hashVerificationToken(token),
+				verificationTokenHash: tokenHash,
+				verificationTokenHashes: [tokenHash],
 				expiresAt,
 				sendCount: 1,
 				lastSentAt: now,
@@ -159,7 +161,7 @@ export class RegistrationService {
 				);
 
 				if (pending && !pending.consumedAt && pending.expiresAt > now) {
-					return this.handlePendingResend(pending, parsed.data.firstName);
+					return this.handlePendingResend(pending);
 				}
 
 				return {
@@ -271,8 +273,7 @@ export class RegistrationService {
 	}
 
 	private async handlePendingResend(
-		registration: PendingRegistrationRecord,
-		firstName: string
+		registration: PendingRegistrationRecord
 	): Promise<RegistrationServiceResult> {
 		const now = this.config.now();
 		const sendCount = registration.sendCount;
@@ -287,22 +288,20 @@ export class RegistrationService {
 
 		const token = this.createToken();
 
-		await this.repository.replaceVerificationToken(
+		await this.repository.addVerificationToken(
 			registration.emailNormalized,
 			{
+				previousVerificationTokenHash: registration.verificationTokenHash,
 				verificationTokenHash: hashVerificationToken(token),
-				expiresAt: registration.expiresAt,
 				sendCount: sendCount + 1,
 				lastSentAt: now,
-				rateLimitWindowStartedAt: registration.rateLimitWindowStartedAt,
-				updatedAt: now,
-				ttl: registration.ttl
+				updatedAt: now
 			}
 		);
 
 		await this.sendVerificationEmail({
 			emailNormalized: registration.emailNormalized,
-			firstName,
+			firstName: registration.firstName,
 			token,
 			expiresAt: registration.expiresAt,
 			now

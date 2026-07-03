@@ -7,6 +7,7 @@ import {
 	GetCommand,
 	PutCommand,
 	QueryCommand,
+	ScanCommand,
 	UpdateCommand
 } from "@aws-sdk/lib-dynamodb";
 import type { LoginProfileRepository } from "@/features/auth/login/service";
@@ -63,38 +64,37 @@ export class DynamoAuthRepository
 		}
 	}
 
-	async replaceVerificationToken(
+	async addVerificationToken(
 		emailNormalized: string,
-		update: Pick<
-			PendingRegistrationRecord,
-			| "verificationTokenHash"
-			| "expiresAt"
-			| "sendCount"
-			| "lastSentAt"
-			| "rateLimitWindowStartedAt"
-			| "updatedAt"
-			| "ttl"
-		>
+		update: {
+			previousVerificationTokenHash: string;
+			verificationTokenHash: string;
+			sendCount: number;
+			lastSentAt: number;
+			updatedAt: number;
+		}
 	) {
 		await this.documentClient.send(
 			new UpdateCommand({
 				TableName: this.registrationTableName,
 				Key: { emailNormalized },
 				UpdateExpression:
-					"SET verificationTokenHash = :tokenHash, expiresAt = :expiresAt, sendCount = :sendCount, lastSentAt = :lastSentAt, rateLimitWindowStartedAt = :windowStartedAt, updatedAt = :updatedAt, #ttl = :ttl",
+					[
+						"SET verificationTokenHash = :tokenHash",
+						"verificationTokenHashes = list_append(if_not_exists(verificationTokenHashes, :existingTokenHashes), :newTokenHashes)",
+						"sendCount = :sendCount",
+						"lastSentAt = :lastSentAt",
+						"updatedAt = :updatedAt",
+					].join(", "),
 				ConditionExpression:
 					"attribute_exists(emailNormalized) AND attribute_not_exists(consumedAt)",
-				ExpressionAttributeNames: {
-					"#ttl": "ttl"
-				},
 				ExpressionAttributeValues: {
 					":tokenHash": update.verificationTokenHash,
-					":expiresAt": update.expiresAt,
+					":existingTokenHashes": [update.previousVerificationTokenHash],
+					":newTokenHashes": [update.verificationTokenHash],
 					":sendCount": update.sendCount,
 					":lastSentAt": update.lastSentAt,
-					":windowStartedAt": update.rateLimitWindowStartedAt,
-					":updatedAt": update.updatedAt,
-					":ttl": update.ttl
+					":updatedAt": update.updatedAt
 				}
 			})
 		);
@@ -113,9 +113,14 @@ export class DynamoAuthRepository
 			})
 		);
 
-		return (
-			(response.Items?.[0] as PendingRegistrationRecord | undefined) ?? null
-		);
+		const indexed =
+			(response.Items?.[0] as PendingRegistrationRecord | undefined) ?? null;
+
+		if (indexed) {
+			return indexed;
+		}
+
+		return this.scanPendingByTokenHash(verificationTokenHash);
 	}
 
 	async consumeVerificationToken(args: {
@@ -131,7 +136,12 @@ export class DynamoAuthRepository
 					UpdateExpression:
 						"SET consumedAt = :consumedAt, #status = :verified, updatedAt = :consumedAt",
 					ConditionExpression:
-						"verificationTokenHash = :tokenHash AND attribute_not_exists(consumedAt)",
+						[
+							"(verificationTokenHash = :tokenHash",
+							"OR (attribute_exists(verificationTokenHashes)",
+							"AND contains(verificationTokenHashes, :tokenHash)))",
+							"AND attribute_not_exists(consumedAt)",
+						].join(" "),
 					ExpressionAttributeNames: {
 						"#status": "status"
 					},
@@ -235,6 +245,34 @@ export class DynamoAuthRepository
 				}
 			})
 		);
+	}
+
+	private async scanPendingByTokenHash(verificationTokenHash: string) {
+		let ExclusiveStartKey: Record<string, unknown> | undefined;
+
+		do {
+			const response = await this.documentClient.send(
+				new ScanCommand({
+					TableName: this.registrationTableName,
+					FilterExpression:
+						"attribute_exists(verificationTokenHashes) AND contains(verificationTokenHashes, :tokenHash)",
+					ExpressionAttributeValues: {
+						":tokenHash": verificationTokenHash
+					},
+					ExclusiveStartKey
+				})
+			);
+			const match =
+				(response.Items?.[0] as PendingRegistrationRecord | undefined) ?? null;
+
+			if (match) {
+				return match;
+			}
+
+			ExclusiveStartKey = response.LastEvaluatedKey;
+		} while (ExclusiveStartKey);
+
+		return null;
 	}
 }
 

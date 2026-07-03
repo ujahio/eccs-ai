@@ -247,6 +247,8 @@ test.describe("Student registration and email verification", () => {
 
 		await expect(page.getByTestId("register-success-message")).toBeVisible();
 
+		const firstVerificationUrl = await fetchVerificationUrl(request, email);
+
 		await page.getByTestId("register-first-name").fill("Changed");
 		await page.getByTestId("register-last-name").fill("Name");
 		await page.getByTestId("register-email").fill(email);
@@ -260,6 +262,14 @@ test.describe("Student registration and email verification", () => {
 		const verificationUrl = await fetchVerificationUrl(request, email);
 
 		expect(verificationUrl).toContain("/verify-email?token=");
+		expect(verificationUrl).not.toBe(firstVerificationUrl);
+
+		await page.goto(firstVerificationUrl);
+
+		await expect(page).toHaveURL(/\/login\?verification=verified/);
+		await expect(page.getByTestId("login-success-message")).toHaveText(
+			"Your email has been verified. Please sign in."
+		);
 	});
 
 	test("rate-limits repeated verification resends", async ({ page }) => {

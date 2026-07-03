@@ -161,18 +161,15 @@ export class InMemoryRegistrationRepository
 		getStore().registrations.set(record.emailNormalized, record);
 	}
 
-	async replaceVerificationToken(
+	async addVerificationToken(
 		emailNormalized: string,
-		update: Pick<
-			PendingRegistrationRecord,
-			| "verificationTokenHash"
-			| "expiresAt"
-			| "sendCount"
-			| "lastSentAt"
-			| "rateLimitWindowStartedAt"
-			| "updatedAt"
-			| "ttl"
-		>
+		update: {
+			previousVerificationTokenHash: string;
+			verificationTokenHash: string;
+			sendCount: number;
+			lastSentAt: number;
+			updatedAt: number;
+		}
 	) {
 		const store = getStore();
 		const existing = store.registrations.get(emailNormalized);
@@ -181,13 +178,27 @@ export class InMemoryRegistrationRepository
 			throw new Error("Missing registration");
 		}
 
-		store.registrations.set(emailNormalized, { ...existing, ...update });
+		store.registrations.set(emailNormalized, {
+			...existing,
+			verificationTokenHash: update.verificationTokenHash,
+			verificationTokenHashes: [
+				...(existing.verificationTokenHashes ?? [
+					update.previousVerificationTokenHash,
+				]),
+				update.verificationTokenHash,
+			],
+			sendCount: update.sendCount,
+			lastSentAt: update.lastSentAt,
+			updatedAt: update.updatedAt,
+		});
 	}
 
 	async findPendingByTokenHash(verificationTokenHash: string) {
 		return (
 			Array.from(getStore().registrations.values()).find(
-				(record) => record.verificationTokenHash === verificationTokenHash
+				(record) =>
+					record.verificationTokenHash === verificationTokenHash ||
+					record.verificationTokenHashes?.includes(verificationTokenHash)
 			) ?? null
 		);
 	}
@@ -203,7 +214,10 @@ export class InMemoryRegistrationRepository
 		if (
 			!existing ||
 			existing.consumedAt ||
-			existing.verificationTokenHash !== args.verificationTokenHash
+			!(
+				existing.verificationTokenHash === args.verificationTokenHash ||
+				existing.verificationTokenHashes?.includes(args.verificationTokenHash)
+			)
 		) {
 			throw new VerificationTokenAlreadyConsumedError();
 		}

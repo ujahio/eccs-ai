@@ -6,6 +6,7 @@ export type PendingRegistrationRecord = {
 	lastName: string;
 	cognitoSub: string;
 	verificationTokenHash: string;
+	verificationTokenHashes?: string[];
 	expiresAt: number;
 	consumedAt?: number;
 	sendCount: number;
@@ -51,18 +52,15 @@ export interface RegistrationWorkflowRepository {
 		emailNormalized: string
 	): Promise<PendingRegistrationRecord | null>;
 	createPendingRegistration(record: PendingRegistrationRecord): Promise<void>;
-	replaceVerificationToken(
+	addVerificationToken(
 		emailNormalized: string,
-		update: Pick<
-			PendingRegistrationRecord,
-			| "verificationTokenHash"
-			| "expiresAt"
-			| "sendCount"
-			| "lastSentAt"
-			| "rateLimitWindowStartedAt"
-			| "updatedAt"
-			| "ttl"
-		>
+		update: {
+			previousVerificationTokenHash: string;
+			verificationTokenHash: string;
+			sendCount: number;
+			lastSentAt: number;
+			updatedAt: number;
+		}
 	): Promise<void>;
 	findPendingByTokenHash(
 		verificationTokenHash: string

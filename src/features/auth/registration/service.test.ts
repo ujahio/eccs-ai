@@ -35,18 +35,15 @@ class InMemoryRegistrationRepository
 		this.registrations.set(record.emailNormalized, record);
 	}
 
-	async replaceVerificationToken(
+	async addVerificationToken(
 		emailNormalized: string,
-		update: Pick<
-			PendingRegistrationRecord,
-			| "verificationTokenHash"
-			| "expiresAt"
-			| "sendCount"
-			| "lastSentAt"
-			| "rateLimitWindowStartedAt"
-			| "updatedAt"
-			| "ttl"
-		>
+		update: {
+			previousVerificationTokenHash: string;
+			verificationTokenHash: string;
+			sendCount: number;
+			lastSentAt: number;
+			updatedAt: number;
+		}
 	) {
 		const existing = this.registrations.get(emailNormalized);
 
@@ -56,14 +53,25 @@ class InMemoryRegistrationRepository
 
 		this.registrations.set(emailNormalized, {
 			...existing,
-			...update
+			verificationTokenHash: update.verificationTokenHash,
+			verificationTokenHashes: [
+				...(existing.verificationTokenHashes ?? [
+					update.previousVerificationTokenHash,
+				]),
+				update.verificationTokenHash,
+			],
+			sendCount: update.sendCount,
+			lastSentAt: update.lastSentAt,
+			updatedAt: update.updatedAt,
 		});
 	}
 
 	async findPendingByTokenHash(verificationTokenHash: string) {
 		return (
 			Array.from(this.registrations.values()).find(
-				(record) => record.verificationTokenHash === verificationTokenHash
+				(record) =>
+					record.verificationTokenHash === verificationTokenHash ||
+					record.verificationTokenHashes?.includes(verificationTokenHash)
 			) ?? null
 		);
 	}
@@ -78,7 +86,10 @@ class InMemoryRegistrationRepository
 		if (
 			!existing ||
 			existing.consumedAt ||
-			existing.verificationTokenHash !== args.verificationTokenHash
+			!(
+				existing.verificationTokenHash === args.verificationTokenHash ||
+				existing.verificationTokenHashes?.includes(args.verificationTokenHash)
+			)
 		) {
 			throw new VerificationTokenAlreadyConsumedError();
 		}
@@ -249,7 +260,8 @@ describe("RegistrationService", () => {
 			lastName: "Adebayo",
 			sendCount: 1,
 			expiresAt: 87_400,
-			verificationTokenHash: hashVerificationToken("verify-me")
+			verificationTokenHash: hashVerificationToken("verify-me"),
+			verificationTokenHashes: [hashVerificationToken("verify-me")]
 		});
 	});
 
@@ -278,10 +290,14 @@ describe("RegistrationService", () => {
 			sendCount: 2,
 			expiresAt: 87_400,
 			ttl: 692_200,
-			verificationTokenHash: hashVerificationToken("second-token")
+			verificationTokenHash: hashVerificationToken("second-token"),
+			verificationTokenHashes: [
+				hashVerificationToken("first-token"),
+				hashVerificationToken("second-token")
+			]
 		});
 		expect(email.sent[1]).toMatchObject({
-			firstName: "Changed",
+			firstName: "Jordan",
 			expiresInHours: 24
 		});
 	});
@@ -305,7 +321,32 @@ describe("RegistrationService", () => {
 		).toMatchObject({
 			sendCount: 2,
 			expiresAt: 87_400,
-			verificationTokenHash: hashVerificationToken("second-token")
+			verificationTokenHash: hashVerificationToken("second-token"),
+			verificationTokenHashes: [
+				hashVerificationToken("first-token"),
+				hashVerificationToken("second-token")
+			]
+		});
+	});
+
+	it("keeps earlier verification links valid after a resend", async () => {
+		const { identity, repository, service, setNow } = createHarness({
+			tokens: ["first-token", "second-token"]
+		});
+
+		await service.registerStudent(validInput);
+		setNow(2_000);
+		await service.registerStudent(validInput);
+
+		const result = await service.verifyEmail("first-token");
+
+		expect(result.status).toBe("verified");
+		expect(identity.confirmed).toEqual(["jordan@example.com"]);
+		expect(
+			repository.registrations.get("jordan@example.com")
+		).toMatchObject({
+			consumedAt: 2_000,
+			status: "verified"
 		});
 	});
 
