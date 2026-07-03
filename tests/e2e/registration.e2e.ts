@@ -66,9 +66,8 @@ async function submitRegistrationRepeatedly(
 	values: RegistrationFormValues,
 	count: number
 ) {
-	await page.goto("/register");
-
 	for (let i = 0; i < count; i++) {
+		await page.goto("/register");
 		await submitRegistrationForm(page, values);
 		await expect(page.getByTestId("register-success-message")).toBeVisible();
 	}
