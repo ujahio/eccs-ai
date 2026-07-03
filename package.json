@@ -6,14 +6,15 @@
 	"packageManager": "bun@1.3.10",
 	"scripts": {
 		"dev": "bunx sst dev --stage localdev",
-		"dev:e2e": "AUTH_E2E_MODE=memory NEXT_PUBLIC_APP_URL=http://127.0.0.1:3001 bunx sst dev --stage localdev",
+		"dev:e2e": "AUTH_E2E_MODE=memory bunx sst dev --stage localdev",
 		"build": "bunx next build --webpack",
 		"start": "bunx next start",
 		"lint": "bunx eslint .",
 		"typecheck": "bunx tsc --noEmit --incremental false",
 		"test": "bunx vitest run",
 		"test:e2e": "bunx playwright test",
-		"test:e2e:local": "AUTH_E2E_MODE=memory PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001 bunx playwright test",
+		"test:e2e:memory": "AUTH_E2E_MODE=memory bunx playwright test",
+		"test:e2e:local": "bun run test:e2e:memory",
 		"cleanup:e2e-registrations": "bunx sst shell --stage localdev -- bun scripts/cleanup-e2e-registrations.ts",
 		"sst:dev": "bun run dev",
 		"sst:remove": "bunx sst remove --stage localdev"
