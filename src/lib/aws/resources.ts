@@ -35,41 +35,43 @@ export function getAuthResources() {
 	return {
 		...sessionResources,
 		registrationWorkflowTableName: required(
-			linkedValue(() => linkedResources.RegistrationWorkflowTable?.name) ??
-				process.env.REGISTRATION_WORKFLOW_TABLE_NAME,
+			linkedValue(() => linkedResources.RegistrationWorkflowTable?.name),
 			"RegistrationWorkflowTable.name",
 		),
 		emailSender:
 			process.env.ECCS_EMAIL_SENDER ?? "no-reply@contact.eccs-online.xyz",
 		resendApiKey: required(
-			linkedValue(() => linkedResources.ResendApiKey?.value) ??
-				process.env.RESEND_API_KEY,
+			linkedValue(() => linkedResources.ResendApiKey?.value),
 			"ResendApiKey.value",
 		),
 	};
 }
 
 export function getSessionAuthResources() {
+	const e2eMode = isE2EMode();
+
 	return {
-		userPoolId: required(
-			linkedValue(() => linkedResources.AuthUserPool?.id) ??
-				process.env.COGNITO_USER_POOL_ID,
-			"AuthUserPool.id",
-		),
-		userPoolClientId: required(
-			linkedValue(() => linkedResources.AuthUserPoolClient?.id) ??
-				process.env.COGNITO_USER_POOL_CLIENT_ID,
-			"AuthUserPoolClient.id",
-		),
-		userProfileTableName: required(
-			linkedValue(() => linkedResources.UserProfileTable?.name) ??
-				process.env.USER_PROFILE_TABLE_NAME,
-			"UserProfileTable.name",
-		),
+		userPoolId: e2eMode
+			? "e2e-auth-user-pool"
+			: required(
+					linkedValue(() => linkedResources.AuthUserPool?.id),
+					"AuthUserPool.id",
+				),
+		userPoolClientId: e2eMode
+			? "e2e-auth-user-pool-client"
+			: required(
+					linkedValue(() => linkedResources.AuthUserPoolClient?.id),
+					"AuthUserPoolClient.id",
+				),
+		userProfileTableName: e2eMode
+			? "e2e-user-profile-table"
+			: required(
+					linkedValue(() => linkedResources.UserProfileTable?.name),
+					"UserProfileTable.name",
+				),
 		betterAuthSecret: required(
 			linkedValue(() => linkedResources.BetterAuthSecret?.value) ??
-				process.env.BETTER_AUTH_SECRET ??
-				(isE2EMode()
+				(e2eMode
 					? "eccs-e2e-better-auth-secret-for-local-tests-only"
 					: undefined),
 			"BetterAuthSecret.value",

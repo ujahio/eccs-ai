@@ -13,9 +13,6 @@ describe("auth", () => {
 	it("configures a DB-less Better Auth route handler", async () => {
 		process.env.AUTH_E2E_MODE = "memory";
 		process.env.BETTER_AUTH_URL = "http://localhost:3001";
-		process.env.COGNITO_USER_POOL_ID = "us-east-1_example";
-		process.env.COGNITO_USER_POOL_CLIENT_ID = "client-id";
-		process.env.USER_PROFILE_TABLE_NAME = "profiles";
 
 		const { auth } = await import("./auth");
 		const response = await auth.handler(
@@ -27,4 +24,3 @@ describe("auth", () => {
 		expect(body).toEqual({ ok: true });
 	});
 });
-
