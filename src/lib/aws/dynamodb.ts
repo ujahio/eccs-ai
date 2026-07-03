@@ -175,6 +175,19 @@ export class DynamoAuthRepository
 		return Boolean(response.Items?.length);
 	}
 
+	async getStudentProfileById(profileId: string) {
+		const response = await this.documentClient.send(
+			new GetCommand({
+				TableName: this.profileTableName,
+				Key: { profileId }
+			})
+		);
+
+		const profile = response.Item as StudentProfileRecord | undefined;
+
+		return profile?.role === "student" ? profile : null;
+	}
+
 	async listExpiredPendingRegistrations(args: { now: number; limit: number }) {
 		const response = await this.documentClient.send(
 			new QueryCommand({

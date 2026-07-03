@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useRouter } from "next/navigation";
+import { type FormEvent, useState } from "react";
 import { ArrowRightIcon } from "@/components/ui/arrow-right-icon";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,12 +16,11 @@ import {
 } from "@/features/auth/form-helpers";
 import {
 	initialLoginFormState,
-	type LoginAction,
 	type LoginFormState
 } from "./state";
+import type { CognitoSignInResponse } from "./api";
 
 type LoginFormProps = {
-  action: LoginAction;
   initialState?: LoginFormState;
 };
 
@@ -53,17 +53,76 @@ function StatusMessage({ state }: { state: LoginFormState }) {
   );
 }
 
-export function LoginForm({ action, initialState }: LoginFormProps) {
+export function LoginForm({ initialState }: LoginFormProps) {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
-  const [state, formAction, isPending] = useActionState(
-    action,
-    initialState ?? initialLoginFormState
-  );
+  const [state, setState] = useState(initialState ?? initialLoginFormState);
+  const [isPending, setIsPending] = useState(false);
   const emailError = fieldError(state, "email");
   const passwordError = fieldError(state, "password");
 
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsPending(true);
+
+    const formData = new FormData(event.currentTarget);
+    const email = String(formData.get("email") ?? "");
+    const password = String(formData.get("password") ?? "");
+
+    try {
+      const response = await fetch("/api/auth/cognito/sign-in", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ email, password })
+      });
+      const result = (await response.json()) as CognitoSignInResponse;
+
+      if (result.status === "signed_in") {
+        setState({
+          status: "success",
+          message: result.message,
+          values: {
+            email,
+            password: ""
+          },
+          errors: {}
+        });
+        router.replace(result.redirectTo);
+        router.refresh();
+        return;
+      }
+
+      setState({
+        status: result.status === "verify_email" ? "blocked" : "error",
+        message: result.message,
+        values: result.values,
+        errors: result.errors
+      });
+    } catch {
+      setState({
+        status: "error",
+        message: "We could not sign you in. Please try again.",
+        values: {
+          email,
+          password: ""
+        },
+        errors: {}
+      });
+    } finally {
+      setIsPending(false);
+    }
+  }
+
   return (
-    <form action={formAction} className="mt-6" data-testid="login-form">
+    <form
+      className="mt-6"
+      action="/api/auth/cognito/sign-in"
+      data-testid="login-form"
+      method="post"
+      onSubmit={handleSubmit}
+    >
       <div className="grid gap-5">
         <div className="grid gap-2">
           <label

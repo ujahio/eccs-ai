@@ -240,6 +240,14 @@ export class InMemoryRegistrationRepository
 	async hasStudentProfile(emailNormalized: string) {
 		return getStore().profiles.has(emailNormalized);
 	}
+
+	async getStudentProfileById(profileId: string) {
+		return (
+			Array.from(getStore().profiles.values()).find(
+				(profile) => profile.profileId === profileId
+			) ?? null
+		);
+	}
 }
 
 export class InMemoryEmailSender implements RegistrationEmailSender {

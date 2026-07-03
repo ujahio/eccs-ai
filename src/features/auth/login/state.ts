@@ -9,11 +9,6 @@ export type LoginFormState = {
 	errors: Partial<Record<LoginField, string[]>>;
 };
 
-export type LoginAction = (
-	previousState: LoginFormState,
-	formData: FormData
-) => Promise<LoginFormState>;
-
 export const initialLoginFormState: LoginFormState = {
 	status: "idle",
 	message: "",

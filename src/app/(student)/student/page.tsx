@@ -20,7 +20,12 @@ export default function StudentDashboardPage() {
         <p className="text-sm font-semibold uppercase text-brand-teal">
           Student area
         </p>
-        <h1 className="mt-3 text-2xl font-semibold">Dashboard</h1>
+        <h1
+          className="mt-3 text-2xl font-semibold"
+          data-testid="student-dashboard-heading"
+        >
+          Dashboard
+        </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-gray">
           This shell establishes the learner route where active cases,
           certificate records, and account status will live in future slices.

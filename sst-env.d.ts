@@ -15,6 +15,10 @@ declare module "sst" {
       "secret": string
       "type": "sst.aws.CognitoUserPoolClient"
     }
+    "BetterAuthSecret": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
     "RegistrationWorkflowTable": {
       "name": string
       "type": "sst.aws.Dynamo"

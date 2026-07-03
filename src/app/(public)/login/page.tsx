@@ -1,6 +1,5 @@
 import Image from "next/image";
 import Link from "next/link";
-import { submitLoginForm } from "@/features/auth/login/actions";
 import { LoginForm } from "@/features/auth/login/login-form";
 import {
   initialLoginFormState,
@@ -33,18 +32,51 @@ const verificationMessages: Record<
   }
 };
 
+const authMessages: Record<string, Pick<LoginFormState, "status" | "message">> =
+  {
+    verify_email: {
+      status: "blocked",
+      message: "Verify your email before signing in."
+    },
+    validation_error: {
+      status: "error",
+      message: "Check the highlighted fields and try again."
+    },
+    invalid_credentials: {
+      status: "error",
+      message: "Invalid email or password."
+    },
+    missing_profile: {
+      status: "error",
+      message: "We could not load your account profile."
+    },
+    unauthorized_role: {
+      status: "error",
+      message: "This sign-in area is for student accounts."
+    },
+    invalid_request: {
+      status: "error",
+      message: "Invalid sign-in request."
+    }
+  };
+
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const verification = Array.isArray(params?.verification)
     ? params?.verification[0]
     : params?.verification;
+  const auth = Array.isArray(params?.auth)
+    ? params?.auth[0]
+    : params?.auth;
   const verificationState = verification
     ? verificationMessages[verification]
     : undefined;
-  const initialState: LoginFormState = verificationState
+  const authState = auth ? authMessages[auth] : undefined;
+  const statusState = verificationState ?? authState;
+  const initialState: LoginFormState = statusState
     ? {
         ...initialLoginFormState,
-        ...verificationState
+        ...statusState
       }
     : initialLoginFormState;
 
@@ -70,7 +102,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             Sign in to Your Account
           </h1>
 
-          <LoginForm action={submitLoginForm} initialState={initialState} />
+          <LoginForm initialState={initialState} />
 
           <p className="mt-7 border-t border-border-gray pt-5 text-sm text-muted-gray">
             New User?{" "}

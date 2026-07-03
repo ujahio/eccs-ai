@@ -182,6 +182,34 @@ test.describe("Student registration and email verification", () => {
 		);
 	});
 
+	test("verified student can sign in and reach the student dashboard", async ({
+		page,
+		request
+	}) => {
+		const email = uniqueEmail();
+
+		await page.goto("/register");
+		await page.getByTestId("register-first-name").fill(validRegistration.firstName);
+		await page.getByTestId("register-last-name").fill(validRegistration.lastName);
+		await page.getByTestId("register-email").fill(email);
+		await page.getByTestId("register-password").fill(validRegistration.password);
+		await page.getByTestId("register-submit").click();
+
+		await expect(page.getByTestId("register-success-message")).toBeVisible();
+
+		const verificationUrl = await fetchVerificationUrl(request, email);
+
+		await page.goto(verificationUrl);
+		await expect(page).toHaveURL(/\/login\?verification=verified/);
+
+		await page.getByTestId("login-email").fill(email);
+		await page.getByTestId("login-password").fill(validRegistration.password);
+		await page.getByTestId("login-submit").click();
+
+		await expect(page).toHaveURL(/\/student$/);
+		await expect(page.getByTestId("student-dashboard-heading")).toBeVisible();
+	});
+
 	test("login is blocked before email verification", async ({ page }) => {
 		const email = uniqueEmail();
 

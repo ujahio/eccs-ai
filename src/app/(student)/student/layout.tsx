@@ -1,11 +1,14 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { requireStudentSession } from "@/lib/auth/session";
 
-export default function StudentLayout({
+export default async function StudentLayout({
   children
 }: Readonly<{
   children: ReactNode;
 }>) {
+  await requireStudentSession();
+
   return (
     <main className="min-h-screen bg-app-canvas text-primary-text">
       <header className="border-b border-border-gray bg-white">
