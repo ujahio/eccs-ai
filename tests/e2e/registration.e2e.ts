@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 function uniqueEmail() {
 	return `e2e-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
@@ -24,6 +24,55 @@ const validRegistration = {
 	lastName: "Adebayo",
 	password: "casework1"
 };
+
+type RegistrationFormValues = {
+	firstName?: string;
+	lastName?: string;
+	email: string;
+	password?: string;
+};
+
+async function fillRegistrationForm(
+	page: Page,
+	values: RegistrationFormValues
+) {
+	await page
+		.getByTestId("register-first-name")
+		.fill(values.firstName ?? validRegistration.firstName);
+	await page
+		.getByTestId("register-last-name")
+		.fill(values.lastName ?? validRegistration.lastName);
+	await page.getByTestId("register-email").fill(values.email);
+	await page
+		.getByTestId("register-password")
+		.fill(values.password ?? validRegistration.password);
+}
+
+async function submitRegistrationForm(
+	page: Page,
+	values: RegistrationFormValues
+) {
+	await fillRegistrationForm(page, values);
+	await page.getByTestId("register-submit").click();
+}
+
+async function registerStudent(page: Page, values: RegistrationFormValues) {
+	await page.goto("/register");
+	await submitRegistrationForm(page, values);
+}
+
+async function submitRegistrationRepeatedly(
+	page: Page,
+	values: RegistrationFormValues,
+	count: number
+) {
+	await page.goto("/register");
+
+	for (let i = 0; i < count; i++) {
+		await submitRegistrationForm(page, values);
+		await expect(page.getByTestId("register-success-message")).toBeVisible();
+	}
+}
 
 test.describe("Student registration and email verification", () => {
 	test.beforeAll(async ({ request }) => {
@@ -61,10 +110,7 @@ test.describe("Student registration and email verification", () => {
 	test("shows validation error for invalid email format", async ({ page }) => {
 		await page.goto("/register");
 
-		await page.getByTestId("register-first-name").fill(validRegistration.firstName);
-		await page.getByTestId("register-last-name").fill(validRegistration.lastName);
-		await page.getByTestId("register-email").fill("not-an-email");
-		await page.getByTestId("register-password").fill(validRegistration.password);
+		await fillRegistrationForm(page, { email: "not-an-email" });
 
 		await page.evaluate(() => {
 			const form = document.querySelector<HTMLFormElement>(
@@ -85,11 +131,10 @@ test.describe("Student registration and email verification", () => {
 	test("shows validation error for weak password", async ({ page }) => {
 		await page.goto("/register");
 
-		await page.getByTestId("register-first-name").fill(validRegistration.firstName);
-		await page.getByTestId("register-last-name").fill(validRegistration.lastName);
-		await page.getByTestId("register-email").fill(uniqueEmail());
-		await page.getByTestId("register-password").fill("short");
-		await page.getByTestId("register-submit").click();
+		await submitRegistrationForm(page, {
+			email: uniqueEmail(),
+			password: "short"
+		});
 
 		await expect(page.getByTestId("register-password-error")).toHaveText(
 			"Password is missing: at least 8 characters, at least one number."
@@ -110,11 +155,10 @@ test.describe("Student registration and email verification", () => {
 	}) => {
 		await page.goto("/register");
 
-		await page.getByTestId("register-first-name").fill(validRegistration.firstName);
-		await page.getByTestId("register-last-name").fill(validRegistration.lastName);
-		await page.getByTestId("register-email").fill(uniqueEmail());
-		await page.getByTestId("register-password").fill("PASSWORD1");
-		await page.getByTestId("register-submit").click();
+		await submitRegistrationForm(page, {
+			email: uniqueEmail(),
+			password: "PASSWORD1"
+		});
 
 		await expect(page.getByTestId("register-password-error")).toHaveText(
 			"Password is missing: at least one lowercase letter."
@@ -124,11 +168,10 @@ test.describe("Student registration and email verification", () => {
 	test("shows validation error for password without number", async ({ page }) => {
 		await page.goto("/register");
 
-		await page.getByTestId("register-first-name").fill(validRegistration.firstName);
-		await page.getByTestId("register-last-name").fill(validRegistration.lastName);
-		await page.getByTestId("register-email").fill(uniqueEmail());
-		await page.getByTestId("register-password").fill("casework");
-		await page.getByTestId("register-submit").click();
+		await submitRegistrationForm(page, {
+			email: uniqueEmail(),
+			password: "casework"
+		});
 
 		await expect(page.getByTestId("register-password-error")).toHaveText(
 			"Password is missing: at least one number."
@@ -141,12 +184,7 @@ test.describe("Student registration and email verification", () => {
 	}) => {
 		const email = uniqueEmail();
 
-		await page.goto("/register");
-		await page.getByTestId("register-first-name").fill(validRegistration.firstName);
-		await page.getByTestId("register-last-name").fill(validRegistration.lastName);
-		await page.getByTestId("register-email").fill(email);
-		await page.getByTestId("register-password").fill(validRegistration.password);
-		await page.getByTestId("register-submit").click();
+		await registerStudent(page, { email });
 
 		await expect(page.getByTestId("register-success-message")).toHaveText(
 			"Check your email. Verification expires in 24 hours."
@@ -163,12 +201,7 @@ test.describe("Student registration and email verification", () => {
 	}) => {
 		const email = uniqueEmail();
 
-		await page.goto("/register");
-		await page.getByTestId("register-first-name").fill(validRegistration.firstName);
-		await page.getByTestId("register-last-name").fill(validRegistration.lastName);
-		await page.getByTestId("register-email").fill(email);
-		await page.getByTestId("register-password").fill(validRegistration.password);
-		await page.getByTestId("register-submit").click();
+		await registerStudent(page, { email });
 
 		await expect(page.getByTestId("register-success-message")).toBeVisible();
 
@@ -188,12 +221,7 @@ test.describe("Student registration and email verification", () => {
 	}) => {
 		const email = uniqueEmail();
 
-		await page.goto("/register");
-		await page.getByTestId("register-first-name").fill(validRegistration.firstName);
-		await page.getByTestId("register-last-name").fill(validRegistration.lastName);
-		await page.getByTestId("register-email").fill(email);
-		await page.getByTestId("register-password").fill(validRegistration.password);
-		await page.getByTestId("register-submit").click();
+		await registerStudent(page, { email });
 
 		await expect(page.getByTestId("register-success-message")).toBeVisible();
 
@@ -213,12 +241,7 @@ test.describe("Student registration and email verification", () => {
 	test("login is blocked before email verification", async ({ page }) => {
 		const email = uniqueEmail();
 
-		await page.goto("/register");
-		await page.getByTestId("register-first-name").fill(validRegistration.firstName);
-		await page.getByTestId("register-last-name").fill(validRegistration.lastName);
-		await page.getByTestId("register-email").fill(email);
-		await page.getByTestId("register-password").fill(validRegistration.password);
-		await page.getByTestId("register-submit").click();
+		await registerStudent(page, { email });
 
 		await expect(page.getByTestId("register-success-message")).toBeVisible();
 
@@ -238,22 +261,17 @@ test.describe("Student registration and email verification", () => {
 	}) => {
 		const email = uniqueEmail();
 
-		await page.goto("/register");
-		await page.getByTestId("register-first-name").fill(validRegistration.firstName);
-		await page.getByTestId("register-last-name").fill(validRegistration.lastName);
-		await page.getByTestId("register-email").fill(email);
-		await page.getByTestId("register-password").fill(validRegistration.password);
-		await page.getByTestId("register-submit").click();
+		await registerStudent(page, { email });
 
 		await expect(page.getByTestId("register-success-message")).toBeVisible();
 
 		const firstVerificationUrl = await fetchVerificationUrl(request, email);
 
-		await page.getByTestId("register-first-name").fill("Changed");
-		await page.getByTestId("register-last-name").fill("Name");
-		await page.getByTestId("register-email").fill(email);
-		await page.getByTestId("register-password").fill(validRegistration.password);
-		await page.getByTestId("register-submit").click();
+		await submitRegistrationForm(page, {
+			firstName: "Changed",
+			lastName: "Name",
+			email
+		});
 
 		await expect(page.getByTestId("register-success-message")).toHaveText(
 			"Verification email sent. Please check your inbox."
@@ -275,31 +293,8 @@ test.describe("Student registration and email verification", () => {
 	test("rate-limits repeated verification resends", async ({ page }) => {
 		const email = uniqueEmail();
 
-		await page.goto("/register");
-
-		for (let i = 0; i < 3; i++) {
-			await page.getByTestId("register-first-name").fill(
-				validRegistration.firstName
-			);
-			await page.getByTestId("register-last-name").fill(
-				validRegistration.lastName
-			);
-			await page.getByTestId("register-email").fill(email);
-			await page.getByTestId("register-password").fill(
-				validRegistration.password
-			);
-			await page.getByTestId("register-submit").click();
-
-			await expect(
-				page.getByTestId("register-success-message")
-			).toBeVisible();
-		}
-
-		await page.getByTestId("register-first-name").fill(validRegistration.firstName);
-		await page.getByTestId("register-last-name").fill(validRegistration.lastName);
-		await page.getByTestId("register-email").fill(email);
-		await page.getByTestId("register-password").fill(validRegistration.password);
-		await page.getByTestId("register-submit").click();
+		await submitRegistrationRepeatedly(page, { email }, 3);
+		await submitRegistrationForm(page, { email });
 
 		await expect(page.getByTestId("register-resend-notice")).toHaveText(
 			"Maximum requests reached. Try again after the verification link expires."
@@ -311,39 +306,12 @@ test.describe("Student registration and email verification", () => {
 	}) => {
 		const email = uniqueEmail();
 
-		await page.goto("/register");
-
-		for (let i = 0; i < 3; i++) {
-			await page.getByTestId("register-first-name").fill(
-				validRegistration.firstName
-			);
-			await page.getByTestId("register-last-name").fill(
-				validRegistration.lastName
-			);
-			await page.getByTestId("register-email").fill(email);
-			await page.getByTestId("register-password").fill(
-				validRegistration.password
-			);
-			await page.getByTestId("register-submit").click();
-
-			await expect(
-				page.getByTestId("register-success-message")
-			).toBeVisible();
-		}
-
-		await page.getByTestId("register-first-name").fill(validRegistration.firstName);
-		await page.getByTestId("register-last-name").fill(validRegistration.lastName);
-		await page.getByTestId("register-email").fill(email);
-		await page.getByTestId("register-password").fill(validRegistration.password);
-		await page.getByTestId("register-submit").click();
+		await submitRegistrationRepeatedly(page, { email }, 3);
+		await submitRegistrationForm(page, { email });
 
 		await expect(page.getByTestId("register-resend-notice")).toBeVisible();
 
-		await page.getByTestId("register-first-name").fill(validRegistration.firstName);
-		await page.getByTestId("register-last-name").fill(validRegistration.lastName);
-		await page.getByTestId("register-email").fill(email);
-		await page.getByTestId("register-password").fill(validRegistration.password);
-		await page.getByTestId("register-submit").click();
+		await submitRegistrationForm(page, { email });
 
 		await expect(page.getByTestId("register-resend-notice")).toHaveText(
 			"Maximum requests reached. Try again after the verification link expires."
