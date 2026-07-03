@@ -1,5 +1,3 @@
-import "./.sst/platform/config.d.ts";
-
 export default $config({
 	app(input) {
 		return {
@@ -10,6 +8,10 @@ export default $config({
 		};
 	},
 	async run() {
+		await import("./infra/auth");
+		await import("./infra/secrets");
+		await import("./infra/tables");
+		await import("./infra/jobs");
 		await import("./infra/nextjs-client");
 	},
 });

@@ -2,6 +2,12 @@
 
 ## Agent skills
 
+### Environment
+
+Keep secrets local. Do not commit and environment variable starting with `.env.*` unless `.env.sample`.
+
+Read `.env.sample` for required local environment varibales.
+
 ### Issue tracker
 
 Issues and PRDs are tracked in GitHub Issues for `otktechnologies/eccs-ai`. See `docs/agents/issue-tracker.md`.
@@ -23,7 +29,7 @@ Single-context repo. Read `PRD.md` for product scope and `DESIGN.md` for UI rule
 - **Full-stack TypeScript** using React.js and Next.js
 - **UI/UX** with tailwind, radix-ui
 - **SST ION** to write components to deploy AWS (other). Do not use any other SDK or IAC.
-- **EMAIL Services** AWS SES (via SST) for production and MailSurp for testing email client
+- **EMAIL Services** Resend for application email delivery; local Playwright auth flows use the isolated in-memory e2e harness
 - **Client Authentication** with better-auth (no database, use cognito for user management)
 - **AWS** for backend resources
 - **DynamoDB** use SST
@@ -79,7 +85,7 @@ When you need to search for up to date documentation, use `context7` tools.
 
 ## Runtime
 
-Use `bun` and `bunx` for all runtime commands.
+Use `bun` and/or `bunx` (whichever is appropriate) for runtime commands.
 
 Do not run `sst dev` or `bun run dev` from the agent shell. The user will run
 SST dev locally after authenticating to AWS.
@@ -88,7 +94,7 @@ SST dev locally after authenticating to AWS.
 
 ### Github Authentication
 
-- For any task that requires Github authentication or reading of .github or related files, ask the user before performing the task. Explain if necessary why authentication is needed. Do not perform any github actions.
+- For any task that requires Github authentication or reading of .github or related files, ask the user before performing the task. Explain if necessary why authentication is needed. Do not perform any github actions without asking first.
 
 ### Branch, PR, And Issue Closeout Workflow
 
@@ -101,3 +107,10 @@ SST component files must live under `infra/` and be imported from inside
 in `sst.config.ts`, and do not use top-level imports in `sst.config.ts`.
 Component files should instantiate resources as exported constants, for example
 `export const client = new sst.aws.Nextjs(...)`.
+
+Scripts that interact with resources created by SST must be TypeScript files
+under `scripts/` and read linked resource names or IDs from `Resource` imported
+from `sst`. Run those scripts through `sst shell`, for example
+`bunx sst shell --stage localdev -- bun scripts/example.ts`, so linked resources
+are available to the process. Do not duplicate SST resource names in standalone
+environment variables.

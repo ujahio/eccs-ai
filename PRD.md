@@ -150,10 +150,11 @@ Feedback is shown to the teacher with the student's name in v1.
 1. Student registers with full name, email, and password.
 2. The system creates a pending, unverified registration and sends a verification link.
 3. Verification links expire after 24 hours.
-4. Login is blocked until verification succeeds.
+4. Login is blocked until verification succeeds, with short messaging that the user must verify their email before signing in.
 5. After successful verification, the user is sent to login. No automatic session starts.
-6. If the same email registers again while an active verification exists, block the new registration and show a notice that verification was already sent.
-7. Expired, unverified pending registrations are deleted automatically by a scheduled cleanup job.
+6. If the same email registers again while an active verification exists, do not create a duplicate account or registration. Treat the request as a rate-limited verification email resend.
+7. Verification email resends are rate-limited to protect users from inbox spam. After the rate limit is reached, the user must wait for the 24-hour verification window to expire before they can attempt to register with that email again.
+8. Expired, unverified pending registrations are deleted automatically by a scheduled cleanup job, which frees the email for a fresh registration attempt.
 
 **Email change flow:**
 
@@ -193,16 +194,18 @@ Feedback is shown to the teacher with the student's name in v1.
 
 **Auth model:**
 
-1. Cognito is the auth/user source of truth.
-2. DynamoDB stores app profile, role, verification workflow state, certificate facts, case progress, and teacher/student product records.
+1. Cognito is the auth/user source of truth for identity, credentials, email verification, and login eligibility.
+2. DynamoDB stores app profile, role mirror, registration workflow state, certificate facts, case progress, and teacher/student product records.
 3. better-auth acts as the app auth integration layer where useful; it does not replace Cognito user management.
 4. Use Cognito groups for coarse roles (`student`, `teacher`) and mirror effective role into DynamoDB profile records for app queries/display.
+5. App workflow records support product behaviors such as pending-registration resend limits and cleanup, but they do not replace Cognito as the authority for successful login.
 
 ### Edge Cases
 
 - **Deadline passes mid-quiz:** Strict cutoff. Once the deadline passes, all student operations on the case stop immediately, including in-progress quiz attempts.
 - **Multi-tab quiz submission:** Unique constraint on `certificates (student_id, case_id)` prevents duplicate certificate records.
-- **Expired registration verification:** Expired, unverified pending registrations are cleaned up automatically. A new registration with the same email cannot proceed until the previous pending verification has expired.
+- **Repeated pending registration:** A repeated registration attempt for an active pending email does not create another account. It may send another verification email only within rate limits. Once the rate limit is reached, the user must wait for the pending verification to expire (24 hours) before attempting to register with that email again.
+- **Expired registration verification:** Expired, unverified pending registrations are cleaned up automatically. A new registration with the same email can start only after the previous pending verification expires or is cleaned up — hitting the resend rate limit does not reset the 24-hour verification window.
 
 ### Certificates
 

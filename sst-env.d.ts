@@ -6,6 +6,31 @@
 
 declare module "sst" {
   export interface Resource {
+    "AuthUserPool": {
+      "id": string
+      "type": "sst.aws.CognitoUserPool"
+    }
+    "AuthUserPoolClient": {
+      "id": string
+      "secret": string
+      "type": "sst.aws.CognitoUserPoolClient"
+    }
+    "BetterAuthSecret": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "RegistrationWorkflowTable": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
+    "ResendApiKey": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "UserProfileTable": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
     "eccsfeweb": {
       "type": "sst.aws.Nextjs"
       "url": string
