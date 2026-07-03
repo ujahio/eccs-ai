@@ -17,7 +17,9 @@ import type {
 import type { StudentProfileRecord } from "@/features/auth/registration/repository";
 import type { CognitoIdTokenVerifier } from "./cognito-id-token-verifier";
 
-type AuthEndpointContext = Parameters<Parameters<typeof createAuthEndpoint>[2]>[0];
+type AuthEndpointContext = Parameters<
+	Parameters<typeof createAuthEndpoint>[2]
+>[0];
 
 export interface CognitoSessionIdentityProvider {
 	authenticateStudent(args: {
@@ -248,13 +250,18 @@ function bridgeResponse(
 
 	if (response.status === "signed_in") {
 		throw ctx.redirect(
-			new URL(response.redirectTo, redirectBaseUrl(ctx.request.headers, options))
-				.toString(),
+			new URL(
+				response.redirectTo,
+				redirectBaseUrl(ctx.request.headers, options),
+			).toString(),
 		);
 	}
 
 	throw ctx.redirect(
-		loginRedirectUrl(redirectBaseUrl(ctx.request.headers, options), response.status),
+		loginRedirectUrl(
+			redirectBaseUrl(ctx.request.headers, options),
+			response.status,
+		),
 	);
 }
 
