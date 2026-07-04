@@ -18,6 +18,51 @@ Use the `gh` CLI for issue operations after the user explicitly approves GitHub-
 - **Closeout PR**: when implementation work is ready, create a pull request before closing the issue. The PR body must mention and link the issue it solves, using GitHub closing keywords such as `Closes #123` where appropriate.
 - **Close after PR**: close an issue only after a PR exists and represents the completed work for that issue.
 
+## PR summary template
+
+When creating or updating a pull request summary, highlight outcomes first, then note any PRD or issue-tracker coordination that affects review or follow-up work. Use this template:
+
+```md
+## Summary
+
+Briefly describe the user-facing or system-level outcome of this PR.
+
+## Work Done
+
+- Added/updated the main feature behavior.
+- Added supporting infrastructure, API, or data model changes.
+- Updated UI flows, validation, or error handling.
+- Added or updated tests for the critical path.
+
+## PRD Changes
+
+- List short notes about any PRD updates made for this work.
+- If no PRD changed, write `None`.
+
+## Issue Notes
+
+- Note if the current issue changed during implementation.
+- Note any downstream or related issues affected by changes to the current issue.
+- If no issue notes apply, write `None`.
+
+## Verification
+
+- `bun test`
+- `bun run typecheck`
+- `bun run lint`
+- Playwright smoke/integration test result, if relevant.
+- Manual verification notes, if relevant.
+
+## Risks / Review Focus
+
+- Mention tricky logic, auth/security-sensitive paths, data migrations, or known limitations.
+- Mention anything intentionally deferred.
+
+## Linked Issue
+
+Closes #123
+```
+
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside the clone.
 
 ## When a skill says "publish to the issue tracker"
