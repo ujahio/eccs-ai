@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { LoginForm } from "@/features/auth/login/login-form";
 import {
   initialLoginFormState,
@@ -60,6 +61,14 @@ const authMessages: Record<string, Pick<LoginFormState, "status" | "message">> =
     }
   };
 
+const resetMessages: Record<string, Pick<LoginFormState, "status" | "message">> =
+  {
+    changed: {
+      status: "success",
+      message: "Your password was changed. Please sign in."
+    }
+  };
+
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const verification = Array.isArray(params?.verification)
@@ -68,11 +77,27 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const auth = Array.isArray(params?.auth)
     ? params?.auth[0]
     : params?.auth;
+  const reset = Array.isArray(params?.reset)
+    ? params?.reset[0]
+    : params?.reset;
+  const hasVerificationParam = params?.verification !== undefined;
+  const hasAuthParam = params?.auth !== undefined;
+  const hasResetParam = params?.reset !== undefined;
   const verificationState = verification
     ? verificationMessages[verification]
     : undefined;
   const authState = auth ? authMessages[auth] : undefined;
-  const statusState = verificationState ?? authState;
+  const resetState = reset ? resetMessages[reset] : undefined;
+
+  if (
+    (hasVerificationParam && !verificationState) ||
+    (hasAuthParam && !authState) ||
+    (hasResetParam && !resetState)
+  ) {
+    redirect("/login");
+  }
+
+  const statusState = verificationState ?? authState ?? resetState;
   const initialState: LoginFormState = statusState
     ? {
         ...initialLoginFormState,

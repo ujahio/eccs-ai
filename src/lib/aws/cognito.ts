@@ -9,8 +9,11 @@ import {
 	AdminGetUserCommand,
 	AdminListGroupsForUserCommand,
 	AdminSetUserPasswordCommand,
+	AdminUserGlobalSignOutCommand,
 	AdminUpdateUserAttributesCommand,
 	CognitoIdentityProviderClient,
+	ConfirmForgotPasswordCommand,
+	ForgotPasswordCommand,
 	InitiateAuthCommand
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
@@ -18,6 +21,13 @@ import {
 	LoginBlockedUntilVerifiedError,
 	type LoginIdentityProvider
 } from "@/features/auth/login/service";
+import {
+	InvalidPasswordResetCodeError,
+	PasswordResetDeliveryUnavailableError,
+	PasswordResetRateLimitedError,
+	PasswordResetUserNotFoundError,
+	type PasswordResetIdentityProvider
+} from "@/features/auth/password-reset/service";
 import {
 	StudentAlreadyExistsError,
 	type CreatePendingStudentInput,
@@ -30,7 +40,10 @@ import {
 } from "@/lib/auth/cognito-groups";
 
 export class CognitoAuthAdapter
-	implements RegistrationIdentityProvider, LoginIdentityProvider
+	implements
+		RegistrationIdentityProvider,
+		LoginIdentityProvider,
+		PasswordResetIdentityProvider
 {
 	private readonly client: CognitoIdentityProviderClient;
 
@@ -220,6 +233,103 @@ export class CognitoAuthAdapter
 			}
 
 			throw error;
+		}
+	}
+
+	async requestPasswordReset(args: { emailNormalized: string }) {
+		try {
+			const response = await this.client.send(
+				new ForgotPasswordCommand({
+					ClientId: this.userPoolClientId,
+					Username: args.emailNormalized
+				})
+			);
+
+			return {
+				delivery: response.CodeDeliveryDetails
+					? {
+							attributeName: response.CodeDeliveryDetails.AttributeName,
+							deliveryMedium: response.CodeDeliveryDetails.DeliveryMedium,
+							destination: response.CodeDeliveryDetails.Destination
+						}
+					: undefined
+			};
+		} catch (error) {
+			const name = errorName(error);
+
+			if (
+				name === "LimitExceededException" ||
+				name === "TooManyRequestsException"
+			) {
+				throw new PasswordResetRateLimitedError();
+			}
+
+			if (name === "UserNotFoundException") {
+				throw new PasswordResetUserNotFoundError();
+			}
+
+			if (
+				name === "InvalidParameterException" ||
+				name === "CodeDeliveryFailureException" ||
+				name === "InvalidEmailRoleAccessPolicyException" ||
+				name === "InvalidSmsRoleAccessPolicyException"
+			) {
+				throw new PasswordResetDeliveryUnavailableError();
+			}
+
+			throw error;
+		}
+	}
+
+	async confirmPasswordReset(args: {
+		emailNormalized: string;
+		code: string;
+		newPassword: string;
+	}) {
+		try {
+			await this.client.send(
+				new ConfirmForgotPasswordCommand({
+					ClientId: this.userPoolClientId,
+					Username: args.emailNormalized,
+					ConfirmationCode: args.code,
+					Password: args.newPassword
+				})
+			);
+		} catch (error) {
+			const name = errorName(error);
+
+			if (
+				name === "LimitExceededException" ||
+				name === "TooManyRequestsException"
+			) {
+				throw new PasswordResetRateLimitedError();
+			}
+
+			if (
+				name === "CodeMismatchException" ||
+				name === "ExpiredCodeException" ||
+				name === "NotAuthorizedException" ||
+				name === "UserNotFoundException"
+			) {
+				throw new InvalidPasswordResetCodeError();
+			}
+
+			throw error;
+		}
+	}
+
+	async invalidateCognitoSessions(args: { emailNormalized: string }) {
+		try {
+			await this.client.send(
+				new AdminUserGlobalSignOutCommand({
+					UserPoolId: this.userPoolId,
+					Username: args.emailNormalized
+				})
+			);
+		} catch (error) {
+			if (errorName(error) !== "UserNotFoundException") {
+				throw error;
+			}
 		}
 	}
 

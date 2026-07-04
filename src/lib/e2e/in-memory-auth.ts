@@ -11,6 +11,18 @@ import {
 	LoginBlockedUntilVerifiedError
 } from "@/features/auth/login/service";
 import type {
+	AppSessionInvalidator,
+	PasswordResetIdentityProvider,
+	PasswordResetProfileRepository
+} from "@/features/auth/password-reset/service";
+import {
+	InvalidPasswordResetCodeError,
+	PasswordResetDeliveryUnavailableError,
+	PasswordResetRateLimitedError,
+	PasswordResetUserNotFoundError
+} from "@/features/auth/password-reset/service";
+import type { PasswordResetEmailSender } from "@/features/auth/password-reset/email";
+import type {
 	CreatePendingStudentInput,
 	CreatePendingStudentResult,
 	RegistrationIdentityProvider
@@ -32,13 +44,27 @@ import {
 	type CognitoGroupName
 } from "@/lib/auth/cognito-groups";
 
-export type E2EEmailRecord = {
-	to: string;
-	firstName: string;
-	verificationUrl: string;
-	expiresInHours: number;
-	sentAt: number;
-};
+export type E2EEmailRecord =
+	| {
+			type: "registration_verification";
+			to: string;
+			firstName: string;
+			verificationUrl: string;
+			expiresInHours: number;
+			sentAt: number;
+	  }
+	| {
+			type: "password_reset";
+			to: string;
+			resetUrl: string;
+			expiresInMinutes: number;
+			sentAt: number;
+	  }
+	| {
+			type: "password_changed";
+			to: string;
+			sentAt: number;
+	  };
 
 type E2EAuthStoreShape = {
 	registrations: Map<string, PendingRegistrationRecord>;
@@ -50,6 +76,10 @@ type E2EAuthStoreShape = {
 			enabled: boolean;
 			groups: CognitoGroupName[];
 			password: string;
+			resetCode?: string;
+			resetCodeConsumedAt?: number;
+			resetRequestCount?: number;
+			resetRequestWindowStartedAt?: number;
 		}
 	>;
 	emails: E2EEmailRecord[];
@@ -95,7 +125,10 @@ export function isE2EMode(): boolean {
 }
 
 export class InMemoryIdentityProvider
-	implements RegistrationIdentityProvider, LoginIdentityProvider
+	implements
+		RegistrationIdentityProvider,
+		LoginIdentityProvider,
+		PasswordResetIdentityProvider
 {
 	async createPendingStudent(
 		input: CreatePendingStudentInput
@@ -170,10 +203,69 @@ export class InMemoryIdentityProvider
 
 		return Boolean(user?.enabled && hasStudentCognitoGroup(user.groups));
 	}
+
+	async requestPasswordReset(args: { emailNormalized: string }) {
+		const user = getStore().users.get(args.emailNormalized);
+
+		if (!user) {
+			throw new PasswordResetUserNotFoundError();
+		}
+
+		if (!user.enabled) {
+			throw new PasswordResetDeliveryUnavailableError();
+		}
+
+		const now = Math.floor(Date.now() / 1000);
+		const windowStartedAt = user.resetRequestWindowStartedAt ?? now;
+		const isNewWindow = now - windowStartedAt >= 60 * 60;
+		const requestCount = isNewWindow ? 0 : (user.resetRequestCount ?? 0);
+
+		if (requestCount >= 5) {
+			throw new PasswordResetRateLimitedError();
+		}
+
+		const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+		user.resetCode = resetCode;
+		user.resetCodeConsumedAt = undefined;
+		user.resetRequestCount = requestCount + 1;
+		user.resetRequestWindowStartedAt = isNewWindow ? now : windowStartedAt;
+
+		return { resetCode };
+	}
+
+	async confirmPasswordReset(args: {
+		emailNormalized: string;
+		code: string;
+		newPassword: string;
+	}) {
+		const user = getStore().users.get(args.emailNormalized);
+
+		if (!user) {
+			throw new PasswordResetUserNotFoundError();
+		}
+
+		if (
+			!user.resetCode ||
+			user.resetCode !== args.code ||
+			user.resetCodeConsumedAt
+		) {
+			throw new InvalidPasswordResetCodeError();
+		}
+
+		user.password = args.newPassword;
+		user.resetCodeConsumedAt = Date.now();
+	}
+
+	async invalidateCognitoSessions() {}
 }
 
 export class InMemoryRegistrationRepository
-	implements RegistrationWorkflowRepository, LoginProfileRepository
+	implements
+		RegistrationWorkflowRepository,
+		LoginProfileRepository,
+		PasswordResetProfileRepository,
+		AppSessionInvalidator
 {
 	async getPendingByEmail(emailNormalized: string) {
 		return getStore().registrations.get(emailNormalized) ?? null;
@@ -288,9 +380,35 @@ export class InMemoryRegistrationRepository
 			) ?? null
 		);
 	}
+
+	async getStudentProfileByEmail(emailNormalized: string) {
+		return getStore().profiles.get(emailNormalized) ?? null;
+	}
+
+	async invalidateSessionsForUser(args: {
+		userId: string;
+		invalidatedAt: number;
+	}) {
+		const store = getStore();
+		const profile = Array.from(store.profiles.values()).find(
+			(record) => record.profileId === args.userId
+		);
+
+		if (!profile) {
+			return;
+		}
+
+		store.profiles.set(profile.emailNormalized, {
+			...profile,
+			sessionsInvalidatedAt: args.invalidatedAt,
+			updatedAt: Math.floor(args.invalidatedAt / 1000)
+		});
+	}
 }
 
-export class InMemoryEmailSender implements RegistrationEmailSender {
+export class InMemoryEmailSender
+	implements RegistrationEmailSender, PasswordResetEmailSender
+{
 	async sendRegistrationVerificationEmail(email: {
 		to: string;
 		firstName: string;
@@ -298,6 +416,7 @@ export class InMemoryEmailSender implements RegistrationEmailSender {
 		expiresInHours: number;
 	}) {
 		const record = {
+			type: "registration_verification" as const,
 			...email,
 			sentAt: Date.now()
 		};
@@ -310,9 +429,56 @@ export class InMemoryEmailSender implements RegistrationEmailSender {
 		const store = getStore();
 		const record = [...store.emails, ...readEmailRecords()]
 			.reverse()
-			.find((e) => e.to === emailNormalized);
+			.find(
+				(e) =>
+					e.type === "registration_verification" &&
+					e.to === emailNormalized
+			);
 
-		return record?.verificationUrl ?? null;
+		return record && "verificationUrl" in record ? record.verificationUrl : null;
+	}
+
+	async sendPasswordResetCodeEmail(email: {
+		to: string;
+		resetUrl: string;
+		expiresInMinutes: number;
+	}) {
+		const record = {
+			type: "password_reset" as const,
+			...email,
+			sentAt: Date.now()
+		};
+
+		getStore().emails.push(record);
+		appendEmailRecord(record);
+	}
+
+	async sendPasswordChangedEmail(email: { to: string }) {
+		const record = {
+			type: "password_changed" as const,
+			...email,
+			sentAt: Date.now()
+		};
+
+		getStore().emails.push(record);
+		appendEmailRecord(record);
+	}
+
+	getLastPasswordResetUrl(emailNormalized: string): string | null {
+		const store = getStore();
+		const record = [...store.emails, ...readEmailRecords()]
+			.reverse()
+			.find((e) => e.type === "password_reset" && e.to === emailNormalized);
+
+		return record && "resetUrl" in record ? record.resetUrl : null;
+	}
+
+	hasPasswordChangedEmail(emailNormalized: string): boolean {
+		const store = getStore();
+
+		return [...store.emails, ...readEmailRecords()].some(
+			(e) => e.type === "password_changed" && e.to === emailNormalized
+		);
 	}
 }
 

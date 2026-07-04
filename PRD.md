@@ -30,34 +30,34 @@ For v1, ECCS is a single-tenant platform with one teacher account/persona. The p
 11. As a student, I want clear subscription copy stating that the account will renew annually and can be cancelled at any time, so that renewal expectations are transparent.
 12. [Deferred until payment provider research] As a student, I want to pay via credit card during checkout, so that I can activate my subscription immediately.
 13. [Deferred until payment provider research] As a student, I want to manage my subscription from my profile, so that I can see my plan details, renewal date, and cancel if needed.
-15. As a student, I want to view a "Coming soon" message on my dashboard when no active case exists, so that I know the platform is still active.
-16. As a student, I want to receive an email when a new case is published, so that I don't miss it.
-17. As a student, I want to read a case presentation with clinical scenario (that may include pertinent information like patient history, and lab results), so that I can understand the medical context.
-18. As a student, I want to write a personal analysis (150–700 words) for each case, so that I can practice clinical reasoning.
-19. As a student, I want my analysis to remain editable until I pass the CME quiz, so that I can refine my thinking after reviewing the model answer.
-20. As a student, I want to submit my analysis and view the teacher's model answer side-by-side with my own, so that I can compare my clinical reasoning to an expert's.
-21. As a student, I want to access teaching resources (lecture text, optional PDF and attachments), so that I can deepen my understanding of the case.
-22. As a student, I want to take a CME quiz of 3–5 multiple-choice questions per case, so that I can demonstrate my understanding.
-23. As a student, I must answer all quiz questions correctly to pass, so that I demonstrate full comprehension before earning credit.
-24. As a student, if I fail the quiz 3 times, I want to be navigated back to the teaching resources to review, so that I can re-engage with the material before retrying.
-25. As a student, I want unlimited quiz retries after review, so that I can learn at my own pace.
-26. As a student, I want to receive a downloadable PDF certificate upon passing the quiz, so that I have proof of my CE credit.
-27. As a student, I want my certificate to include my full name, case title, completion date, CE credit hours, ECCS branding, partner logo, and a unique certificate ID, so that it is accepted for license renewal.
-28. As a student, I want certificates to remain downloadable from my account, so that I can produce them for licensing audits years later.
-29. As a student, I want to view and download all my earned certificates from a dedicated page, so that I can manage my CE credit records.
-30. As a student, I want to leave optional feedback (rating/comment) on a case after completion, so that I can share my experience with teachers.
-31. As a student, I want to change my email address and verify the new one via a confirmation link before it takes effect, so that my account stays secure.
-32. As a student, I want to change my full name in my profile, so that my account reflects my current name.
-33. As a student, I want past certificates to show the name I had when I earned them, so that my CE credits remain traceable to that point in time.
-34. As a student, I want to change my password, so that my account stays secure.
-35. As a student, when I change my password, I want all other active sessions to be invalidated, so that old devices or compromised tokens can't access my account.
-36. As a student, I want password reset requests to be rate-limited (max 3 per hour), so that my inbox isn't spammed.
-37. As a student, I want password reset tokens to expire after 15 minutes, so that a stale link cannot be reused.
-38. As a student, I want to log out securely, so that my account is protected on shared devices.
-39. [Deferred until payment provider research] As a student, if my payment fails, I want to be blocked from progressing on the active case but still able to download past certificates and access my profile, so that I can resolve payment without losing earned credits.
-40. [Deferred until payment provider research] As a student, I want my subscription to activate immediately after successful payment/checkout so that I can access cases right away.
-41. As a student, if I open the same case in two browser tabs and pass the quiz on one, I want the other submission to be rejected, so that I don't receive duplicate certificates.
-42. As a student, if the deadline passes while I am mid-quiz, I am immediately blocked from submitting the attempt, so that the published deadline is strictly enforced.
+14. As a student, I want to view a "Coming soon" message on my dashboard when no active case exists, so that I know the platform is still active.
+15. As a student, I want to receive an email when a new case is published, so that I don't miss it.
+16. As a student, I want to read a case presentation with clinical scenario (that may include pertinent information like patient history, and lab results), so that I can understand the medical context.
+17. As a student, I want to write a personal analysis (150–700 words) for each case, so that I can practice clinical reasoning.
+18. As a student, I want my analysis to remain editable until I pass the CME quiz, so that I can refine my thinking after reviewing the model answer.
+19. As a student, I want to submit my analysis and view the teacher's model answer side-by-side with my own, so that I can compare my clinical reasoning to an expert's.
+20. As a student, I want to access teaching resources (lecture text, optional PDF and attachments), so that I can deepen my understanding of the case.
+21. As a student, I want to take a CME quiz of 3–5 multiple-choice questions per case, so that I can demonstrate my understanding.
+22. As a student, I must answer all quiz questions correctly to pass, so that I demonstrate full comprehension before earning credit.
+23. As a student, if I fail the quiz 3 times, I want to be navigated back to the teaching resources to review, so that I can re-engage with the material before retrying.
+24. As a student, I want unlimited quiz retries after review, so that I can learn at my own pace.
+25. As a student, I want to receive a downloadable PDF certificate upon passing the quiz, so that I have proof of my CE credit.
+26. As a student, I want my certificate to include my full name, case title, completion date, CE credit hours, ECCS branding, partner logo, and a unique certificate ID, so that it is accepted for license renewal.
+27. As a student, I want certificates to remain downloadable from my account, so that I can produce them for licensing audits years later.
+28. As a student, I want to view and download all my earned certificates from a dedicated page, so that I can manage my CE credit records.
+29. As a student, I want to leave optional feedback (rating/comment) on a case after completion, so that I can share my experience with teachers.
+30. As a student, I want to change my email address and verify the new one via a confirmation link before it takes effect, so that my account stays secure.
+31. As a student, I want to change my full name in my profile, so that my account reflects my current name.
+32. As a student, I want past certificates to show the name I had when I earned them, so that my CE credits remain traceable to that point in time.
+33. As a student, I want to change my password, so that my account stays secure.
+34. As a student, when I change my password, I want all other active sessions to be invalidated, so that old devices or compromised tokens can't access my account.
+35. As a student, I want password reset requests to be rate-limited (max 5 per hour), so that my inbox isn't spammed.
+36. As a student, I want password reset tokens to expire after 60 minutes, so that a stale link cannot be reused.
+37. As a student, I want to log out securely, so that my account is protected on shared devices.
+38. [Deferred until payment provider research] As a student, if my payment fails, I want to be blocked from progressing on the active case but still able to download past certificates and access my profile, so that I can resolve payment without losing earned credits.
+39. [Deferred until payment provider research] As a student, I want my subscription to activate immediately after successful payment/checkout so that I can access cases right away.
+40. As a student, if I open the same case in two browser tabs and pass the quiz on one, I want the other submission to be rejected, so that I don't receive duplicate certificates.
+41. As a student, if the deadline passes while I am mid-quiz, I am immediately blocked from submitting the attempt, so that the published deadline is strictly enforced.
 
 ### Teacher Educator
 
@@ -167,11 +167,12 @@ Feedback is shown to the teacher with the student's name in v1.
 **Password reset flow:**
 
 1. User clicks "Forgot password" → enters email
-2. Rate limited: max 3 requests per email per hour
-3. Email sent with magic link containing token
-4. User clicks link → enters new password → confirm
-5. Confirmation email sent: "Your password was changed."
-6. Completing password reset invalidates all existing sessions. The user must log in again with the new password.
+2. Rate limited: max 5 requests per email per hour
+3. Email sent with reset link containing token, but not the user's email address.
+4. User clicks the link → enters email, new password, and confirmation.
+5. Server confirms the reset with the identity provider using the entered email and URL code.
+6. Confirmation email sent: "Your password was changed."
+7. Completing password reset invalidates all existing sessions. The user must log in again with the new password.
 
 **Password change (while logged in):**
 
@@ -196,9 +197,9 @@ Feedback is shown to the teacher with the student's name in v1.
 
 1. Cognito is the auth/user source of truth for identity, credentials, email verification, and login eligibility.
 2. DynamoDB stores app profile, role mirror, registration workflow state, certificate facts, case progress, and teacher/student product records.
-3. better-auth acts as the app auth integration layer where useful; it does not replace Cognito user management.
+3. better-auth acts as the app auth integration layer and can bridge identity-provider login into product sessions; it does not replace cognito user management.
 4. Use Cognito groups for coarse roles (`student`, `teacher`) and mirror effective role into DynamoDB profile records for app queries/display.
-5. App workflow records support product behaviors such as pending-registration resend limits and cleanup, but they do not replace Cognito as the authority for successful login.
+5. App workflow records support product behaviors such as pending-registration resend limits and cleanup, but they do not replace cognito as the authority for successful login.
 
 ### Edge Cases
 
@@ -256,7 +257,7 @@ Tests verify external behavior, not implementation details. A test should break 
 #### Smoke tests with real infrastructure
 
 - **Case workflow** — walk through the full student flow (presentation → analysis → model answer → quiz → certificate). Verifies state transitions, word count validation, quiz pass/fail branching, and the 3-fail review redirect.
-- **Password reset** — test rate limiting (3rd request within hour is rejected), token expiry (15 min), single-use token (second attempt with same token fails), and session invalidation (old token rejected after password change).
+- **Password reset** — test Cognito forgot-password and confirm-password behavior, Resend custom email delivery, reset links containing the Cognito code but not the user's email address, old-password rejection after reset, confirmation email delivery, and session invalidation after password change.
 - **Email change** — test that new email is not applied until verification is successful.
 - **Registration verification** — test active pending registration blocks duplicate registration, expired pending registrations are cleaned up, login is blocked before verification, and verification sends the user to login.
 - **Deadline cutoff** — test that a case becomes inaccessible to students immediately after the UAE deadline, including blocking in-progress quiz submission.
