@@ -16,11 +16,10 @@ import type {
 	CognitoSignInResponse,
 } from "@/features/auth/login/api";
 import type { StudentProfileRecord } from "@/features/auth/registration/repository";
+import { hasStudentCognitoGroup } from "@/lib/auth/cognito-groups";
 import type { CognitoIdTokenVerifier } from "./cognito-id-token-verifier";
 
-type AuthEndpointContext = Parameters<
-	Parameters<typeof createAuthEndpoint>[2]
->[0];
+type AuthEndpointContext = Parameters<typeof setSessionCookie>[0];
 
 export interface CognitoSessionIdentityProvider {
 	authenticateStudent(args: {
@@ -138,6 +137,18 @@ export function cognitoSessionBridge(
 							);
 						}
 
+						if (!hasStudentCognitoGroup(verified.groups)) {
+							return bridgeResponse(
+								ctx,
+								options,
+								failure(
+									"unauthorized_role",
+									"This sign-in area is for student accounts.",
+									input,
+								),
+							);
+						}
+
 						const profile = await options.profiles.getStudentProfileById(
 							verified.cognitoSub,
 						);
@@ -245,7 +256,9 @@ function bridgeResponse(
 	options: CognitoSessionBridgeOptions,
 	response: CognitoSignInResponse,
 ) {
-	if (!isHtmlFormRequest(ctx.request.headers)) {
+	const request = requiredRequest(ctx);
+
+	if (!isHtmlFormRequest(request.headers)) {
 		return ctx.json(response);
 	}
 
@@ -253,17 +266,25 @@ function bridgeResponse(
 		throw ctx.redirect(
 			new URL(
 				response.redirectTo,
-				redirectBaseUrl(ctx.request.headers, options),
+				redirectBaseUrl(request.headers, options),
 			).toString(),
 		);
 	}
 
 	throw ctx.redirect(
 		loginRedirectUrl(
-			redirectBaseUrl(ctx.request.headers, options),
+			redirectBaseUrl(request.headers, options),
 			response.status,
 		),
 	);
+}
+
+function requiredRequest(ctx: AuthEndpointContext) {
+	if (!ctx.request) {
+		throw new Error("Cognito sign-in endpoint requires a request context.");
+	}
+
+	return ctx.request;
 }
 
 function failure(

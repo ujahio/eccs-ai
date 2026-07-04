@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { betterAuth } from "better-auth";
 import { LoginBlockedUntilVerifiedError } from "@/features/auth/login/service";
 import type { StudentProfileRecord } from "@/features/auth/registration/repository";
+import { COGNITO_GROUPS } from "@/lib/auth/cognito-groups";
 import {
 	cognitoSessionBridge,
 	type CognitoSessionIdentityProvider,
@@ -47,7 +48,7 @@ class FakeVerifier implements CognitoIdTokenVerifier {
 		cognitoSub: profile.profileId,
 		emailNormalized: profile.emailNormalized,
 		emailVerified: true,
-		groups: ["student"],
+		groups: [COGNITO_GROUPS.student],
 	};
 
 	async verifyIdToken() {
@@ -98,7 +99,9 @@ function createAuthHarness() {
 	};
 }
 
-async function postSignIn(auth: ReturnType<typeof betterAuth>, body: unknown) {
+type AuthHarness = ReturnType<typeof createAuthHarness>["auth"];
+
+async function postSignIn(auth: AuthHarness, body: unknown) {
 	return auth.handler(
 		new Request("http://localhost:3001/api/auth/cognito/sign-in", {
 			method: "POST",
@@ -112,7 +115,7 @@ async function postSignIn(auth: ReturnType<typeof betterAuth>, body: unknown) {
 }
 
 async function postFormSignIn(
-	auth: ReturnType<typeof betterAuth>,
+	auth: AuthHarness,
 	body: URLSearchParams,
 ) {
 	return auth.handler(
@@ -214,6 +217,24 @@ describe("cognitoSessionBridge", () => {
 
 		expect(body.status).toBe("missing_profile");
 		expect(body.message).toBe("We could not load your account profile.");
+		expect(response.headers.get("set-cookie")).toBeNull();
+	});
+
+	it("fails closed when Cognito has not authorized the student group", async () => {
+		const { auth, tokenVerifier } = createAuthHarness();
+		tokenVerifier.result = {
+			...tokenVerifier.result,
+			groups: [],
+		};
+
+		const response = await postSignIn(auth, {
+			email: "student@example.com",
+			password: "casework1",
+		});
+		const body = await response.json();
+
+		expect(body.status).toBe("unauthorized_role");
+		expect(body.message).toBe("This sign-in area is for student accounts.");
 		expect(response.headers.get("set-cookie")).toBeNull();
 	});
 });

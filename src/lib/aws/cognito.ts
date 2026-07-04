@@ -7,6 +7,7 @@ import {
 	AdminDisableUserCommand,
 	AdminEnableUserCommand,
 	AdminGetUserCommand,
+	AdminListGroupsForUserCommand,
 	AdminSetUserPasswordCommand,
 	AdminUpdateUserAttributesCommand,
 	CognitoIdentityProviderClient,
@@ -23,8 +24,10 @@ import {
 	type CreatePendingStudentResult,
 	type RegistrationIdentityProvider
 } from "@/features/auth/registration/identity";
-
-const STUDENT_GROUP_NAME = "student";
+import {
+	COGNITO_GROUPS,
+	hasStudentCognitoGroup
+} from "@/lib/auth/cognito-groups";
 
 export class CognitoAuthAdapter
 	implements RegistrationIdentityProvider, LoginIdentityProvider
@@ -114,7 +117,7 @@ export class CognitoAuthAdapter
 			new AdminAddUserToGroupCommand({
 				UserPoolId: this.userPoolId,
 				Username: args.emailNormalized,
-				GroupName: STUDENT_GROUP_NAME
+				GroupName: COGNITO_GROUPS.student
 			})
 		);
 	}
@@ -178,6 +181,42 @@ export class CognitoAuthAdapter
 				name === "UserNotFoundException"
 			) {
 				throw new InvalidLoginCredentialsError();
+			}
+
+			throw error;
+		}
+	}
+
+	async isStudentLoginEligible(args: { emailNormalized: string }) {
+		try {
+			const user = await this.client.send(
+				new AdminGetUserCommand({
+					UserPoolId: this.userPoolId,
+					Username: args.emailNormalized
+				})
+			);
+			const emailVerified = user.UserAttributes?.some(
+				(attribute) =>
+					attribute.Name === "email_verified" && attribute.Value === "true"
+			);
+
+			if (!user.Enabled || !emailVerified) {
+				return false;
+			}
+
+			const groups = await this.client.send(
+				new AdminListGroupsForUserCommand({
+					UserPoolId: this.userPoolId,
+					Username: args.emailNormalized
+				})
+			);
+
+			return hasStudentCognitoGroup(
+				groups.Groups?.map((group) => group.GroupName ?? "") ?? []
+			);
+		} catch (error) {
+			if (errorName(error) === "UserNotFoundException") {
+				return false;
 			}
 
 			throw error;

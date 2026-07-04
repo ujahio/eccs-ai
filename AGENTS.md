@@ -78,6 +78,7 @@ Single-context repo. Read `PRD.md` for product scope and `DESIGN.md` for UI rule
 - When using sub-agents to implement features, act as a coordinator only
 - Use the best model for the task - premium models for complex tasks (like coding) and mid-tier models for simpler tasks, like documentation
 - Run lint, typecheck, and build only after a commit has taken place or when the user explicitly asks for those checks.
+- When code is ready for manual testing, ask the user to manually test it before staging or committing.
 
 ## Context7
 
@@ -94,7 +95,10 @@ SST dev locally after authenticating to AWS.
 
 ### Github Authentication
 
-- For any task that requires Github authentication or reading of .github or related files, ask the user before performing the task. Explain if necessary why authentication is needed. Do not perform any github actions without asking first.
+- GitHub operations are allowed for this repository through the `gh` CLI, including reading issues/PRs, commenting, applying labels, creating branches, opening PRs, and closeout workflow steps.
+- Do not ask for separate approval before routine `gh` operations in this repository.
+- Use the currently authenticated GitHub session. If authentication is missing or insufficient, report the blocker and ask the user to authenticate.
+- Do not read or modify secrets. Treat `.github` workflow/config files as normal repo files only when they are relevant to the task.
 
 ### Branch, PR, And Issue Closeout Workflow
 
