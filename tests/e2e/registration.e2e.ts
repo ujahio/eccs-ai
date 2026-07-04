@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import type { CognitoGroupName } from "@/lib/auth/cognito-groups";
 
 function uniqueEmail() {
 	return `e2e-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
@@ -22,7 +23,7 @@ async function fetchVerificationUrl(
 async function updateE2EStudentEligibility(
 	request: APIRequestContext,
 	email: string,
-	update: { enabled?: boolean; groups?: string[] }
+	update: { enabled?: boolean; groups?: CognitoGroupName[] }
 ) {
 	const response = await request.patch("/api/e2e/auth/state", {
 		data: {

@@ -24,8 +24,10 @@ import {
 	type CreatePendingStudentResult,
 	type RegistrationIdentityProvider
 } from "@/features/auth/registration/identity";
-
-const STUDENT_GROUP_NAME = "student";
+import {
+	COGNITO_GROUPS,
+	hasStudentCognitoGroup
+} from "@/lib/auth/cognito-groups";
 
 export class CognitoAuthAdapter
 	implements RegistrationIdentityProvider, LoginIdentityProvider
@@ -115,7 +117,7 @@ export class CognitoAuthAdapter
 			new AdminAddUserToGroupCommand({
 				UserPoolId: this.userPoolId,
 				Username: args.emailNormalized,
-				GroupName: STUDENT_GROUP_NAME
+				GroupName: COGNITO_GROUPS.student
 			})
 		);
 	}
@@ -209,8 +211,8 @@ export class CognitoAuthAdapter
 				})
 			);
 
-			return Boolean(
-				groups.Groups?.some((group) => group.GroupName === STUDENT_GROUP_NAME)
+			return hasStudentCognitoGroup(
+				groups.Groups?.map((group) => group.GroupName ?? "") ?? []
 			);
 		} catch (error) {
 			if (errorName(error) === "UserNotFoundException") {

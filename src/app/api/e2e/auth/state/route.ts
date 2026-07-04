@@ -4,6 +4,7 @@ import {
 	isE2EMode,
 	resetE2EAuthStore
 } from "@/lib/e2e/in-memory-auth";
+import { isKnownCognitoGroup } from "@/lib/auth/cognito-groups";
 
 export async function GET() {
 	if (!isE2EMode()) {
@@ -61,9 +62,7 @@ export async function PATCH(request: Request) {
 	}
 
 	if (Array.isArray(body.groups)) {
-		user.groups = body.groups.filter(
-			(group: unknown): group is string => typeof group === "string"
-		);
+		user.groups = body.groups.filter(isKnownCognitoGroup);
 	}
 
 	return NextResponse.json({

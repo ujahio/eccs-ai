@@ -3,13 +3,17 @@ import "server-only";
 import { CognitoJwtVerifier } from "aws-jwt-verify";
 import type { CognitoIdTokenPayload } from "aws-jwt-verify/jwt-model";
 import { normalizeEmail } from "@/features/auth/registration/schema";
+import {
+	isKnownCognitoGroup,
+	type CognitoGroupName
+} from "@/lib/auth/cognito-groups";
 import { getE2EAuthStore } from "@/lib/e2e/in-memory-auth";
 
 export type VerifiedCognitoIdToken = {
 	cognitoSub: string;
 	emailNormalized: string;
 	emailVerified: boolean;
-	groups: string[];
+	groups: CognitoGroupName[];
 };
 
 export interface CognitoIdTokenVerifier {
@@ -59,9 +63,7 @@ function toVerifiedToken(
 ): VerifiedCognitoIdToken {
 	const email = typeof payload.email === "string" ? payload.email : "";
 	const groups = Array.isArray(payload["cognito:groups"])
-		? payload["cognito:groups"].filter(
-				(group): group is string => typeof group === "string"
-			)
+		? payload["cognito:groups"].filter(isKnownCognitoGroup)
 		: [];
 
 	if (!payload.sub || !email) {

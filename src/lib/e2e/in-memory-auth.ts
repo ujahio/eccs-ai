@@ -26,6 +26,11 @@ import {
 	VerificationResendLimitExceededError,
 	VerificationTokenAlreadyConsumedError
 } from "@/features/auth/registration/repository";
+import {
+	COGNITO_GROUPS,
+	hasStudentCognitoGroup,
+	type CognitoGroupName
+} from "@/lib/auth/cognito-groups";
 
 export type E2EEmailRecord = {
 	to: string;
@@ -43,7 +48,7 @@ type E2EAuthStoreShape = {
 		{
 			cognitoSub: string;
 			enabled: boolean;
-			groups: string[];
+			groups: CognitoGroupName[];
 			password: string;
 		}
 	>;
@@ -126,7 +131,7 @@ export class InMemoryIdentityProvider
 		}
 
 		user.enabled = true;
-		user.groups = ["student"];
+		user.groups = [COGNITO_GROUPS.student];
 	}
 
 	async deletePendingStudent(emailNormalized: string) {
@@ -163,7 +168,7 @@ export class InMemoryIdentityProvider
 	async isStudentLoginEligible(args: { emailNormalized: string }) {
 		const user = getStore().users.get(args.emailNormalized);
 
-		return Boolean(user?.enabled && user.groups.includes("student"));
+		return Boolean(user?.enabled && hasStudentCognitoGroup(user.groups));
 	}
 }
 

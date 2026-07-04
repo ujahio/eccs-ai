@@ -16,6 +16,7 @@ import type {
 	CognitoSignInResponse,
 } from "@/features/auth/login/api";
 import type { StudentProfileRecord } from "@/features/auth/registration/repository";
+import { hasStudentCognitoGroup } from "@/lib/auth/cognito-groups";
 import type { CognitoIdTokenVerifier } from "./cognito-id-token-verifier";
 
 type AuthEndpointContext = Parameters<typeof setSessionCookie>[0];
@@ -136,7 +137,7 @@ export function cognitoSessionBridge(
 							);
 						}
 
-						if (!verified.groups.includes("student")) {
+						if (!hasStudentCognitoGroup(verified.groups)) {
 							return bridgeResponse(
 								ctx,
 								options,

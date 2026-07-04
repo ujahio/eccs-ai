@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { betterAuth } from "better-auth";
 import { LoginBlockedUntilVerifiedError } from "@/features/auth/login/service";
 import type { StudentProfileRecord } from "@/features/auth/registration/repository";
+import { COGNITO_GROUPS } from "@/lib/auth/cognito-groups";
 import {
 	cognitoSessionBridge,
 	type CognitoSessionIdentityProvider,
@@ -47,7 +48,7 @@ class FakeVerifier implements CognitoIdTokenVerifier {
 		cognitoSub: profile.profileId,
 		emailNormalized: profile.emailNormalized,
 		emailVerified: true,
-		groups: ["student"],
+		groups: [COGNITO_GROUPS.student],
 	};
 
 	async verifyIdToken() {
