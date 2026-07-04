@@ -4,16 +4,12 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { ArrowRightIcon } from "@/components/ui/arrow-right-icon";
 import { Button } from "@/components/ui/button";
-import {
-	AuthStatusMessage,
-	fieldError,
-	inputClasses,
-	type StatusTone
-} from "@/features/auth/form-helpers";
+import { fieldError, inputClasses } from "@/features/auth/form-helpers";
 import {
 	initialPasswordResetRequestFormState,
 	type PasswordResetRequestFormState
 } from "./state";
+import { PasswordResetStatusMessage } from "./status-message";
 
 type PasswordResetRequestFormProps = {
 	action: (
@@ -22,35 +18,6 @@ type PasswordResetRequestFormProps = {
 	) => Promise<PasswordResetRequestFormState>;
 	initialState?: PasswordResetRequestFormState;
 };
-
-function StatusMessage({ state }: { state: PasswordResetRequestFormState }) {
-	if (!state.message) {
-		return null;
-	}
-
-	const tone: StatusTone =
-		state.status === "success"
-			? "success"
-			: state.status === "notice"
-				? "warning"
-				: "error";
-	const testId =
-		state.status === "success"
-			? "forgot-password-success-message"
-			: state.status === "notice"
-				? "forgot-password-notice-message"
-				: "forgot-password-error-message";
-
-	return (
-		<AuthStatusMessage
-			role={state.status === "error" ? "alert" : "status"}
-			testId={testId}
-			tone={tone}
-		>
-			{state.message}
-		</AuthStatusMessage>
-	);
-}
 
 export function PasswordResetRequestForm({
 	action,
@@ -101,7 +68,10 @@ export function PasswordResetRequestForm({
 				) : null}
 			</div>
 
-			<StatusMessage state={state} />
+			<PasswordResetStatusMessage
+				state={state}
+				testIdPrefix="forgot-password"
+			/>
 
 			<Button
 				className="group mt-6 w-full justify-start px-5 text-left transition duration-200 hover:!bg-action-hover"

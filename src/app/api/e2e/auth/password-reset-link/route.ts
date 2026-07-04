@@ -1,28 +1,16 @@
 import { NextResponse } from "next/server";
-import { getE2EAdapters, isE2EMode } from "@/lib/e2e/in-memory-auth";
+import { getE2EAdapters } from "@/lib/e2e/in-memory-auth";
+import { getRequiredE2EEmailParam } from "@/lib/e2e/route-helpers";
 
 export async function GET(request: Request) {
-	if (!isE2EMode()) {
-		return NextResponse.json(
-			{ error: "This endpoint is only available in e2e mode." },
-			{ status: 403 }
-		);
-	}
+	const emailResult = getRequiredE2EEmailParam(request);
 
-	const url = new URL(request.url);
-	const email = url.searchParams.get("email");
-
-	if (!email) {
-		return NextResponse.json(
-			{ error: "Missing required query parameter: email" },
-			{ status: 400 }
-		);
+	if ("response" in emailResult) {
+		return emailResult.response;
 	}
 
 	const { email: emailSender } = getE2EAdapters();
-	const resetUrl = emailSender.getLastPasswordResetUrl(
-		email.toLowerCase().trim()
-	);
+	const resetUrl = emailSender.getLastPasswordResetUrl(emailResult.email);
 
 	if (!resetUrl) {
 		return NextResponse.json(

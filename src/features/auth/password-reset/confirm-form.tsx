@@ -4,18 +4,17 @@ import { useActionState, useState } from "react";
 import { ArrowRightIcon } from "@/components/ui/arrow-right-icon";
 import { Button } from "@/components/ui/button";
 import {
-	AuthStatusMessage,
 	PasswordVisibilityToggle,
 	authPasswordInputClasses,
 	fieldError,
 	inputClasses,
-	passwordShellClasses,
-	type StatusTone
+	passwordShellClasses
 } from "@/features/auth/form-helpers";
 import {
 	initialPasswordResetConfirmFormState,
 	type PasswordResetConfirmFormState
 } from "./state";
+import { PasswordResetStatusMessage } from "./status-message";
 
 type PasswordResetConfirmFormProps = {
 	action: (
@@ -24,35 +23,6 @@ type PasswordResetConfirmFormProps = {
 	) => Promise<PasswordResetConfirmFormState>;
 	code: string;
 };
-
-function StatusMessage({ state }: { state: PasswordResetConfirmFormState }) {
-	if (!state.message) {
-		return null;
-	}
-
-	const tone: StatusTone =
-		state.status === "success"
-			? "success"
-			: state.status === "notice"
-				? "warning"
-				: "error";
-	const testId =
-		state.status === "success"
-			? "reset-password-success-message"
-			: state.status === "notice"
-				? "reset-password-notice-message"
-				: "reset-password-error-message";
-
-	return (
-		<AuthStatusMessage
-			role={state.status === "error" ? "alert" : "status"}
-			testId={testId}
-			tone={tone}
-		>
-			{state.message}
-		</AuthStatusMessage>
-	);
-}
 
 export function PasswordResetConfirmForm({
 	action,
@@ -203,7 +173,7 @@ export function PasswordResetConfirmForm({
 				</div>
 			</div>
 
-			<StatusMessage state={state} />
+			<PasswordResetStatusMessage state={state} testIdPrefix="reset-password" />
 
 			<Button
 				className="group mt-6 w-full justify-start px-5 text-left transition duration-200 hover:!bg-action-hover"
