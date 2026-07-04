@@ -12,7 +12,8 @@ Use the `gh` CLI for issue operations after the user explicitly approves GitHub-
 - **Branch scope**: do not implement issue work directly on `main`. Keep one implementation branch focused on one issue unless the user explicitly asks otherwise.
 - **Read an issue**: `gh issue view <number> --comments`.
 - **List issues**: `gh issue list --state open --json number,title,body,labels,comments`.
-- **Comment on an issue**: `gh issue comment <number> --body "..."`
+- **Comment on an issue**: first check whether the issue is open. If it is open, run `gh issue comment <number> --body "..."`. If it is closed, do not add the comment.
+- **Comment on a PR**: first check whether the PR is open. If it is open, add the comment. If it is closed or merged, do not add the comment.
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: `gh issue close <number> --comment "..."`
 - **Closeout PR**: when implementation work is ready, create a pull request before closing the issue. The PR body must mention and link the issue it solves, using GitHub closing keywords such as `Closes #123` where appropriate.
@@ -43,6 +44,7 @@ Briefly describe the user-facing or system-level outcome of this PR.
 
 - Note if the current issue changed during implementation.
 - Note any downstream or related issues affected by changes to the current issue.
+- If adding comments to affected issues or PRs, check whether each issue or PR is open first. Comment only on open issues or PRs.
 - If no issue notes apply, write `None`.
 
 ## Verification
