@@ -5,6 +5,7 @@ import {
 } from "@aws-crypto/client-node";
 import { Resend } from "resend";
 import { Resource } from "sst";
+import type { LinkedResources } from "@/lib/aws/resources";
 
 type CognitoCustomEmailSenderEvent = {
 	triggerSource: string;
@@ -19,6 +20,7 @@ type CognitoCustomEmailSenderEvent = {
 const { decrypt } = buildClient(
 	CommitmentPolicy.REQUIRE_ENCRYPT_ALLOW_DECRYPT
 );
+const linkedResources = Resource as unknown as Partial<LinkedResources>;
 
 export async function handler(event: CognitoCustomEmailSenderEvent) {
 	if (event.triggerSource !== "CustomEmailSender_ForgotPassword") {
@@ -34,7 +36,7 @@ export async function handler(event: CognitoCustomEmailSenderEvent) {
 
 	const code = await decryptCode(encryptedCode);
 	const resetUrl = resetPasswordUrl(code);
-	const resend = new Resend(Resource.ResendApiKey.value);
+	const resend = new Resend(resendApiKey());
 
 	await resend.emails.send({
 		from:
@@ -51,6 +53,16 @@ export async function handler(event: CognitoCustomEmailSenderEvent) {
 	});
 
 	return event;
+}
+
+function resendApiKey() {
+	const apiKey = linkedResources.ResendApiKey?.value;
+
+	if (!apiKey) {
+		throw new Error("Missing required auth resource: ResendApiKey.value");
+	}
+
+	return apiKey;
 }
 
 async function decryptCode(encryptedCode: string) {
