@@ -96,6 +96,7 @@ SST dev locally after authenticating to AWS.
 ### Github Authentication
 
 - GitHub operations are allowed for this repository through the `gh` CLI, including reading issues/PRs, commenting, applying labels, creating branches, opening PRs, and closeout workflow steps.
+- Do not ask for separate approval before routine `gh` operations in this repository.
 - Use the currently authenticated GitHub session. If authentication is missing or insufficient, report the blocker and ask the user to authenticate.
 - Do not read or modify secrets. Treat `.github` workflow/config files as normal repo files only when they are relevant to the task.
 

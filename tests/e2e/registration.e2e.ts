@@ -83,6 +83,31 @@ async function loginStudent(page: Page, email: string) {
 	await page.getByTestId("login-submit").click();
 }
 
+async function verifyStudentEmail(
+	page: Page,
+	request: APIRequestContext,
+	email: string
+) {
+	const verificationUrl = await fetchVerificationUrl(request, email);
+
+	await page.goto(verificationUrl);
+	await expect(page).toHaveURL(/\/login\?verification=verified/);
+}
+
+async function registerVerifiedAndLoginStudent(
+	page: Page,
+	request: APIRequestContext,
+	email: string
+) {
+	await registerStudent(page, { email });
+	await expect(page.getByTestId("register-success-message")).toBeVisible();
+
+	await verifyStudentEmail(page, request, email);
+	await loginStudent(page, email);
+
+	await expect(page).toHaveURL(/\/student$/);
+}
+
 async function submitRegistrationRepeatedly(
 	page: Page,
 	values: RegistrationFormValues,
@@ -242,18 +267,7 @@ test.describe("Student registration and email verification", () => {
 	}) => {
 		const email = uniqueEmail();
 
-		await registerStudent(page, { email });
-
-		await expect(page.getByTestId("register-success-message")).toBeVisible();
-
-		const verificationUrl = await fetchVerificationUrl(request, email);
-
-		await page.goto(verificationUrl);
-		await expect(page).toHaveURL(/\/login\?verification=verified/);
-
-		await loginStudent(page, email);
-
-		await expect(page).toHaveURL(/\/student$/);
+		await registerVerifiedAndLoginStudent(page, request, email);
 		await expect(page.getByTestId("student-dashboard-heading")).toBeVisible();
 	});
 
@@ -263,18 +277,7 @@ test.describe("Student registration and email verification", () => {
 	}) => {
 		const email = uniqueEmail();
 
-		await registerStudent(page, { email });
-
-		await expect(page.getByTestId("register-success-message")).toBeVisible();
-
-		const verificationUrl = await fetchVerificationUrl(request, email);
-
-		await page.goto(verificationUrl);
-		await expect(page).toHaveURL(/\/login\?verification=verified/);
-
-		await loginStudent(page, email);
-
-		await expect(page).toHaveURL(/\/student$/);
+		await registerVerifiedAndLoginStudent(page, request, email);
 		await page.getByTestId("student-logout-button").click();
 
 		await expect(page).toHaveURL(/\/login$/);
@@ -289,18 +292,7 @@ test.describe("Student registration and email verification", () => {
 	}) => {
 		const email = uniqueEmail();
 
-		await registerStudent(page, { email });
-
-		await expect(page.getByTestId("register-success-message")).toBeVisible();
-
-		const verificationUrl = await fetchVerificationUrl(request, email);
-
-		await page.goto(verificationUrl);
-		await expect(page).toHaveURL(/\/login\?verification=verified/);
-
-		await loginStudent(page, email);
-
-		await expect(page).toHaveURL(/\/student$/);
+		await registerVerifiedAndLoginStudent(page, request, email);
 
 		await updateE2EStudentEligibility(request, email, { enabled: false });
 		await page.goto("/student");
