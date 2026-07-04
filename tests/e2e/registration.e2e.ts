@@ -1,11 +1,11 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
 function uniqueEmail() {
 	return `e2e-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
 }
 
 async function fetchVerificationUrl(
-	request: import("@playwright/test").APIRequestContext,
+	request: APIRequestContext,
 	email: string
 ): Promise<string> {
 	const response = await request.get(
@@ -17,6 +17,21 @@ async function fetchVerificationUrl(
 	const body = await response.json();
 
 	return body.verificationUrl;
+}
+
+async function updateE2EStudentEligibility(
+	request: APIRequestContext,
+	email: string,
+	update: { enabled?: boolean; groups?: string[] }
+) {
+	const response = await request.patch("/api/e2e/auth/state", {
+		data: {
+			email,
+			...update
+		}
+	});
+
+	expect(response.ok()).toBe(true);
 }
 
 const validRegistration = {
@@ -59,6 +74,13 @@ async function submitRegistrationForm(
 async function registerStudent(page: Page, values: RegistrationFormValues) {
 	await page.goto("/register");
 	await submitRegistrationForm(page, values);
+}
+
+async function loginStudent(page: Page, email: string) {
+	await page.goto("/login");
+	await page.getByTestId("login-email").fill(email);
+	await page.getByTestId("login-password").fill(validRegistration.password);
+	await page.getByTestId("login-submit").click();
 }
 
 async function submitRegistrationRepeatedly(
@@ -229,12 +251,62 @@ test.describe("Student registration and email verification", () => {
 		await page.goto(verificationUrl);
 		await expect(page).toHaveURL(/\/login\?verification=verified/);
 
-		await page.getByTestId("login-email").fill(email);
-		await page.getByTestId("login-password").fill(validRegistration.password);
-		await page.getByTestId("login-submit").click();
+		await loginStudent(page, email);
 
 		await expect(page).toHaveURL(/\/student$/);
 		await expect(page.getByTestId("student-dashboard-heading")).toBeVisible();
+	});
+
+	test("logout clears the student session and protects the dashboard", async ({
+		page,
+		request
+	}) => {
+		const email = uniqueEmail();
+
+		await registerStudent(page, { email });
+
+		await expect(page.getByTestId("register-success-message")).toBeVisible();
+
+		const verificationUrl = await fetchVerificationUrl(request, email);
+
+		await page.goto(verificationUrl);
+		await expect(page).toHaveURL(/\/login\?verification=verified/);
+
+		await loginStudent(page, email);
+
+		await expect(page).toHaveURL(/\/student$/);
+		await page.getByTestId("student-logout-button").click();
+
+		await expect(page).toHaveURL(/\/login$/);
+		await page.goto("/student");
+		await expect(page).toHaveURL(/\/login$/);
+		await expect(page.getByTestId("login-heading")).toBeVisible();
+	});
+
+	test("student dashboard re-checks Cognito eligibility for an active session", async ({
+		page,
+		request
+	}) => {
+		const email = uniqueEmail();
+
+		await registerStudent(page, { email });
+
+		await expect(page.getByTestId("register-success-message")).toBeVisible();
+
+		const verificationUrl = await fetchVerificationUrl(request, email);
+
+		await page.goto(verificationUrl);
+		await expect(page).toHaveURL(/\/login\?verification=verified/);
+
+		await loginStudent(page, email);
+
+		await expect(page).toHaveURL(/\/student$/);
+
+		await updateE2EStudentEligibility(request, email, { enabled: false });
+		await page.goto("/student");
+
+		await expect(page).toHaveURL(/\/login$/);
+		await expect(page.getByTestId("login-heading")).toBeVisible();
 	});
 
 	test("login is blocked before email verification", async ({ page }) => {
@@ -252,6 +324,10 @@ test.describe("Student registration and email verification", () => {
 		await expect(page.getByTestId("login-blocked-message")).toHaveText(
 			"Verify your email before signing in."
 		);
+
+		await page.goto("/student");
+
+		await expect(page).toHaveURL(/\/login$/);
 	});
 
 	test("duplicate pending registration triggers resend", async ({

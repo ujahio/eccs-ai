@@ -7,6 +7,7 @@ import {
 	AdminDisableUserCommand,
 	AdminEnableUserCommand,
 	AdminGetUserCommand,
+	AdminListGroupsForUserCommand,
 	AdminSetUserPasswordCommand,
 	AdminUpdateUserAttributesCommand,
 	CognitoIdentityProviderClient,
@@ -178,6 +179,42 @@ export class CognitoAuthAdapter
 				name === "UserNotFoundException"
 			) {
 				throw new InvalidLoginCredentialsError();
+			}
+
+			throw error;
+		}
+	}
+
+	async isStudentLoginEligible(args: { emailNormalized: string }) {
+		try {
+			const user = await this.client.send(
+				new AdminGetUserCommand({
+					UserPoolId: this.userPoolId,
+					Username: args.emailNormalized
+				})
+			);
+			const emailVerified = user.UserAttributes?.some(
+				(attribute) =>
+					attribute.Name === "email_verified" && attribute.Value === "true"
+			);
+
+			if (!user.Enabled || !emailVerified) {
+				return false;
+			}
+
+			const groups = await this.client.send(
+				new AdminListGroupsForUserCommand({
+					UserPoolId: this.userPoolId,
+					Username: args.emailNormalized
+				})
+			);
+
+			return Boolean(
+				groups.Groups?.some((group) => group.GroupName === STUDENT_GROUP_NAME)
+			);
+		} catch (error) {
+			if (errorName(error) === "UserNotFoundException") {
+				return false;
 			}
 
 			throw error;

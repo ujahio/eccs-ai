@@ -49,7 +49,7 @@ export class E2ECognitoIdTokenVerifier implements CognitoIdTokenVerifier {
 			cognitoSub: user.cognitoSub,
 			emailNormalized,
 			emailVerified: true,
-			groups: ["student"],
+			groups: user.groups,
 		};
 	}
 }
@@ -75,4 +75,3 @@ function toVerifiedToken(
 		groups,
 	};
 }
-
