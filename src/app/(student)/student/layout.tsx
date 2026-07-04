@@ -3,6 +3,8 @@ import Link from "next/link";
 import { LogoutButton } from "@/features/auth/logout/logout-button";
 import { requireStudentSession } from "@/lib/auth/session";
 
+export const dynamic = "force-dynamic";
+
 export default async function StudentLayout({
   children
 }: Readonly<{
