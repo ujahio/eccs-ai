@@ -225,10 +225,6 @@ function EccsTransactionalEmail({
 						<Hr style={styles.divider} />
 						<Text style={styles.footerNote}>{footerNote}</Text>
 					</Section>
-					<Text style={styles.footer}>
-						E-Clinical Case Solutions sends account security emails
-						automatically.
-					</Text>
 				</Container>
 			</Body>
 		</Html>
@@ -285,13 +281,6 @@ const styles = {
 		fontSize: "12px",
 		lineHeight: "1.7",
 		margin: "0"
-	},
-	footer: {
-		color: "#72808C",
-		fontSize: "11px",
-		lineHeight: "1.6",
-		margin: "18px 0 0",
-		textAlign: "center" as const
 	},
 	footerNote: {
 		color: "#4B5A67",
