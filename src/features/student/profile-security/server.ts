@@ -28,6 +28,7 @@ export function createStudentProfileService() {
 	const email = new ResendRegistrationEmailSender(
 		resources.emailSender,
 		resources.resendApiKey,
+		resources.appBaseUrl,
 	);
 
 	return new StudentProfileService(identity, repository, email, {

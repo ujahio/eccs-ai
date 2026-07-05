@@ -34,6 +34,7 @@ export function createRegistrationService() {
 	const email = new ResendRegistrationEmailSender(
 		resources.emailSender,
 		resources.resendApiKey,
+		resources.appBaseUrl,
 	);
 
 	return new RegistrationService({

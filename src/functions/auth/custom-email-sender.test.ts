@@ -94,6 +94,8 @@ describe("resetPasswordUrl", () => {
 		expect(email.text).toContain(
 			"https://eccs.example/reset-password?code=654321"
 		);
+		expect(email.html).toContain("https://eccs.example/images/logo.png");
+		expect(email.html).toContain("Reset password");
 		expect(email.text).not.toContain("student@example.com");
 		expect(email.text).not.toContain("student%40example.com");
 	});

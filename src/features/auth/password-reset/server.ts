@@ -34,7 +34,8 @@ export function createPasswordResetService() {
 	);
 	const email = new ResendRegistrationEmailSender(
 		resources.emailSender,
-		resources.resendApiKey
+		resources.resendApiKey,
+		resources.appBaseUrl
 	);
 
 	return new PasswordResetService(

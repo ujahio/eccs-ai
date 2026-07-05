@@ -27,6 +27,7 @@
 		"@radix-ui/react-slot": "1.3.0",
 		"aws-jwt-verify": "5.2.1",
 		"better-auth": "1.6.11",
+		"jsx-email": "3.2.1",
 		"next": "16.2.9",
 		"react": "19.2.7",
 		"react-dom": "19.2.7",

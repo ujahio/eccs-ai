@@ -7,6 +7,14 @@ import type {
 	RegistrationVerificationEmail,
 } from "@/features/auth/registration/email";
 import type { StudentProfileEmailSender } from "@/features/student/profile-security/service";
+import {
+	emailLogoUrl,
+	forgotPasswordUrl,
+	renderEmailChangeVerificationEmail,
+	renderPasswordChangedEmail,
+	renderPasswordResetEmail,
+	renderRegistrationVerificationEmail,
+} from "@/lib/email-templates/transactional";
 
 export class ResendRegistrationEmailSender
 	implements
@@ -19,6 +27,8 @@ export class ResendRegistrationEmailSender
 	constructor(
 		private readonly sender: string,
 		apiKey: string,
+		private readonly appBaseUrl = process.env.NEXT_PUBLIC_APP_URL ??
+			"http://localhost:3001"
 	) {
 		this.client = new Resend(apiKey);
 	}
@@ -26,19 +36,19 @@ export class ResendRegistrationEmailSender
 	async sendRegistrationVerificationEmail(
 		email: RegistrationVerificationEmail,
 	) {
+		const content = await renderRegistrationVerificationEmail({
+			firstName: email.firstName,
+			verificationUrl: email.verificationUrl,
+			expiresInHours: email.expiresInHours,
+			logoUrl: emailLogoUrl(this.appBaseUrl),
+		});
+
 		await this.client.emails.send({
 			from: this.sender,
 			to: email.to,
 			subject: "Verify your ECCS account",
-			text: [
-				`Hello ${email.firstName},`,
-				"",
-				"Please verify your E-Clinical Case Solutions account.",
-				`This link expires in ${email.expiresInHours} hours:`,
-				email.verificationUrl,
-				"",
-				"If you did not request this account, you can ignore this email.",
-			].join("\n"),
+			html: content.html,
+			text: content.text
 		});
 	}
 
@@ -47,30 +57,33 @@ export class ResendRegistrationEmailSender
 		resetUrl: string;
 		expiresInMinutes: number;
 	}) {
+		const content = await renderPasswordResetEmail({
+			resetUrl: email.resetUrl,
+			expiresInMinutes: email.expiresInMinutes,
+			logoUrl: emailLogoUrl(this.appBaseUrl),
+		});
+
 		await this.client.emails.send({
 			from: this.sender,
 			to: email.to,
 			subject: "Reset your ECCS password",
-			text: [
-				"Please use this link to reset your E-Clinical Case Solutions password.",
-				`This link expires in ${email.expiresInMinutes} minutes:`,
-				email.resetUrl,
-				"",
-				"If you did not request a password reset, you can ignore this email."
-			].join("\n")
+			html: content.html,
+			text: content.text
 		});
 	}
 
 	async sendPasswordChangedEmail(email: { to: string }) {
+		const content = await renderPasswordChangedEmail({
+			forgotPasswordUrl: forgotPasswordUrl(this.appBaseUrl),
+			logoUrl: emailLogoUrl(this.appBaseUrl),
+		});
+
 		await this.client.emails.send({
 			from: this.sender,
 			to: email.to,
 			subject: "Your password was changed",
-			text: [
-				"Your E-Clinical Case Solutions password was changed.",
-				"",
-				"If you did not make this change, reset your password immediately."
-			].join("\n")
+			html: content.html,
+			text: content.text
 		});
 	}
 
@@ -79,17 +92,18 @@ export class ResendRegistrationEmailSender
 		verificationUrl: string;
 		expiresInHours: number;
 	}) {
+		const content = await renderEmailChangeVerificationEmail({
+			verificationUrl: email.verificationUrl,
+			expiresInHours: email.expiresInHours,
+			logoUrl: emailLogoUrl(this.appBaseUrl),
+		});
+
 		await this.client.emails.send({
 			from: this.sender,
 			to: email.to,
 			subject: "Verify your new ECCS email",
-			text: [
-				"Please verify this new email address for your E-Clinical Case Solutions account.",
-				`This link expires in ${email.expiresInHours} hours:`,
-				email.verificationUrl,
-				"",
-				"If you did not request this change, you can ignore this email."
-			].join("\n")
+			html: content.html,
+			text: content.text
 		});
 	}
 }
