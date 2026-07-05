@@ -12,6 +12,8 @@ const validRegistration = {
 	password: "casework1",
 };
 const changedPassword = "newcase1";
+const verificationEmailSentMessage =
+	"Check your email. Verification expires in 24 hours.";
 
 async function fetchVerificationUrl(
 	request: APIRequestContext,
@@ -78,7 +80,11 @@ async function registerStudent(page: Page, email: string) {
 	await page.getByTestId("register-password").fill(validRegistration.password);
 	await page.getByTestId("register-submit").click();
 
-	await expect(page.getByTestId("register-success-message")).toBeVisible();
+	await expect(page).toHaveURL(/\/login\?registration=verification_sent$/);
+	await expect(page.getByTestId("login-email")).toHaveValue("");
+	await expect(page.getByTestId("login-success-message")).toHaveText(
+		verificationEmailSentMessage,
+	);
 }
 
 async function verifyStudentEmail(

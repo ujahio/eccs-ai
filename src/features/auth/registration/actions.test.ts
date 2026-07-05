@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { createRegistrationService } from "./server";
 import {
@@ -9,6 +10,11 @@ import type { RegistrationFormState } from "./state";
 import { submitRegistrationForm } from "./actions";
 
 vi.mock("server-only", () => ({}));
+vi.mock("next/navigation", () => ({
+	redirect: vi.fn((url: string) => {
+		throw new Error(`NEXT_REDIRECT:${url}`);
+	})
+}));
 vi.mock("./server", () => ({
 	createRegistrationService: vi.fn()
 }));
@@ -22,6 +28,7 @@ const mockedRegistrationInputFromFormData = vi.mocked(
 	registrationInputFromFormData
 );
 const mockedFailedPasswordRequirements = vi.mocked(failedPasswordRequirements);
+const mockedRedirect = vi.mocked(redirect);
 
 const parsedInput = {
 	firstName: "Jordan",
@@ -47,29 +54,20 @@ function stubService(result: RegistrationServiceResult) {
 }
 
 describe("submitRegistrationForm", () => {
-	it("returns success state when verification is sent", async () => {
+	it("redirects to login when verification is sent", async () => {
 		stubService({
 			status: "verification_sent",
 			message: "Check your email."
 		});
 
-		const result = await submitRegistrationForm(
-			previousState,
-			new FormData()
+		await expect(
+			submitRegistrationForm(previousState, new FormData())
+		).rejects.toThrow(
+			"NEXT_REDIRECT:/login?registration=verification_sent"
 		);
-
-		expect(result).toEqual({
-			status: "success",
-			message: "Check your email.",
-			values: {
-				firstName: "",
-				lastName: "",
-				email: "jordan@example.com",
-				password: ""
-			},
-			errors: {},
-			failedPasswordRequirementIds: []
-		});
+		expect(mockedRedirect).toHaveBeenCalledWith(
+			"/login?registration=verification_sent"
+		);
 	});
 
 	it("returns error state with mapped field errors on validation failure", async () => {
@@ -163,8 +161,8 @@ describe("submitRegistrationForm", () => {
 
 	it("clears password from returned values", async () => {
 		stubService({
-			status: "verification_sent",
-			message: "Done."
+			status: "resend_blocked",
+			message: "Maximum requests reached."
 		});
 
 		const result = await submitRegistrationForm(

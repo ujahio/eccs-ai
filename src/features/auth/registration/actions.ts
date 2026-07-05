@@ -1,5 +1,6 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { createRegistrationService } from "./server";
 import { toFormErrors } from "../form-errors";
 import {
@@ -56,16 +57,5 @@ export async function submitRegistrationForm(
 		};
 	}
 
-	return {
-		status: "success",
-		message: result.message,
-		values: {
-			firstName: "",
-			lastName: "",
-			email: input.email,
-			password: ""
-		},
-		errors: {},
-		failedPasswordRequirementIds: []
-	};
+	redirect("/login?registration=verification_sent");
 }

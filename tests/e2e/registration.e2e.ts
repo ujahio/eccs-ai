@@ -40,6 +40,8 @@ const validRegistration = {
 	lastName: "Adebayo",
 	password: "casework1"
 };
+const verificationEmailSentMessage =
+	"Check your email. Verification expires in 24 hours.";
 
 type RegistrationFormValues = {
 	firstName?: string;
@@ -75,6 +77,7 @@ async function submitRegistrationForm(
 async function registerStudent(page: Page, values: RegistrationFormValues) {
 	await page.goto("/register");
 	await submitRegistrationForm(page, values);
+	await expectVerificationEmailSentLogin(page);
 }
 
 async function loginStudent(page: Page, email: string) {
@@ -101,7 +104,6 @@ async function registerVerifiedAndLoginStudent(
 	email: string
 ) {
 	await registerStudent(page, { email });
-	await expect(page.getByTestId("register-success-message")).toBeVisible();
 
 	await verifyStudentEmail(page, request, email);
 	await loginStudent(page, email);
@@ -117,8 +119,16 @@ async function submitRegistrationRepeatedly(
 	for (let i = 0; i < count; i++) {
 		await page.goto("/register");
 		await submitRegistrationForm(page, values);
-		await expect(page.getByTestId("register-success-message")).toBeVisible();
+		await expectVerificationEmailSentLogin(page);
 	}
+}
+
+async function expectVerificationEmailSentLogin(page: Page) {
+	await expect(page).toHaveURL(/\/login\?registration=verification_sent$/);
+	await expect(page.getByTestId("login-email")).toHaveValue("");
+	await expect(page.getByTestId("login-success-message")).toHaveText(
+		verificationEmailSentMessage
+	);
 }
 
 test.describe("Student registration and email verification", () => {
@@ -233,10 +243,6 @@ test.describe("Student registration and email verification", () => {
 
 		await registerStudent(page, { email });
 
-		await expect(page.getByTestId("register-success-message")).toHaveText(
-			"Check your email. Verification expires in 24 hours."
-		);
-
 		const verificationUrl = await fetchVerificationUrl(request, email);
 
 		expect(verificationUrl).toContain("/verify-email?token=");
@@ -249,8 +255,6 @@ test.describe("Student registration and email verification", () => {
 		const email = uniqueEmail();
 
 		await registerStudent(page, { email });
-
-		await expect(page.getByTestId("register-success-message")).toBeVisible();
 
 		const verificationUrl = await fetchVerificationUrl(request, email);
 
@@ -313,8 +317,6 @@ test.describe("Student registration and email verification", () => {
 
 		await registerStudent(page, { email });
 
-		await expect(page.getByTestId("register-success-message")).toBeVisible();
-
 		await page.goto("/login");
 		await page.getByTestId("login-email").fill(email);
 		await page.getByTestId("login-password").fill(validRegistration.password);
@@ -337,19 +339,16 @@ test.describe("Student registration and email verification", () => {
 
 		await registerStudent(page, { email });
 
-		await expect(page.getByTestId("register-success-message")).toBeVisible();
-
 		const firstVerificationUrl = await fetchVerificationUrl(request, email);
 
+		await page.goto("/register");
 		await submitRegistrationForm(page, {
 			firstName: "Changed",
 			lastName: "Name",
 			email
 		});
 
-		await expect(page.getByTestId("register-success-message")).toHaveText(
-			"Verification email sent. Please check your inbox."
-		);
+		await expectVerificationEmailSentLogin(page);
 
 		const verificationUrl = await fetchVerificationUrl(request, email);
 
@@ -368,6 +367,7 @@ test.describe("Student registration and email verification", () => {
 		const email = uniqueEmail();
 
 		await submitRegistrationRepeatedly(page, { email }, 3);
+		await page.goto("/register");
 		await submitRegistrationForm(page, { email });
 
 		await expect(page.getByTestId("register-resend-notice")).toHaveText(
@@ -381,6 +381,7 @@ test.describe("Student registration and email verification", () => {
 		const email = uniqueEmail();
 
 		await submitRegistrationRepeatedly(page, { email }, 3);
+		await page.goto("/register");
 		await submitRegistrationForm(page, { email });
 
 		await expect(page.getByTestId("register-resend-notice")).toBeVisible();

@@ -12,6 +12,8 @@ const validRegistration = {
 	password: "casework1"
 };
 const newPassword = "newcase1";
+const verificationEmailSentMessage =
+	"Check your email. Verification expires in 24 hours.";
 const resetRequestedMessage =
 	"If this account exists and has a verified email, a reset link has been sent. If you do not receive one, verify your email or contact support.";
 const invalidResetLinkMessage =
@@ -80,7 +82,11 @@ async function registerStudent(page: Page, email: string) {
 	await page.getByTestId("register-password").fill(validRegistration.password);
 	await page.getByTestId("register-submit").click();
 
-	await expect(page.getByTestId("register-success-message")).toBeVisible();
+	await expect(page).toHaveURL(/\/login\?registration=verification_sent$/);
+	await expect(page.getByTestId("login-email")).toHaveValue("");
+	await expect(page.getByTestId("login-success-message")).toHaveText(
+		verificationEmailSentMessage
+	);
 }
 
 async function verifyStudentEmail(

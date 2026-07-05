@@ -33,6 +33,16 @@ const verificationMessages: Record<
   }
 };
 
+const registrationMessages: Record<
+  string,
+  Pick<LoginFormState, "status" | "message">
+> = {
+  verification_sent: {
+    status: "success",
+    message: "Check your email. Verification expires in 24 hours."
+  }
+};
+
 const authMessages: Record<string, Pick<LoginFormState, "status" | "message">> =
   {
     verify_email: {
@@ -96,6 +106,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const verification = Array.isArray(params?.verification)
     ? params?.verification[0]
     : params?.verification;
+  const registration = Array.isArray(params?.registration)
+    ? params?.registration[0]
+    : params?.registration;
   const auth = Array.isArray(params?.auth)
     ? params?.auth[0]
     : params?.auth;
@@ -106,11 +119,15 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     ? params?.emailChange[0]
     : params?.emailChange;
   const hasVerificationParam = params?.verification !== undefined;
+  const hasRegistrationParam = params?.registration !== undefined;
   const hasAuthParam = params?.auth !== undefined;
   const hasResetParam = params?.reset !== undefined;
   const hasEmailChangeParam = params?.emailChange !== undefined;
   const verificationState = verification
     ? verificationMessages[verification]
+    : undefined;
+  const registrationState = registration
+    ? registrationMessages[registration]
     : undefined;
   const authState = auth ? authMessages[auth] : undefined;
   const resetState = reset ? resetMessages[reset] : undefined;
@@ -120,6 +137,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   if (
     (hasVerificationParam && !verificationState) ||
+    (hasRegistrationParam && !registrationState) ||
     (hasAuthParam && !authState) ||
     (hasResetParam && !resetState) ||
     (hasEmailChangeParam && !emailChangeState)
@@ -128,7 +146,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   }
 
   const statusState =
-    verificationState ?? authState ?? resetState ?? emailChangeState;
+    verificationState ??
+    registrationState ??
+    authState ??
+    resetState ??
+    emailChangeState;
   const initialState: LoginFormState = statusState
     ? {
         ...initialLoginFormState,
