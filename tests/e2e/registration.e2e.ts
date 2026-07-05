@@ -1,4 +1,9 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import {
+	expect,
+	test,
+	type APIRequestContext,
+	type Page,
+} from "@playwright/test";
 import type { CognitoGroupName } from "@/lib/auth/cognito-groups";
 
 function uniqueEmail() {
@@ -7,10 +12,10 @@ function uniqueEmail() {
 
 async function fetchVerificationUrl(
 	request: APIRequestContext,
-	email: string
+	email: string,
 ): Promise<string> {
 	const response = await request.get(
-		`/api/e2e/auth/verification-link?email=${encodeURIComponent(email)}`
+		`/api/e2e/auth/verification-link?email=${encodeURIComponent(email)}`,
 	);
 
 	expect(response.ok()).toBe(true);
@@ -23,13 +28,13 @@ async function fetchVerificationUrl(
 async function updateE2EStudentEligibility(
 	request: APIRequestContext,
 	email: string,
-	update: { enabled?: boolean; groups?: CognitoGroupName[] }
+	update: { enabled?: boolean; groups?: CognitoGroupName[] },
 ) {
 	const response = await request.patch("/api/e2e/auth/state", {
 		data: {
 			email,
-			...update
-		}
+			...update,
+		},
 	});
 
 	expect(response.ok()).toBe(true);
@@ -38,7 +43,7 @@ async function updateE2EStudentEligibility(
 const validRegistration = {
 	firstName: "Jordan",
 	lastName: "Adebayo",
-	password: "casework1"
+	password: "casework1",
 };
 const verificationEmailSentMessage =
 	"We just sent a verification link to your inbox. Click the link in that email to confirm your account.";
@@ -52,7 +57,7 @@ type RegistrationFormValues = {
 
 async function fillRegistrationForm(
 	page: Page,
-	values: RegistrationFormValues
+	values: RegistrationFormValues,
 ) {
 	await page
 		.getByTestId("register-first-name")
@@ -68,7 +73,7 @@ async function fillRegistrationForm(
 
 async function submitRegistrationForm(
 	page: Page,
-	values: RegistrationFormValues
+	values: RegistrationFormValues,
 ) {
 	await fillRegistrationForm(page, values);
 	await page.getByTestId("register-submit").click();
@@ -90,7 +95,7 @@ async function loginStudent(page: Page, email: string) {
 async function verifyStudentEmail(
 	page: Page,
 	request: APIRequestContext,
-	email: string
+	email: string,
 ) {
 	const verificationUrl = await fetchVerificationUrl(request, email);
 
@@ -101,7 +106,7 @@ async function verifyStudentEmail(
 async function registerVerifiedAndLoginStudent(
 	page: Page,
 	request: APIRequestContext,
-	email: string
+	email: string,
 ) {
 	await registerStudent(page, { email });
 
@@ -114,7 +119,7 @@ async function registerVerifiedAndLoginStudent(
 async function submitRegistrationRepeatedly(
 	page: Page,
 	values: RegistrationFormValues,
-	count: number
+	count: number,
 ) {
 	for (let i = 0; i < count; i++) {
 		await page.goto("/register");
@@ -127,7 +132,7 @@ async function expectVerificationEmailSentLogin(page: Page) {
 	await expect(page).toHaveURL(/\/login\?registration=verification_sent$/);
 	await expect(page.getByTestId("login-email")).toHaveValue("");
 	await expect(page.getByTestId("login-success-message")).toHaveText(
-		verificationEmailSentMessage
+		verificationEmailSentMessage,
 	);
 }
 
@@ -151,16 +156,16 @@ test.describe("Student registration and email verification", () => {
 		await page.getByTestId("register-submit").click();
 
 		await expect(page.getByTestId("register-first-name-error")).toHaveText(
-			"Enter your first name."
+			"Enter your first name.",
 		);
 		await expect(page.getByTestId("register-last-name-error")).toHaveText(
-			"Enter your last name."
+			"Enter your last name.",
 		);
 		await expect(page.getByTestId("register-email-error")).toHaveText(
-			"Enter your email address."
+			"Enter your email address.",
 		);
 		await expect(page.getByTestId("register-password-error")).toHaveText(
-			"Password is missing: at least 8 characters, at least one lowercase letter, at least one number."
+			"Password is missing: at least 8 characters, at least one lowercase letter, at least one number.",
 		);
 	});
 
@@ -171,7 +176,7 @@ test.describe("Student registration and email verification", () => {
 
 		await page.evaluate(() => {
 			const form = document.querySelector<HTMLFormElement>(
-				'[data-testid="register-form"]'
+				'[data-testid="register-form"]',
 			);
 
 			if (form) {
@@ -181,7 +186,7 @@ test.describe("Student registration and email verification", () => {
 		await page.getByTestId("register-submit").click();
 
 		await expect(page.getByTestId("register-email-error")).toHaveText(
-			"Enter a valid email address."
+			"Enter a valid email address.",
 		);
 	});
 
@@ -190,54 +195,56 @@ test.describe("Student registration and email verification", () => {
 
 		await submitRegistrationForm(page, {
 			email: uniqueEmail(),
-			password: "short"
+			password: "short",
 		});
 
 		await expect(page.getByTestId("register-password-error")).toHaveText(
-			"Password is missing: at least 8 characters, at least one number."
+			"Password is missing: at least 8 characters, at least one number.",
 		);
 		await expect(
-			page.getByTestId("register-password-requirement-minimumLength")
+			page.getByTestId("register-password-requirement-minimumLength"),
 		).toHaveText("Required: At least 8 characters");
 		await expect(
-			page.getByTestId("register-password-requirement-lowercase")
+			page.getByTestId("register-password-requirement-lowercase"),
 		).toHaveCount(0);
 		await expect(
-			page.getByTestId("register-password-requirement-number")
+			page.getByTestId("register-password-requirement-number"),
 		).toHaveText("Required: At least one number");
 	});
 
 	test("shows validation error for password without lowercase letter", async ({
-		page
+		page,
 	}) => {
 		await page.goto("/register");
 
 		await submitRegistrationForm(page, {
 			email: uniqueEmail(),
-			password: "PASSWORD1"
+			password: "PASSWORD1",
 		});
 
 		await expect(page.getByTestId("register-password-error")).toHaveText(
-			"Password is missing: at least one lowercase letter."
+			"Password is missing: at least one lowercase letter.",
 		);
 	});
 
-	test("shows validation error for password without number", async ({ page }) => {
+	test("shows validation error for password without number", async ({
+		page,
+	}) => {
 		await page.goto("/register");
 
 		await submitRegistrationForm(page, {
 			email: uniqueEmail(),
-			password: "casework"
+			password: "casework",
 		});
 
 		await expect(page.getByTestId("register-password-error")).toHaveText(
-			"Password is missing: at least one number."
+			"Password is missing: at least one number.",
 		);
 	});
 
 	test("successful registration shows verification email notice", async ({
 		page,
-		request
+		request,
 	}) => {
 		const email = uniqueEmail();
 
@@ -250,7 +257,7 @@ test.describe("Student registration and email verification", () => {
 
 	test("verification link redirects to login with verified message", async ({
 		page,
-		request
+		request,
 	}) => {
 		const email = uniqueEmail();
 
@@ -264,7 +271,7 @@ test.describe("Student registration and email verification", () => {
 		expect(new URL(page.url()).searchParams.has("email")).toBe(false);
 		await expect(page.getByTestId("login-email")).toHaveValue("");
 		await expect(page.getByTestId("login-success-message")).toHaveText(
-			"Your email has been verified. Please sign in."
+			"Your email has been successfully verified.",
 		);
 
 		await page.goto("/student");
@@ -273,7 +280,7 @@ test.describe("Student registration and email verification", () => {
 
 	test("verified student can sign in and reach the student dashboard", async ({
 		page,
-		request
+		request,
 	}) => {
 		const email = uniqueEmail();
 
@@ -283,7 +290,7 @@ test.describe("Student registration and email verification", () => {
 
 	test("logout clears the student session and protects the dashboard", async ({
 		page,
-		request
+		request,
 	}) => {
 		const email = uniqueEmail();
 
@@ -299,7 +306,7 @@ test.describe("Student registration and email verification", () => {
 
 	test("student dashboard re-checks Cognito eligibility for an active session", async ({
 		page,
-		request
+		request,
 	}) => {
 		const email = uniqueEmail();
 
@@ -323,7 +330,7 @@ test.describe("Student registration and email verification", () => {
 		await page.getByTestId("login-submit").click();
 
 		await expect(page.getByTestId("login-blocked-message")).toHaveText(
-			"Verify your email before signing in."
+			"Verify your email before signing in.",
 		);
 
 		await page.goto("/student");
@@ -333,7 +340,7 @@ test.describe("Student registration and email verification", () => {
 
 	test("duplicate pending registration triggers resend", async ({
 		page,
-		request
+		request,
 	}) => {
 		const email = uniqueEmail();
 
@@ -345,7 +352,7 @@ test.describe("Student registration and email verification", () => {
 		await submitRegistrationForm(page, {
 			firstName: "Changed",
 			lastName: "Name",
-			email
+			email,
 		});
 
 		await expectVerificationEmailSentLogin(page);
@@ -359,7 +366,7 @@ test.describe("Student registration and email verification", () => {
 
 		await expect(page).toHaveURL(/\/login\?verification=verified/);
 		await expect(page.getByTestId("login-success-message")).toHaveText(
-			"Your email has been verified. Please sign in."
+			"Your email has been successfully verified.",
 		);
 	});
 
@@ -371,12 +378,12 @@ test.describe("Student registration and email verification", () => {
 		await submitRegistrationForm(page, { email });
 
 		await expect(page.getByTestId("register-resend-notice")).toHaveText(
-			"Maximum requests reached. Try again after the verification link expires."
+			"Maximum requests reached. Try again after the verification link expires.",
 		);
 	});
 
 	test("registration remains blocked after rate limit until verification expires", async ({
-		page
+		page,
 	}) => {
 		const email = uniqueEmail();
 
@@ -389,7 +396,7 @@ test.describe("Student registration and email verification", () => {
 		await submitRegistrationForm(page, { email });
 
 		await expect(page.getByTestId("register-resend-notice")).toHaveText(
-			"Maximum requests reached. Try again after the verification link expires."
+			"Maximum requests reached. Try again after the verification link expires.",
 		);
 	});
 });

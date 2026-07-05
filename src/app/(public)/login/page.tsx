@@ -17,7 +17,7 @@ const verificationMessages: Record<
 > = {
 	verified: {
 		status: "success",
-		message: "Your email has been verified. Please sign in.",
+		message: "Your email has been successfully verified.",
 	},
 	expired: {
 		status: "blocked",

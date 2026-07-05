@@ -4,17 +4,17 @@ import type { RegistrationEmailSender } from "./email";
 import type {
 	PendingRegistrationRecord,
 	RegistrationWorkflowRepository,
-	StudentProfileRecord
+	StudentProfileRecord,
 } from "./repository";
 import {
 	DuplicatePendingRegistrationError,
 	VerificationResendLimitExceededError,
-	VerificationTokenAlreadyConsumedError
+	VerificationTokenAlreadyConsumedError,
 } from "./repository";
 import {
 	parseRegistrationInput,
 	type RegistrationFieldErrors,
-	type RegistrationInput
+	type RegistrationInput,
 } from "./schema";
 import { generateVerificationToken, hashVerificationToken } from "./tokens";
 
@@ -82,12 +82,12 @@ export class RegistrationService {
 			maxSendsPerWindow:
 				dependencies.config.maxSendsPerWindow ?? DEFAULT_MAX_SENDS_PER_WINDOW,
 			now: dependencies.config.now ?? (() => Math.floor(Date.now() / 1000)),
-			generateToken: dependencies.config.generateToken
+			generateToken: dependencies.config.generateToken,
 		};
 	}
 
 	async registerStudent(
-		input: RegistrationInput
+		input: RegistrationInput,
 	): Promise<RegistrationServiceResult> {
 		const parsed = parseRegistrationInput(input);
 
@@ -95,13 +95,13 @@ export class RegistrationService {
 			return {
 				status: "validation_error",
 				message: "Check the highlighted fields and try again.",
-				fieldErrors: parsed.fieldErrors
+				fieldErrors: parsed.fieldErrors,
 			};
 		}
 
 		const now = this.config.now();
 		const existing = await this.repository.getPendingByEmail(
-			parsed.data.emailNormalized
+			parsed.data.emailNormalized,
 		);
 
 		if (existing && !existing.consumedAt && existing.expiresAt > now) {
@@ -111,7 +111,7 @@ export class RegistrationService {
 		if (existing && !existing.consumedAt && existing.expiresAt <= now) {
 			await this.identity.deletePendingStudent(parsed.data.emailNormalized);
 			await this.repository.deletePendingRegistration(
-				parsed.data.emailNormalized
+				parsed.data.emailNormalized,
 			);
 		}
 
@@ -123,7 +123,7 @@ export class RegistrationService {
 				emailNormalized: parsed.data.emailNormalized,
 				firstName: parsed.data.firstName,
 				lastName: parsed.data.lastName,
-				password: parsed.data.password
+				password: parsed.data.password,
 			});
 			const token = this.createToken();
 			const tokenHash = hashVerificationToken(token);
@@ -142,7 +142,7 @@ export class RegistrationService {
 				createdAt: now,
 				updatedAt: now,
 				ttl,
-				status: "pending"
+				status: "pending",
 			});
 
 			await this.sendVerificationEmail({
@@ -150,7 +150,7 @@ export class RegistrationService {
 				firstName: parsed.data.firstName,
 				token,
 				expiresAt,
-				now
+				now,
 			});
 		} catch (error) {
 			if (
@@ -158,7 +158,7 @@ export class RegistrationService {
 				error instanceof DuplicatePendingRegistrationError
 			) {
 				const pending = await this.repository.getPendingByEmail(
-					parsed.data.emailNormalized
+					parsed.data.emailNormalized,
 				);
 
 				if (pending && !pending.consumedAt && pending.expiresAt > now) {
@@ -167,7 +167,7 @@ export class RegistrationService {
 
 				return {
 					status: "account_exists",
-					message: "An account already exists for this email. Please sign in."
+					message: "An account already exists for this email. Please sign in.",
 				};
 			}
 
@@ -177,7 +177,7 @@ export class RegistrationService {
 		return {
 			status: "verification_sent",
 			message:
-				"We just sent a verification link to your inbox. Click the link in that email to confirm your account."
+				"We just sent a verification link to your inbox. Click the link in that email to confirm your account.",
 		};
 	}
 
@@ -185,55 +185,56 @@ export class RegistrationService {
 		if (!token) {
 			return {
 				status: "invalid",
-				message: "This verification link is invalid."
+				message: "This verification link is invalid.",
 			};
 		}
 
 		const now = this.config.now();
 		const tokenHash = hashVerificationToken(token);
-		const registration = await this.repository.findPendingByTokenHash(tokenHash);
+		const registration =
+			await this.repository.findPendingByTokenHash(tokenHash);
 
 		if (!registration) {
 			return {
 				status: "invalid",
-				message: "This verification link is invalid."
+				message: "This verification link is invalid.",
 			};
 		}
 
 		if (registration.consumedAt || registration.status === "verified") {
 			return {
 				status: "already_used",
-				message: "This verification link has already been used."
+				message: "This verification link has already been used.",
 			};
 		}
 
 		if (registration.expiresAt <= now) {
 			return {
 				status: "expired",
-				message: "This verification link has expired."
+				message: "This verification link has expired.",
 			};
 		}
 
 		await this.identity.confirmStudentEmail({
 			emailNormalized: registration.emailNormalized,
 			firstName: registration.firstName,
-			lastName: registration.lastName
+			lastName: registration.lastName,
 		});
 		await this.repository.upsertStudentProfile(
-			this.toStudentProfile(registration, now)
+			this.toStudentProfile(registration, now),
 		);
 
 		try {
 			await this.repository.consumeVerificationToken({
 				emailNormalized: registration.emailNormalized,
 				verificationTokenHash: tokenHash,
-				consumedAt: now
+				consumedAt: now,
 			});
 		} catch (error) {
 			if (error instanceof VerificationTokenAlreadyConsumedError) {
 				return {
 					status: "already_used",
-					message: "This verification link has already been used."
+					message: "This verification link has already been used.",
 				};
 			}
 
@@ -242,7 +243,7 @@ export class RegistrationService {
 
 		return {
 			status: "verified",
-			message: "Your email has been verified. Please sign in."
+			message: "Your email has been successfully verified.",
 		};
 	}
 
@@ -250,23 +251,21 @@ export class RegistrationService {
 		const now = this.config.now();
 		const expired = await this.repository.listExpiredPendingRegistrations({
 			now,
-			limit
+			limit,
 		});
 
 		for (const registration of expired) {
 			try {
 				await this.identity.deletePendingStudent(registration.emailNormalized);
 				await this.repository.deletePendingRegistration(
-					registration.emailNormalized
+					registration.emailNormalized,
 				);
 			} catch (error) {
 				await this.repository.recordCleanupFailure({
 					emailNormalized: registration.emailNormalized,
 					attemptedAt: now,
 					error:
-						error instanceof Error
-							? error.message
-							: "Unknown cleanup failure"
+						error instanceof Error ? error.message : "Unknown cleanup failure",
 				});
 			}
 		}
@@ -275,7 +274,7 @@ export class RegistrationService {
 	}
 
 	private async handlePendingResend(
-		registration: PendingRegistrationRecord
+		registration: PendingRegistrationRecord,
 	): Promise<RegistrationServiceResult> {
 		const now = this.config.now();
 		const sendCount = registration.sendCount;
@@ -292,7 +291,7 @@ export class RegistrationService {
 				verificationTokenHash: hashVerificationToken(token),
 				lastSentAt: now,
 				updatedAt: now,
-				maxSendsPerWindow: this.config.maxSendsPerWindow
+				maxSendsPerWindow: this.config.maxSendsPerWindow,
 			});
 		} catch (error) {
 			if (error instanceof VerificationResendLimitExceededError) {
@@ -307,12 +306,12 @@ export class RegistrationService {
 			firstName: registration.firstName,
 			token,
 			expiresAt: registration.expiresAt,
-			now
+			now,
 		});
 
 		return {
 			status: "verification_sent",
-			message: "Verification email sent. Please check your inbox."
+			message: "Verification email sent. Please check your inbox.",
 		};
 	}
 
@@ -320,7 +319,7 @@ export class RegistrationService {
 		return {
 			status: "resend_blocked",
 			message:
-				"Maximum requests reached. Try again after the verification link expires."
+				"Maximum requests reached. Try again after the verification link expires.",
 		};
 	}
 
@@ -335,7 +334,7 @@ export class RegistrationService {
 			to: input.emailNormalized,
 			firstName: input.firstName,
 			verificationUrl: this.verificationUrl(input.token),
-			expiresInHours: this.hoursUntil(input.expiresAt, input.now)
+			expiresInHours: this.hoursUntil(input.expiresAt, input.now),
 		});
 	}
 
@@ -361,7 +360,7 @@ export class RegistrationService {
 
 	private toStudentProfile(
 		registration: PendingRegistrationRecord,
-		now: number
+		now: number,
 	): StudentProfileRecord {
 		return {
 			profileId: registration.cognitoSub,
@@ -373,7 +372,7 @@ export class RegistrationService {
 			emailVerifiedAt: now,
 			canAccessCases: true,
 			createdAt: now,
-			updatedAt: now
+			updatedAt: now,
 		};
 	}
 }
