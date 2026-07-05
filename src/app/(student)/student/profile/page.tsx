@@ -73,9 +73,6 @@ export default async function StudentProfilePage({
 				personalDetailsAction={submitStudentPersonalDetailsForm}
 				passwordAction={submitStudentPasswordChangeForm}
 				pendingEmail={profile.pendingEmail}
-				pendingEmailVerificationExpiresAt={
-					profile.pendingEmailVerificationExpiresAt
-				}
 			/>
 		</section>
 	);

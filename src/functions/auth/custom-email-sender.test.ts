@@ -94,8 +94,15 @@ describe("resetPasswordUrl", () => {
 		expect(email.text).toContain(
 			"https://eccs.example/reset-password?code=654321"
 		);
-		expect(email.html).toContain("https://eccs.example/images/logo.png");
+		expect(email.html).toContain("cid:eccs-logo");
 		expect(email.html).toContain("Reset password");
+		expect(email.attachments).toHaveLength(1);
+		expect(email.attachments[0]).toMatchObject({
+			contentId: "eccs-logo",
+			contentType: "image/png",
+			filename: "eccs-logo.png"
+		});
+		expect(Buffer.isBuffer(email.attachments[0].content)).toBe(true);
 		expect(email.text).not.toContain("student@example.com");
 		expect(email.text).not.toContain("student%40example.com");
 	});

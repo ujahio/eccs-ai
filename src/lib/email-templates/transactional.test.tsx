@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-	emailLogoUrl,
+	ECCS_LOGO_CONTENT_ID,
+	ECCS_LOGO_SRC,
+	eccsLogoAttachment,
+} from "./logo-attachment";
+import {
 	forgotPasswordUrl,
 	renderEmailChangeVerificationEmail,
 	renderPasswordChangedEmail,
@@ -8,18 +12,15 @@ import {
 	renderRegistrationVerificationEmail
 } from "./transactional";
 
-const logoUrl = emailLogoUrl("https://eccs.example");
-
 describe("ECCS transactional email templates", () => {
 	it("renders the registration verification email with branded html and text", async () => {
 		const email = await renderRegistrationVerificationEmail({
 			firstName: "Jordan",
 			verificationUrl: "https://eccs.example/verify-email?token=abc123",
-			expiresInHours: 24,
-			logoUrl
+			expiresInHours: 24
 		});
 
-		expect(email.html).toContain("https://eccs.example/images/logo.png");
+		expect(email.html).toContain(ECCS_LOGO_SRC);
 		expect(email.html).toContain("Verify account");
 		expect(email.html).toContain(
 			"https://eccs.example/verify-email?token=abc123"
@@ -31,8 +32,7 @@ describe("ECCS transactional email templates", () => {
 	it("renders the password reset email with a reset link", async () => {
 		const email = await renderPasswordResetEmail({
 			resetUrl: "https://eccs.example/reset-password?code=654321",
-			expiresInMinutes: 60,
-			logoUrl
+			expiresInMinutes: 60
 		});
 
 		expect(email.html).toContain("Reset password");
@@ -44,8 +44,7 @@ describe("ECCS transactional email templates", () => {
 
 	it("renders the password changed email with recovery guidance", async () => {
 		const email = await renderPasswordChangedEmail({
-			forgotPasswordUrl: forgotPasswordUrl("https://eccs.example"),
-			logoUrl
+			forgotPasswordUrl: forgotPasswordUrl("https://eccs.example")
 		});
 
 		expect(email.html).toContain("Your password was changed");
@@ -59,8 +58,7 @@ describe("ECCS transactional email templates", () => {
 		const email = await renderEmailChangeVerificationEmail({
 			verificationUrl:
 				"https://eccs.example/verify-email-change?token=new-email",
-			expiresInHours: 24,
-			logoUrl
+			expiresInHours: 24
 		});
 
 		expect(email.html).toContain("Verify new email");
@@ -69,5 +67,17 @@ describe("ECCS transactional email templates", () => {
 		);
 		expect(email.text).toContain("Your current login email stays");
 		expect(email.text).toContain("active until this verification succeeds.");
+	});
+
+	it("builds the inline logo attachment used by transactional emails", () => {
+		const attachment = eccsLogoAttachment();
+
+		expect(attachment).toMatchObject({
+			contentId: ECCS_LOGO_CONTENT_ID,
+			contentType: "image/png",
+			filename: "eccs-logo.png"
+		});
+		expect(Buffer.isBuffer(attachment.content)).toBe(true);
+		expect(Buffer.byteLength(attachment.content as Buffer)).toBeGreaterThan(0);
 	});
 });

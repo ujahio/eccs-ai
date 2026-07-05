@@ -1,4 +1,9 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import {
+	expect,
+	test,
+	type APIRequestContext,
+	type Page,
+} from "@playwright/test";
 
 function uniqueEmail(prefix: string) {
 	return `e2e-${prefix}-${Date.now()}-${Math.random()
@@ -73,9 +78,7 @@ async function registerStudent(page: Page, email: string) {
 	await page
 		.getByTestId("register-first-name")
 		.fill(validRegistration.firstName);
-	await page
-		.getByTestId("register-last-name")
-		.fill(validRegistration.lastName);
+	await page.getByTestId("register-last-name").fill(validRegistration.lastName);
 	await page.getByTestId("register-email").fill(email);
 	await page.getByTestId("register-password").fill(validRegistration.password);
 	await page.getByTestId("register-submit").click();
@@ -139,11 +142,11 @@ test.describe("Student profile security", () => {
 
 		await page.getByTestId("student-account-menu-trigger").click();
 		await page.getByTestId("student-account-menu-profile").click();
-		await expect(page.getByTestId("student-profile-personal-tab")).toBeVisible();
-		await page.setViewportSize({ width: 390, height: 844 });
 		await expect(
-			page.getByAltText("E-Clinical Case Solutions"),
+			page.getByTestId("student-profile-personal-tab"),
 		).toBeVisible();
+		await page.setViewportSize({ width: 390, height: 844 });
+		await expect(page.getByAltText("E-Clinical Case Solutions")).toBeVisible();
 		await page.getByTestId("student-account-menu-trigger").click();
 		await expect(
 			page.getByTestId("student-account-menu-dashboard"),
@@ -152,24 +155,28 @@ test.describe("Student profile security", () => {
 			page.getByTestId("student-account-menu-certificates"),
 		).toBeVisible();
 		await page.getByTestId("student-account-menu-profile").click();
-		await expect(page.getByTestId("student-profile-personal-tab")).toBeVisible();
+		await expect(
+			page.getByTestId("student-profile-personal-tab"),
+		).toBeVisible();
 		await page.setViewportSize({ width: 1280, height: 720 });
 
 		await page.getByTestId("student-profile-first-name").fill("Alex");
 		await page.getByTestId("student-profile-last-name").fill("Chen");
 		await page.getByTestId("student-profile-details-submit").click();
-		await expect(page.getByTestId("student-details-success-message")).toHaveText(
-			"Your name has been updated.",
-		);
+		await expect(
+			page.getByTestId("student-details-success-message"),
+		).toHaveText("Your name has been updated.");
 
 		await page.getByTestId("student-profile-new-email").fill(newEmail);
 		await page.getByTestId("student-profile-details-submit").click();
-		await expect(page.getByTestId("student-details-success-message")).toHaveText(
-			"Check your new email address. The verification link expires in 24 hours.",
+		await expect(
+			page.getByTestId("student-pending-email"),
+		).toHaveText(
+			"We sent a verification link to your new email address.",
 		);
-		await expect(page.getByTestId("student-pending-email")).toContainText(
-			newEmail,
-		);
+		await expect(
+			page.getByTestId("student-details-success-message"),
+		).toHaveCount(0);
 
 		const emailChangeUrl = await fetchEmailChangeVerificationUrl(
 			request,
@@ -178,7 +185,7 @@ test.describe("Student profile security", () => {
 		await page.goto(emailChangeUrl);
 		await expect(page).toHaveURL(/\/login\?emailChange=verified$/);
 		await expect(page.getByTestId("login-success-message")).toHaveText(
-			"Your email address has been updated. Please sign in.",
+			"Your email address has been updated.",
 		);
 
 		await olderPage.goto("/student");
@@ -198,10 +205,12 @@ test.describe("Student profile security", () => {
 		);
 
 		await page.getByTestId("student-profile-password-tab").click();
-		await page.getByTestId("student-profile-current-password").fill(
-			validRegistration.password,
-		);
-		await page.getByTestId("student-profile-new-password").fill(changedPassword);
+		await page
+			.getByTestId("student-profile-current-password")
+			.fill(validRegistration.password);
+		await page
+			.getByTestId("student-profile-new-password")
+			.fill(changedPassword);
 		await page
 			.getByTestId("student-profile-confirm-password")
 			.fill(changedPassword);
@@ -212,7 +221,9 @@ test.describe("Student profile security", () => {
 		await expectPasswordChangedEmail(request, newEmail);
 
 		await page.goto("/student/profile");
-		await expect(page.getByTestId("student-profile-personal-tab")).toBeVisible();
+		await expect(
+			page.getByTestId("student-profile-personal-tab"),
+		).toBeVisible();
 
 		await page.getByTestId("student-account-menu-trigger").click();
 		await page.getByTestId("student-logout-button").click();

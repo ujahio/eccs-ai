@@ -312,8 +312,7 @@ describe("StudentProfileService", () => {
 
 		expect(result).toEqual({
 			status: "verification_sent",
-			message:
-				"Check your new email address. The verification link expires in 24 hours.",
+			message: "We sent a verification link to your new email address.",
 			pendingEmail: "new.student@example.com",
 		});
 		expect(profiles.records.get("student@example.com")).toMatchObject({

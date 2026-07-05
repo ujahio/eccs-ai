@@ -24,7 +24,6 @@ type ProfileSecurityFormsProps = {
 	firstName: string;
 	lastName: string;
 	pendingEmail?: string;
-	pendingEmailVerificationExpiresAt?: number;
 	personalDetailsAction: (
 		previousState: StudentPersonalDetailsFormState,
 		formData: FormData,
@@ -49,9 +48,11 @@ const tabButtonBase =
 
 function StatusMessage({
 	state,
+	testId,
 	testIdPrefix,
 }: {
 	state: StatusState;
+	testId?: string;
 	testIdPrefix: string;
 }) {
 	if (!state.message) {
@@ -74,10 +75,10 @@ function StatusMessage({
 	return (
 		<AuthStatusMessage
 			role={state.status === "error" ? "alert" : "status"}
-			testId={`${testIdPrefix}-${suffix}-message`}
+			testId={testId ?? `${testIdPrefix}-${suffix}-message`}
 			tone={tone}
 		>
-			{state.message}
+			<span className="break-words">{state.message}</span>
 		</AuthStatusMessage>
 	);
 }
@@ -114,12 +115,19 @@ function normalizeEmailForComparison(value: string) {
 	return value.trim().toLowerCase();
 }
 
+function pendingEmailStatusMessage(pendingEmail?: string) {
+	if (!pendingEmail) {
+		return "";
+	}
+
+	return "We sent a verification link to your new email address.";
+}
+
 export function ProfileSecurityForms({
 	currentEmail,
 	firstName,
 	lastName,
 	pendingEmail,
-	pendingEmailVerificationExpiresAt,
 	personalDetailsAction,
 	passwordAction,
 }: ProfileSecurityFormsProps) {
@@ -174,6 +182,18 @@ export function ProfileSecurityForms({
 		passwordValues.currentPassword.length > 0 &&
 		passwordValues.password.length > 0 &&
 		passwordValues.confirmPassword.length > 0;
+	const isEmailChangeRequestSuccess =
+		detailsState.status === "success" &&
+		normalizeEmailForComparison(detailsState.values.email) !==
+			normalizeEmailForComparison(currentEmail);
+	const displayedDetailsState =
+		isEmailChangeRequestSuccess
+			? { ...detailsState, message: "" }
+			: detailsState;
+	const pendingEmailMessage = pendingEmailStatusMessage(
+		pendingEmail ??
+			(isEmailChangeRequestSuccess ? detailsState.values.email : undefined),
+	);
 
 	function updateDetailsValue<Field extends keyof DetailsValues>(
 		field: Field,
@@ -359,23 +379,18 @@ export function ProfileSecurityForms({
 									{emailError}
 								</p>
 							) : null}
-							{pendingEmail ? (
-								<p
-									className="break-words border border-warning-gold bg-app-canvas px-4 py-3 text-sm leading-6"
-									data-testid="student-pending-email"
-								>
-									Pending verification: {pendingEmail}
-									{pendingEmailVerificationExpiresAt
-										? `, expires ${new Date(
-												pendingEmailVerificationExpiresAt * 1000,
-											).toLocaleString()}`
-										: ""}
-								</p>
-							) : null}
+							<StatusMessage
+								state={{
+									status: "notice",
+									message: pendingEmailMessage,
+								}}
+								testId="student-pending-email"
+								testIdPrefix="student-pending-email"
+							/>
 						</div>
 
 						<StatusMessage
-							state={detailsState}
+							state={displayedDetailsState}
 							testIdPrefix="student-details"
 						/>
 

@@ -7,8 +7,8 @@ import type {
 	RegistrationVerificationEmail,
 } from "@/features/auth/registration/email";
 import type { StudentProfileEmailSender } from "@/features/student/profile-security/service";
+import { eccsLogoAttachment } from "@/lib/email-templates/logo-attachment";
 import {
-	emailLogoUrl,
 	forgotPasswordUrl,
 	renderEmailChangeVerificationEmail,
 	renderPasswordChangedEmail,
@@ -39,11 +39,11 @@ export class ResendRegistrationEmailSender
 		const content = await renderRegistrationVerificationEmail({
 			firstName: email.firstName,
 			verificationUrl: email.verificationUrl,
-			expiresInHours: email.expiresInHours,
-			logoUrl: emailLogoUrl(this.appBaseUrl),
+			expiresInHours: email.expiresInHours
 		});
 
 		await this.client.emails.send({
+			attachments: [eccsLogoAttachment()],
 			from: this.sender,
 			to: email.to,
 			subject: "Verify your ECCS account",
@@ -59,11 +59,11 @@ export class ResendRegistrationEmailSender
 	}) {
 		const content = await renderPasswordResetEmail({
 			resetUrl: email.resetUrl,
-			expiresInMinutes: email.expiresInMinutes,
-			logoUrl: emailLogoUrl(this.appBaseUrl),
+			expiresInMinutes: email.expiresInMinutes
 		});
 
 		await this.client.emails.send({
+			attachments: [eccsLogoAttachment()],
 			from: this.sender,
 			to: email.to,
 			subject: "Reset your ECCS password",
@@ -74,11 +74,11 @@ export class ResendRegistrationEmailSender
 
 	async sendPasswordChangedEmail(email: { to: string }) {
 		const content = await renderPasswordChangedEmail({
-			forgotPasswordUrl: forgotPasswordUrl(this.appBaseUrl),
-			logoUrl: emailLogoUrl(this.appBaseUrl),
+			forgotPasswordUrl: forgotPasswordUrl(this.appBaseUrl)
 		});
 
 		await this.client.emails.send({
+			attachments: [eccsLogoAttachment()],
 			from: this.sender,
 			to: email.to,
 			subject: "Your password was changed",
@@ -94,11 +94,11 @@ export class ResendRegistrationEmailSender
 	}) {
 		const content = await renderEmailChangeVerificationEmail({
 			verificationUrl: email.verificationUrl,
-			expiresInHours: email.expiresInHours,
-			logoUrl: emailLogoUrl(this.appBaseUrl),
+			expiresInHours: email.expiresInHours
 		});
 
 		await this.client.emails.send({
+			attachments: [eccsLogoAttachment()],
 			from: this.sender,
 			to: email.to,
 			subject: "Verify your new ECCS email",

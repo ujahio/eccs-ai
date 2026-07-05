@@ -90,8 +90,7 @@ Expected:
 
 Expected:
 
-- Success message says `Check your new email address. The verification link expires in 24 hours.`
-- A pending verification notice appears for the new email.
+- One notice appears: `We sent a verification link to your new email address.`
 - Signing out and signing in with the original email still works.
 - Signing in with the new email does not work yet.
 
@@ -144,7 +143,7 @@ Expected:
 Expected:
 
 - You are redirected to `/login?emailChange=verified`.
-- Login page says `Your email address has been updated. Please sign in.`
+- Login page says `Your email address has been updated.`
 - Signing in with the original email fails.
 - Signing in with the new email and old password succeeds.
 - `/student/profile` now shows the new email in the email field.

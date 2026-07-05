@@ -247,8 +247,7 @@ export class StudentProfileService {
 
 		return {
 			status: "verification_sent",
-			message:
-				"Check your new email address. The verification link expires in 24 hours.",
+			message: "We sent a verification link to your new email address.",
 			pendingEmail: parsed.data.emailNormalized,
 		};
 	}

@@ -14,6 +14,7 @@ import {
 	render
 } from "jsx-email";
 import type { ReactElement } from "react";
+import { ECCS_LOGO_SRC } from "./logo-attachment";
 
 type RenderedEmail = {
 	html: string;
@@ -39,30 +40,22 @@ type EccsTransactionalEmailProps = {
 export type RegistrationVerificationEmailTemplateInput = {
 	expiresInHours: number;
 	firstName: string;
-	logoUrl: string;
 	verificationUrl: string;
 };
 
 export type PasswordResetEmailTemplateInput = {
 	expiresInMinutes: number;
-	logoUrl: string;
 	resetUrl: string;
 };
 
 export type PasswordChangedEmailTemplateInput = {
 	forgotPasswordUrl: string;
-	logoUrl: string;
 };
 
 export type EmailChangeVerificationTemplateInput = {
 	expiresInHours: number;
-	logoUrl: string;
 	verificationUrl: string;
 };
-
-export function emailLogoUrl(appBaseUrl: string) {
-	return new URL("/images/logo.png", appBaseUrl).toString();
-}
 
 export function forgotPasswordUrl(appBaseUrl: string) {
 	return new URL("/forgot-password", appBaseUrl).toString();
@@ -84,7 +77,7 @@ export function renderRegistrationVerificationEmail(
 			eyebrow="Account verification"
 			footerNote="If you did not create an ECCS account, you can ignore this email."
 			heading="Verify your ECCS account"
-			logoUrl={input.logoUrl}
+			logoUrl={ECCS_LOGO_SRC}
 			preview="Confirm your ECCS account to begin your case-based learning."
 			supportingNote={`This verification link expires in ${input.expiresInHours} hours.`}
 		/>
@@ -105,7 +98,7 @@ export function renderPasswordResetEmail(input: PasswordResetEmailTemplateInput)
 			eyebrow="Password reset"
 			footerNote="If you did not request a password reset, you can ignore this email."
 			heading="Reset your ECCS password"
-			logoUrl={input.logoUrl}
+			logoUrl={ECCS_LOGO_SRC}
 			preview="Use this secure link to reset your ECCS password."
 			supportingNote={`This reset link expires in ${input.expiresInMinutes} minutes.`}
 		/>
@@ -128,7 +121,7 @@ export function renderPasswordChangedEmail(
 			eyebrow="Security notice"
 			footerNote="If you did not make this change, reset your password immediately and contact support."
 			heading="Your password was changed"
-			logoUrl={input.logoUrl}
+			logoUrl={ECCS_LOGO_SRC}
 			preview="Your ECCS password was changed."
 			supportingNote="This notice helps protect your account from unauthorized access."
 		/>
@@ -151,7 +144,7 @@ export function renderEmailChangeVerificationEmail(
 			eyebrow="Email change"
 			footerNote="If you did not request this email change, you can ignore this email."
 			heading="Verify your new ECCS email"
-			logoUrl={input.logoUrl}
+			logoUrl={ECCS_LOGO_SRC}
 			preview="Confirm your new ECCS email address."
 			supportingNote={`This verification link expires in ${input.expiresInHours} hours.`}
 		/>

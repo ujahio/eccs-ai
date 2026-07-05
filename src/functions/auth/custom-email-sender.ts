@@ -1,14 +1,12 @@
 import {
 	CommitmentPolicy,
 	KmsKeyringNode,
-	buildClient
+	buildClient,
 } from "@aws-crypto/client-node";
 import { Resend } from "resend";
 import { Resource } from "sst";
-import {
-	emailLogoUrl,
-	renderPasswordResetEmail
-} from "@/lib/email-templates/transactional";
+import { eccsLogoAttachment } from "@/lib/email-templates/logo-attachment";
+import { renderPasswordResetEmail } from "@/lib/email-templates/transactional";
 import type { LinkedResources } from "@/lib/aws/resources";
 
 type CognitoCustomEmailSenderEvent = {
@@ -21,9 +19,7 @@ type CognitoCustomEmailSenderEvent = {
 	};
 };
 
-const { decrypt } = buildClient(
-	CommitmentPolicy.REQUIRE_ENCRYPT_ALLOW_DECRYPT
-);
+const { decrypt } = buildClient(CommitmentPolicy.REQUIRE_ENCRYPT_ALLOW_DECRYPT);
 const linkedResources = Resource as unknown as Partial<LinkedResources>;
 
 export async function handler(event: CognitoCustomEmailSenderEvent) {
@@ -45,16 +41,15 @@ export async function handler(event: CognitoCustomEmailSenderEvent) {
 	const content = await renderPasswordResetEmail({
 		resetUrl,
 		expiresInMinutes: 60,
-		logoUrl: emailLogoUrl(appBaseUrl)
 	});
 
 	await resend.emails.send({
-		from:
-			process.env.ECCS_EMAIL_SENDER ?? "no-reply@contact.eccs-online.xyz",
+		attachments: [eccsLogoAttachment()],
+		from: process.env.ECCS_EMAIL_SENDER ?? "no-reply@contact.eccs-online.xyz",
 		to: email,
 		subject: "Reset your ECCS password",
 		html: content.html,
-		text: content.text
+		text: content.text,
 	});
 
 	return event;
@@ -79,11 +74,11 @@ async function decryptCode(encryptedCode: string) {
 
 	const keyring = new KmsKeyringNode({
 		generatorKeyId: keyArn,
-		keyIds: [keyArn]
+		keyIds: [keyArn],
 	});
 	const { plaintext } = await decrypt(
 		keyring,
-		Buffer.from(encryptedCode, "base64")
+		Buffer.from(encryptedCode, "base64"),
 	);
 
 	return Buffer.from(plaintext).toString("utf8");
