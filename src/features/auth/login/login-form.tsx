@@ -201,7 +201,7 @@ export function LoginForm({ initialState }: LoginFormProps) {
       <Link
         className="mt-4 inline-flex text-[11px] font-bold uppercase underline underline-offset-2"
         data-testid="login-forgot-password"
-        href="#"
+        href="/forgot-password"
       >
         Forgot your password?
       </Link>

@@ -109,8 +109,10 @@ SST dev locally after authenticating to AWS.
 SST component files must live under `infra/` and be imported from inside
 `sst.config.ts` `run()` with dynamic imports. Do not define SST resources inline
 in `sst.config.ts`, and do not use top-level imports in `sst.config.ts`.
-Component files should instantiate resources as exported constants, for example
-`export const client = new sst.aws.Nextjs(...)`.
+Component files should instantiate public SST components and resource outputs as
+exported constants, for example `export const client = new sst.aws.Nextjs(...)`.
+Provider resources such as `new aws.*` may remain unexported when they are
+private implementation details of the component file.
 
 Scripts that interact with resources created by SST must be TypeScript files
 under `scripts/` and read linked resource names or IDs from `Resource` imported

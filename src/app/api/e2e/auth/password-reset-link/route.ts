@@ -10,14 +10,14 @@ export async function GET(request: Request) {
 	}
 
 	const { email: emailSender } = getE2EAdapters();
-	const verificationUrl = emailSender.getLastVerificationUrl(emailResult.email);
+	const resetUrl = emailSender.getLastPasswordResetUrl(emailResult.email);
 
-	if (!verificationUrl) {
+	if (!resetUrl) {
 		return NextResponse.json(
-			{ error: "No verification email found for this address." },
+			{ error: "No password reset email found for this address." },
 			{ status: 404 }
 		);
 	}
 
-	return NextResponse.json({ verificationUrl });
+	return NextResponse.json({ resetUrl });
 }

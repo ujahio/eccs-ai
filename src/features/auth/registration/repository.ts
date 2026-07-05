@@ -31,6 +31,8 @@ export type StudentProfileRecord = {
 	canAccessCases: boolean;
 	createdAt: number;
 	updatedAt: number;
+	// Millisecond epoch for exact comparison with Better Auth session dates.
+	sessionsInvalidatedAt?: number;
 };
 
 export class DuplicatePendingRegistrationError extends Error {

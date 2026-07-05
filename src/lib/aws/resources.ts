@@ -2,7 +2,7 @@ import "server-only";
 
 import { Resource } from "sst";
 
-type LinkedResources = {
+export type LinkedResources = {
 	AuthUserPool: { id: string };
 	AuthUserPoolClient: { id: string };
 	RegistrationWorkflowTable: { name: string };

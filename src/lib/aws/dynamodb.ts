@@ -12,6 +12,10 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import type { LoginProfileRepository } from "@/features/auth/login/service";
 import type {
+	AppSessionInvalidator,
+	PasswordResetProfileRepository
+} from "@/features/auth/password-reset/service";
+import type {
 	PendingRegistrationRecord,
 	RegistrationWorkflowRepository,
 	StudentProfileRecord
@@ -23,7 +27,11 @@ import {
 } from "@/features/auth/registration/repository";
 
 export class DynamoAuthRepository
-	implements RegistrationWorkflowRepository, LoginProfileRepository
+	implements
+		RegistrationWorkflowRepository,
+		LoginProfileRepository,
+		PasswordResetProfileRepository,
+		AppSessionInvalidator
 {
 	private readonly documentClient: DynamoDBDocumentClient;
 
@@ -211,6 +219,42 @@ export class DynamoAuthRepository
 		const profile = response.Item as StudentProfileRecord | undefined;
 
 		return profile?.role === "student" ? profile : null;
+	}
+
+	async getStudentProfileByEmail(emailNormalized: string) {
+		const response = await this.documentClient.send(
+			new QueryCommand({
+				TableName: this.profileTableName,
+				IndexName: "EmailIndex",
+				KeyConditionExpression: "emailNormalized = :email",
+				ExpressionAttributeValues: {
+					":email": emailNormalized
+				},
+				Limit: 1
+			})
+		);
+
+		const profile = response.Items?.[0] as StudentProfileRecord | undefined;
+
+		return profile?.role === "student" ? profile : null;
+	}
+
+	async invalidateSessionsForUser(args: {
+		userId: string;
+		invalidatedAt: number;
+	}) {
+		await this.documentClient.send(
+			new UpdateCommand({
+				TableName: this.profileTableName,
+				Key: { profileId: args.userId },
+				UpdateExpression:
+					"SET sessionsInvalidatedAt = :invalidatedAt, updatedAt = :updatedAt",
+				ExpressionAttributeValues: {
+					":invalidatedAt": args.invalidatedAt,
+					":updatedAt": Math.floor(args.invalidatedAt / 1000)
+				}
+			})
+		);
 	}
 
 	async listExpiredPendingRegistrations(args: { now: number; limit: number }) {

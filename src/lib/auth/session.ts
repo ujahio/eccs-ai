@@ -25,6 +25,10 @@ export async function requireStudentSession() {
 		redirect("/login");
 	}
 
+	if (isSessionInvalidated(session, profile)) {
+		redirect("/login");
+	}
+
 	const isLoginEligible = await isStudentLoginEligible(profile);
 
 	if (!isLoginEligible) {
@@ -35,6 +39,41 @@ export async function requireStudentSession() {
 		session,
 		profile,
 	};
+}
+
+export function isSessionInvalidated(
+	session: { session?: { createdAt?: Date | string | number } } | null,
+	profile: StudentProfileRecord
+) {
+	if (!profile.sessionsInvalidatedAt) {
+		return false;
+	}
+
+	const createdAt = sessionCreatedAtMilliseconds(
+		session?.session?.createdAt
+	);
+
+	return createdAt !== null && createdAt <= profile.sessionsInvalidatedAt;
+}
+
+function sessionCreatedAtMilliseconds(
+	value: Date | string | number | undefined
+) {
+	if (value instanceof Date) {
+		return value.getTime();
+	}
+
+	if (typeof value === "number") {
+		return value > 9_999_999_999 ? value : value * 1000;
+	}
+
+	if (typeof value === "string") {
+		const parsed = Date.parse(value);
+
+		return Number.isNaN(parsed) ? null : parsed;
+	}
+
+	return null;
 }
 
 async function getStudentProfile(profileId: string) {
