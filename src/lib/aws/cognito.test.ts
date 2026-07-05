@@ -1,4 +1,6 @@
 import {
+	AdminSetUserPasswordCommand,
+	AdminUpdateUserAttributesCommand,
 	AdminUserGlobalSignOutCommand,
 	ConfirmForgotPasswordCommand,
 	ForgotPasswordCommand
@@ -9,6 +11,7 @@ import {
 	PasswordResetDeliveryUnavailableError,
 	PasswordResetRateLimitedError
 } from "@/features/auth/password-reset/service";
+import { StudentEmailUnavailableError } from "@/features/student/profile-security/service";
 import { CognitoAuthAdapter } from "./cognito";
 
 vi.mock("server-only", () => ({}));
@@ -16,13 +19,18 @@ vi.mock("server-only", () => ({}));
 class FakeCognitoClient {
 	sent: unknown[] = [];
 	nextError?: Error;
+	nextErrors: Array<Error | undefined> = [];
 	nextResponse: unknown = {};
 
 	async send(command: unknown) {
 		this.sent.push(command);
 
-		if (this.nextError) {
-			throw this.nextError;
+		const error = this.nextErrors.length
+			? this.nextErrors.shift()
+			: this.nextError;
+
+		if (error) {
+			throw error;
 		}
 
 		return this.nextResponse;
@@ -143,6 +151,82 @@ describe("CognitoAuthAdapter password reset", () => {
 		).toMatchObject({
 			UserPoolId: "user-pool-id",
 			Username: "student@example.com"
+		});
+	});
+
+	it("updates Cognito student name attributes", async () => {
+		const { adapter, client } = createHarness();
+
+		await adapter.updateStudentName({
+			emailNormalized: "student@example.com",
+			firstName: "Alex",
+			lastName: "Chen",
+			fullName: "Alex Chen"
+		});
+
+		expect(client.sent[1]).toBeInstanceOf(AdminUpdateUserAttributesCommand);
+		expect(
+			(client.sent[1] as AdminUpdateUserAttributesCommand).input
+		).toMatchObject({
+			UserPoolId: "user-pool-id",
+			Username: "student@example.com",
+			UserAttributes: [
+				{ Name: "given_name", Value: "Alex" },
+				{ Name: "family_name", Value: "Chen" },
+				{ Name: "name", Value: "Alex Chen" }
+			]
+		});
+	});
+
+	it("updates Cognito email and marks it verified only after app verification", async () => {
+		const { adapter, client } = createHarness();
+
+		await adapter.updateStudentEmail({
+			currentEmailNormalized: "student@example.com",
+			newEmailNormalized: "new@example.com"
+		});
+
+		expect(client.sent[1]).toBeInstanceOf(AdminUpdateUserAttributesCommand);
+		expect(
+			(client.sent[1] as AdminUpdateUserAttributesCommand).input
+		).toMatchObject({
+			UserPoolId: "user-pool-id",
+			Username: "student@example.com",
+			UserAttributes: [
+				{ Name: "email", Value: "new@example.com" },
+				{ Name: "email_verified", Value: "true" }
+			]
+		});
+	});
+
+	it("maps Cognito email alias conflicts", async () => {
+		const { adapter, client } = createHarness();
+		client.nextErrors = [undefined, namedError("AliasExistsException")];
+
+		await expect(
+			adapter.updateStudentEmail({
+				currentEmailNormalized: "student@example.com",
+				newEmailNormalized: "taken@example.com"
+			})
+		).rejects.toBeInstanceOf(StudentEmailUnavailableError);
+	});
+
+	it("sets a permanent Cognito password for logged-in password changes", async () => {
+		const { adapter, client } = createHarness();
+
+		await adapter.setStudentPassword({
+			emailNormalized: "student@example.com",
+			password: "newcase1"
+		});
+
+		expect(client.sent[1]).toBeInstanceOf(AdminSetUserPasswordCommand);
+		expect(
+			(client.sent[1] as AdminSetUserPasswordCommand).input
+		).toMatchObject({
+			UserPoolId: "user-pool-id",
+			Username: "student@example.com",
+			Password: "newcase1",
+			Permanent: true
 		});
 	});
 });

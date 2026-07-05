@@ -35,6 +35,10 @@ import {
 	type RegistrationIdentityProvider
 } from "@/features/auth/registration/identity";
 import {
+	StudentEmailUnavailableError,
+	type StudentProfileIdentityProvider
+} from "@/features/student/profile-security/service";
+import {
 	COGNITO_GROUPS,
 	hasStudentCognitoGroup
 } from "@/lib/auth/cognito-groups";
@@ -43,7 +47,8 @@ export class CognitoAuthAdapter
 	implements
 		RegistrationIdentityProvider,
 		LoginIdentityProvider,
-		PasswordResetIdentityProvider
+		PasswordResetIdentityProvider,
+		StudentProfileIdentityProvider
 {
 	private readonly client: CognitoIdentityProviderClient;
 
@@ -320,17 +325,77 @@ export class CognitoAuthAdapter
 
 	async invalidateCognitoSessions(args: { emailNormalized: string }) {
 		try {
-			await this.client.send(
-				new AdminUserGlobalSignOutCommand({
-					UserPoolId: this.userPoolId,
-					Username: args.emailNormalized
-				})
-			);
+			await this.globalSignOut(args.emailNormalized);
 		} catch (error) {
 			if (errorName(error) !== "UserNotFoundException") {
 				throw error;
 			}
 		}
+	}
+
+	async updateStudentName(args: {
+		emailNormalized: string;
+		firstName: string;
+		lastName: string;
+		fullName: string;
+	}) {
+		const username = await this.getCognitoUsername(args.emailNormalized);
+
+		await this.client.send(
+			new AdminUpdateUserAttributesCommand({
+				UserPoolId: this.userPoolId,
+				Username: username,
+				UserAttributes: [
+					{ Name: "given_name", Value: args.firstName },
+					{ Name: "family_name", Value: args.lastName },
+					{ Name: "name", Value: args.fullName }
+				]
+			})
+		);
+	}
+
+	async updateStudentEmail(args: {
+		currentEmailNormalized: string;
+		newEmailNormalized: string;
+	}) {
+		const username = await this.getCognitoUsername(args.currentEmailNormalized);
+
+		try {
+			await this.client.send(
+				new AdminUpdateUserAttributesCommand({
+					UserPoolId: this.userPoolId,
+					Username: username,
+					UserAttributes: [
+						{ Name: "email", Value: args.newEmailNormalized },
+						{ Name: "email_verified", Value: "true" }
+					]
+				})
+			);
+		} catch (error) {
+			const name = errorName(error);
+
+			if (name === "AliasExistsException" || name === "UsernameExistsException") {
+				throw new StudentEmailUnavailableError();
+			}
+
+			throw error;
+		}
+	}
+
+	async setStudentPassword(args: {
+		emailNormalized: string;
+		password: string;
+	}) {
+		const username = await this.getCognitoUsername(args.emailNormalized);
+
+		await this.client.send(
+			new AdminSetUserPasswordCommand({
+				UserPoolId: this.userPoolId,
+				Username: username,
+				Password: args.password,
+				Permanent: true
+			})
+		);
 	}
 
 	private async getUserSub(emailNormalized: string) {
@@ -348,6 +413,26 @@ export class CognitoAuthAdapter
 		}
 
 		return sub;
+	}
+
+	private async getCognitoUsername(emailNormalized: string) {
+		const user = await this.client.send(
+			new AdminGetUserCommand({
+				UserPoolId: this.userPoolId,
+				Username: emailNormalized
+			})
+		);
+
+		return user.Username ?? emailNormalized;
+	}
+
+	private async globalSignOut(username: string) {
+		await this.client.send(
+			new AdminUserGlobalSignOutCommand({
+				UserPoolId: this.userPoolId,
+				Username: username
+			})
+		);
 	}
 }
 

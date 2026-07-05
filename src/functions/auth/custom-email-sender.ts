@@ -1,10 +1,12 @@
 import {
 	CommitmentPolicy,
 	KmsKeyringNode,
-	buildClient
+	buildClient,
 } from "@aws-crypto/client-node";
 import { Resend } from "resend";
 import { Resource } from "sst";
+import { eccsLogoAttachment } from "@/lib/email-templates/logo-attachment";
+import { renderPasswordResetEmail } from "@/lib/email-templates/transactional";
 import type { LinkedResources } from "@/lib/aws/resources";
 
 type CognitoCustomEmailSenderEvent = {
@@ -17,9 +19,7 @@ type CognitoCustomEmailSenderEvent = {
 	};
 };
 
-const { decrypt } = buildClient(
-	CommitmentPolicy.REQUIRE_ENCRYPT_ALLOW_DECRYPT
-);
+const { decrypt } = buildClient(CommitmentPolicy.REQUIRE_ENCRYPT_ALLOW_DECRYPT);
 const linkedResources = Resource as unknown as Partial<LinkedResources>;
 
 export async function handler(event: CognitoCustomEmailSenderEvent) {
@@ -35,21 +35,21 @@ export async function handler(event: CognitoCustomEmailSenderEvent) {
 	}
 
 	const code = await decryptCode(encryptedCode);
-	const resetUrl = resetPasswordUrl(code);
+	const appBaseUrl = appUrl();
+	const resetUrl = resetPasswordUrl(code, appBaseUrl);
 	const resend = new Resend(resendApiKey());
+	const content = await renderPasswordResetEmail({
+		resetUrl,
+		expiresInMinutes: 60,
+	});
 
 	await resend.emails.send({
-		from:
-			process.env.ECCS_EMAIL_SENDER ?? "no-reply@contact.eccs-online.xyz",
+		attachments: [eccsLogoAttachment()],
+		from: process.env.ECCS_EMAIL_SENDER ?? "no-reply@contact.eccs-online.xyz",
 		to: email,
 		subject: "Reset your ECCS password",
-		text: [
-			"Please use this link to reset your E-Clinical Case Solutions password.",
-			"This link expires in 60 minutes:",
-			resetUrl,
-			"",
-			"If you did not request a password reset, you can ignore this email."
-		].join("\n")
+		html: content.html,
+		text: content.text,
 	});
 
 	return event;
@@ -74,21 +74,22 @@ async function decryptCode(encryptedCode: string) {
 
 	const keyring = new KmsKeyringNode({
 		generatorKeyId: keyArn,
-		keyIds: [keyArn]
+		keyIds: [keyArn],
 	});
 	const { plaintext } = await decrypt(
 		keyring,
-		Buffer.from(encryptedCode, "base64")
+		Buffer.from(encryptedCode, "base64"),
 	);
 
 	return Buffer.from(plaintext).toString("utf8");
 }
 
-export function resetPasswordUrl(code: string) {
-	const url = new URL(
-		"/reset-password",
-		process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001"
-	);
+export function resetPasswordUrl(code: string, appBaseUrl = appUrl()) {
+	const url = new URL("/reset-password", appBaseUrl);
 	url.searchParams.set("code", code);
 	return url.toString();
+}
+
+function appUrl() {
+	return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001";
 }

@@ -10,7 +10,6 @@ export type CognitoSessionBridgeStatus =
 export type CognitoSignInResponse =
 	| {
 			status: "signed_in";
-			message: string;
 			redirectTo: "/student";
 	  }
 	| {
@@ -22,4 +21,3 @@ export type CognitoSignInResponse =
 			};
 			errors: Partial<Record<"email" | "password", string[]>>;
 	  };
-

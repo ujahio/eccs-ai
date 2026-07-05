@@ -20,7 +20,7 @@ export async function submitLoginForm(
 	if (result.status === "signed_in") {
 		return {
 			status: "success",
-			message: result.message,
+			message: "",
 			values: {
 				email: input.email,
 				password: ""

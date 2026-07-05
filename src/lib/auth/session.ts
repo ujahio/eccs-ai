@@ -42,10 +42,23 @@ export async function requireStudentSession() {
 }
 
 export function isSessionInvalidated(
-	session: { session?: { createdAt?: Date | string | number } } | null,
+	session: {
+		session?: {
+			createdAt?: Date | string | number;
+			id?: string;
+			token?: string;
+		};
+	} | null,
 	profile: StudentProfileRecord
 ) {
 	if (!profile.sessionsInvalidatedAt) {
+		return false;
+	}
+
+	if (
+		profile.sessionInvalidationExemptToken &&
+		sessionToken(session?.session) === profile.sessionInvalidationExemptToken
+	) {
 		return false;
 	}
 
@@ -53,10 +66,16 @@ export function isSessionInvalidated(
 		session?.session?.createdAt
 	);
 
-	return createdAt !== null && createdAt <= profile.sessionsInvalidatedAt;
+	return createdAt === null || createdAt <= profile.sessionsInvalidatedAt;
 }
 
-function sessionCreatedAtMilliseconds(
+export function sessionToken(
+	session: { id?: string; token?: string } | undefined
+) {
+	return session?.token ?? session?.id ?? null;
+}
+
+export function sessionCreatedAtMilliseconds(
 	value: Date | string | number | undefined
 ) {
 	if (value instanceof Date) {

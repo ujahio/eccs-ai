@@ -1,4 +1,5 @@
 import { parseLoginInput, type LoginFieldErrors, type LoginInput } from "./schema";
+import { GENERIC_SIGN_IN_ERROR_MESSAGE } from "./messages";
 
 export type AuthSessionTokens = {
 	accessToken: string;
@@ -9,8 +10,7 @@ export type AuthSessionTokens = {
 
 export type LoginFailureReason =
 	| "invalid_credentials"
-	| "verify_email"
-	| "missing_profile";
+	| "verify_email";
 
 export class LoginBlockedUntilVerifiedError extends Error {
 	constructor() {
@@ -21,7 +21,7 @@ export class LoginBlockedUntilVerifiedError extends Error {
 
 export class InvalidLoginCredentialsError extends Error {
 	constructor() {
-		super("Invalid email or password.");
+		super(GENERIC_SIGN_IN_ERROR_MESSAGE);
 		this.name = "InvalidLoginCredentialsError";
 	}
 }
@@ -38,7 +38,7 @@ export interface LoginProfileRepository {
 }
 
 export type LoginServiceResult =
-	| { status: "signed_in"; message: string; tokens: AuthSessionTokens }
+	| { status: "signed_in"; tokens: AuthSessionTokens }
 	| {
 			status: "validation_error";
 			message: string;
@@ -74,14 +74,13 @@ export class LoginService {
 
 			if (!hasProfile) {
 				return {
-					status: "missing_profile",
-					message: "We could not load your account profile."
+					status: "invalid_credentials",
+					message: GENERIC_SIGN_IN_ERROR_MESSAGE
 				};
 			}
 
 			return {
 				status: "signed_in",
-				message: "Signed in.",
 				tokens
 			};
 		} catch (error) {
@@ -95,7 +94,7 @@ export class LoginService {
 			if (error instanceof InvalidLoginCredentialsError) {
 				return {
 					status: "invalid_credentials",
-					message: "Invalid email or password."
+					message: GENERIC_SIGN_IN_ERROR_MESSAGE
 				};
 			}
 

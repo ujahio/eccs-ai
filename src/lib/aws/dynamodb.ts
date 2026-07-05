@@ -15,6 +15,7 @@ import type {
 	AppSessionInvalidator,
 	PasswordResetProfileRepository
 } from "@/features/auth/password-reset/service";
+import type { StudentProfileRepository } from "@/features/student/profile-security/service";
 import type {
 	PendingRegistrationRecord,
 	RegistrationWorkflowRepository,
@@ -31,6 +32,7 @@ export class DynamoAuthRepository
 		RegistrationWorkflowRepository,
 		LoginProfileRepository,
 		PasswordResetProfileRepository,
+		StudentProfileRepository,
 		AppSessionInvalidator
 {
 	private readonly documentClient: DynamoDBDocumentClient;
@@ -239,6 +241,159 @@ export class DynamoAuthRepository
 		return profile?.role === "student" ? profile : null;
 	}
 
+	async updateStudentName(args: {
+		profileId: string;
+		firstName: string;
+		lastName: string;
+		fullName: string;
+		updatedAt: number;
+	}) {
+		await this.documentClient.send(
+			new UpdateCommand({
+				TableName: this.profileTableName,
+				Key: { profileId: args.profileId },
+				UpdateExpression:
+					"SET firstName = :firstName, lastName = :lastName, fullName = :fullName, updatedAt = :updatedAt",
+				ConditionExpression: "attribute_exists(profileId) AND #role = :student",
+				ExpressionAttributeNames: {
+					"#role": "role"
+				},
+				ExpressionAttributeValues: {
+					":firstName": args.firstName,
+					":lastName": args.lastName,
+					":fullName": args.fullName,
+					":updatedAt": args.updatedAt,
+					":student": "student"
+				}
+			})
+		);
+	}
+
+	async storePendingEmailChange(args: {
+		profileId: string;
+		pendingEmail: string;
+		pendingEmailVerificationTokenHash: string;
+		pendingEmailVerificationExpiresAt: number;
+		pendingEmailVerificationRequestedAt: number;
+		updatedAt: number;
+	}) {
+		await this.documentClient.send(
+			new UpdateCommand({
+				TableName: this.profileTableName,
+				Key: { profileId: args.profileId },
+				UpdateExpression:
+					[
+						"SET pendingEmail = :pendingEmail",
+						"pendingEmailVerificationTokenHash = :tokenHash",
+						"pendingEmailVerificationExpiresAt = :expiresAt",
+						"pendingEmailVerificationRequestedAt = :requestedAt",
+						"updatedAt = :updatedAt"
+					].join(", "),
+				ConditionExpression: "attribute_exists(profileId) AND #role = :student",
+				ExpressionAttributeNames: {
+					"#role": "role"
+				},
+				ExpressionAttributeValues: {
+					":pendingEmail": args.pendingEmail,
+					":tokenHash": args.pendingEmailVerificationTokenHash,
+					":expiresAt": args.pendingEmailVerificationExpiresAt,
+					":requestedAt": args.pendingEmailVerificationRequestedAt,
+					":updatedAt": args.updatedAt,
+					":student": "student"
+				}
+			})
+		);
+	}
+
+	async findStudentProfileByPendingEmailTokenHash(tokenHash: string) {
+		const response = await this.documentClient.send(
+			new QueryCommand({
+				TableName: this.profileTableName,
+				IndexName: "PendingEmailVerificationTokenHashIndex",
+				KeyConditionExpression:
+					"pendingEmailVerificationTokenHash = :tokenHash",
+				ExpressionAttributeValues: {
+					":tokenHash": tokenHash
+				},
+				Limit: 1
+			})
+		);
+
+		const profile = response.Items?.[0] as StudentProfileRecord | undefined;
+
+		return profile?.role === "student" ? profile : null;
+	}
+
+	async completePendingEmailChange(args: {
+		profileId: string;
+		currentEmailNormalized: string;
+		newEmailNormalized: string;
+		verifiedAt: number;
+		sessionsInvalidatedAt: number;
+		sessionInvalidationExemptToken?: string;
+	}) {
+		await this.documentClient.send(
+			new UpdateCommand({
+				TableName: this.profileTableName,
+				Key: { profileId: args.profileId },
+				UpdateExpression:
+					[
+						"SET emailNormalized = :newEmail, emailVerifiedAt = :verifiedAt, sessionsInvalidatedAt = :sessionsInvalidatedAt, updatedAt = :verifiedAt",
+						"REMOVE pendingEmail, pendingEmailVerificationTokenHash, pendingEmailVerificationExpiresAt, pendingEmailVerificationRequestedAt, sessionInvalidationExemptToken"
+					].join(" "),
+				ConditionExpression:
+					"emailNormalized = :currentEmail AND pendingEmail = :newEmail AND #role = :student",
+				ExpressionAttributeNames: {
+					"#role": "role"
+				},
+				ExpressionAttributeValues: {
+					":currentEmail": args.currentEmailNormalized,
+					":newEmail": args.newEmailNormalized,
+					":verifiedAt": args.verifiedAt,
+					":sessionsInvalidatedAt": args.sessionsInvalidatedAt,
+					":student": "student"
+				}
+			})
+		);
+	}
+
+	async invalidateOtherSessionsForUser(args: {
+		userId: string;
+		invalidatedAt: number;
+		updatedAt: number;
+		sessionInvalidationExemptToken?: string;
+	}) {
+		const setExpressions = [
+			"sessionsInvalidatedAt = :invalidatedAt",
+			"updatedAt = :updatedAt"
+		];
+		const expressionAttributeValues: Record<string, unknown> = {
+			":invalidatedAt": args.invalidatedAt,
+			":updatedAt": args.updatedAt
+		};
+
+		if (args.sessionInvalidationExemptToken) {
+			setExpressions.push(
+				"sessionInvalidationExemptToken = :exemptToken"
+			);
+			expressionAttributeValues[":exemptToken"] =
+				args.sessionInvalidationExemptToken;
+		}
+
+		await this.documentClient.send(
+			new UpdateCommand({
+				TableName: this.profileTableName,
+				Key: { profileId: args.userId },
+				UpdateExpression: `SET ${setExpressions.join(", ")}${
+					args.sessionInvalidationExemptToken
+						? ""
+						: " REMOVE sessionInvalidationExemptToken"
+				}`,
+				ExpressionAttributeValues: expressionAttributeValues
+			})
+		);
+	}
+
 	async invalidateSessionsForUser(args: {
 		userId: string;
 		invalidatedAt: number;
@@ -248,7 +403,7 @@ export class DynamoAuthRepository
 				TableName: this.profileTableName,
 				Key: { profileId: args.userId },
 				UpdateExpression:
-					"SET sessionsInvalidatedAt = :invalidatedAt, updatedAt = :updatedAt",
+					"SET sessionsInvalidatedAt = :invalidatedAt, updatedAt = :updatedAt REMOVE sessionInvalidationExemptToken",
 				ExpressionAttributeValues: {
 					":invalidatedAt": args.invalidatedAt,
 					":updatedAt": Math.floor(args.invalidatedAt / 1000)

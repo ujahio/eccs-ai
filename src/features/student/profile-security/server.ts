@@ -5,46 +5,33 @@ import { DynamoAuthRepository } from "@/lib/aws/dynamodb";
 import { ResendRegistrationEmailSender } from "@/lib/aws/email";
 import { getAuthResources } from "@/lib/aws/resources";
 import { getE2EAdapters, isE2EMode } from "@/lib/e2e/in-memory-auth";
-import { PasswordResetService } from "./service";
+import { StudentProfileService } from "./service";
 
-export function createPasswordResetService() {
+export function createStudentProfileService() {
 	if (isE2EMode()) {
 		const { identity, repository, email } = getE2EAdapters();
 
-		return new PasswordResetService(
-			identity,
-			repository,
-			repository,
-			email,
-			{
-				appBaseUrl:
-					process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001"
-			}
-		);
+		return new StudentProfileService(identity, repository, email, {
+			appBaseUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001",
+		});
 	}
 
 	const resources = getAuthResources();
 	const repository = new DynamoAuthRepository(
 		resources.registrationWorkflowTableName,
-		resources.userProfileTableName
+		resources.userProfileTableName,
 	);
 	const identity = new CognitoAuthAdapter(
 		resources.userPoolId,
-		resources.userPoolClientId
+		resources.userPoolClientId,
 	);
 	const email = new ResendRegistrationEmailSender(
 		resources.emailSender,
 		resources.resendApiKey,
-		resources.appBaseUrl
+		resources.appBaseUrl,
 	);
 
-	return new PasswordResetService(
-		identity,
-		repository,
-		repository,
-		email,
-		{
-			appBaseUrl: resources.appBaseUrl
-		}
-	);
+	return new StudentProfileService(identity, repository, email, {
+		appBaseUrl: resources.appBaseUrl,
+	});
 }

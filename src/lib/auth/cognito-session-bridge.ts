@@ -10,6 +10,7 @@ import {
 	LoginBlockedUntilVerifiedError,
 	type AuthSessionTokens,
 } from "@/features/auth/login/service";
+import { GENERIC_SIGN_IN_ERROR_MESSAGE } from "@/features/auth/login/messages";
 import { parseLoginInput } from "@/features/auth/login/schema";
 import type {
 	CognitoSessionBridgeStatus,
@@ -103,7 +104,7 @@ export function cognitoSessionBridge(
 								options,
 								failure(
 									"invalid_credentials",
-									"Invalid email or password.",
+									GENERIC_SIGN_IN_ERROR_MESSAGE,
 									input,
 								),
 							);
@@ -131,7 +132,7 @@ export function cognitoSessionBridge(
 								options,
 								failure(
 									"invalid_credentials",
-									"Invalid email or password.",
+									GENERIC_SIGN_IN_ERROR_MESSAGE,
 									input,
 								),
 							);
@@ -142,8 +143,8 @@ export function cognitoSessionBridge(
 								ctx,
 								options,
 								failure(
-									"unauthorized_role",
-									"This sign-in area is for student accounts.",
+									"invalid_credentials",
+									GENERIC_SIGN_IN_ERROR_MESSAGE,
 									input,
 								),
 							);
@@ -161,8 +162,8 @@ export function cognitoSessionBridge(
 								ctx,
 								options,
 								failure(
-									"missing_profile",
-									"We could not load your account profile.",
+									"invalid_credentials",
+									GENERIC_SIGN_IN_ERROR_MESSAGE,
 									input,
 								),
 							);
@@ -173,8 +174,8 @@ export function cognitoSessionBridge(
 								ctx,
 								options,
 								failure(
-									"unauthorized_role",
-									"This sign-in area is for student accounts.",
+									"invalid_credentials",
+									GENERIC_SIGN_IN_ERROR_MESSAGE,
 									input,
 								),
 							);
@@ -189,7 +190,6 @@ export function cognitoSessionBridge(
 
 						return bridgeResponse(ctx, options, {
 							status: "signed_in",
-							message: "Signed in.",
 							redirectTo: "/student",
 						} satisfies CognitoSignInResponse);
 					} catch (error) {
@@ -211,7 +211,7 @@ export function cognitoSessionBridge(
 								options,
 								failure(
 									"invalid_credentials",
-									"Invalid email or password.",
+									GENERIC_SIGN_IN_ERROR_MESSAGE,
 									input,
 								),
 							);
