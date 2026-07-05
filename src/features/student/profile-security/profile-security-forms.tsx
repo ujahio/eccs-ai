@@ -41,6 +41,8 @@ type StatusState = {
 };
 
 type TabId = "personal" | "password";
+type DetailsValues = StudentPersonalDetailsFormState["values"];
+type PasswordValues = StudentPasswordChangeFormState["values"];
 
 const tabButtonBase =
 	"flex min-h-11 min-w-0 flex-1 items-center justify-center border-b px-2 text-center text-[11px] font-semibold uppercase transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal sm:min-h-0 sm:flex-none sm:justify-start sm:px-0 sm:pb-3";
@@ -104,6 +106,14 @@ function SaveButton({
 	);
 }
 
+function normalizeTextForComparison(value: string) {
+	return value.trim();
+}
+
+function normalizeEmailForComparison(value: string) {
+	return value.trim().toLowerCase();
+}
+
 export function ProfileSecurityForms({
 	currentEmail,
 	firstName,
@@ -122,10 +132,20 @@ export function ProfileSecurityForms({
 			email: currentEmail,
 		}),
 	);
+	const [detailsValues, setDetailsValues] = useState<DetailsValues>(() => ({
+		firstName,
+		lastName,
+		email: currentEmail,
+	}));
 	const [passwordState, submitPassword, isPasswordPending] = useActionState(
 		passwordAction,
 		initialStudentPasswordChangeFormState,
 	);
+	const [passwordValues, setPasswordValues] = useState<PasswordValues>({
+		currentPassword: "",
+		password: "",
+		confirmPassword: "",
+	});
 	const [showCurrentPassword, setShowCurrentPassword] = useState(false);
 	const [showNewPassword, setShowNewPassword] = useState(false);
 	const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -135,6 +155,54 @@ export function ProfileSecurityForms({
 	const currentPasswordError = fieldError(passwordState, "currentPassword");
 	const passwordError = fieldError(passwordState, "password");
 	const confirmPasswordError = fieldError(passwordState, "confirmPassword");
+	const savedDetailsValues =
+		detailsState.status === "success"
+			? detailsState.values
+			: {
+					firstName,
+					lastName,
+					email: currentEmail,
+				};
+	const hasDetailsChanges =
+		normalizeTextForComparison(detailsValues.firstName) !==
+			normalizeTextForComparison(savedDetailsValues.firstName) ||
+		normalizeTextForComparison(detailsValues.lastName) !==
+			normalizeTextForComparison(savedDetailsValues.lastName) ||
+		normalizeEmailForComparison(detailsValues.email) !==
+			normalizeEmailForComparison(savedDetailsValues.email);
+	const isPasswordReadyToSubmit =
+		passwordValues.currentPassword.length > 0 &&
+		passwordValues.password.length > 0 &&
+		passwordValues.confirmPassword.length > 0;
+
+	function updateDetailsValue<Field extends keyof DetailsValues>(
+		field: Field,
+		value: DetailsValues[Field],
+	) {
+		setDetailsValues((previousValues) => ({
+			...previousValues,
+			[field]: value,
+		}));
+	}
+
+	function updatePasswordValue<Field extends keyof PasswordValues>(
+		field: Field,
+		value: PasswordValues[Field],
+	) {
+		setPasswordValues((previousValues) => ({
+			...previousValues,
+			[field]: value,
+		}));
+	}
+
+	function submitPasswordAndReset(formData: FormData) {
+		submitPassword(formData);
+		setPasswordValues({
+			currentPassword: "",
+			password: "",
+			confirmPassword: "",
+		});
+	}
 
 	return (
 		<div className="border border-border-gray bg-white px-4 py-6 sm:px-10 sm:py-10">
@@ -202,10 +270,13 @@ export function ProfileSecurityForms({
 									autoComplete="given-name"
 									className={inputClasses(Boolean(firstNameError))}
 									data-testid="student-profile-first-name"
-									defaultValue={detailsState.values.firstName}
 									id="student-profile-first-name"
 									name="firstName"
+									onChange={(event) =>
+										updateDetailsValue("firstName", event.target.value)
+									}
 									type="text"
+									value={detailsValues.firstName}
 								/>
 								{firstNameError ? (
 									<p
@@ -235,10 +306,13 @@ export function ProfileSecurityForms({
 									autoComplete="family-name"
 									className={inputClasses(Boolean(lastNameError))}
 									data-testid="student-profile-last-name"
-									defaultValue={detailsState.values.lastName}
 									id="student-profile-last-name"
 									name="lastName"
+									onChange={(event) =>
+										updateDetailsValue("lastName", event.target.value)
+									}
 									type="text"
+									value={detailsValues.lastName}
 								/>
 								{lastNameError ? (
 									<p
@@ -267,11 +341,14 @@ export function ProfileSecurityForms({
 								autoComplete="email"
 								className={inputClasses(Boolean(emailError))}
 								data-testid="student-profile-new-email"
-								defaultValue={detailsState.values.email}
 								id="student-profile-new-email"
 								inputMode="email"
 								name="email"
+								onChange={(event) =>
+									updateDetailsValue("email", event.target.value)
+								}
 								type="email"
+								value={detailsValues.email}
 							/>
 							{emailError ? (
 								<p
@@ -303,7 +380,7 @@ export function ProfileSecurityForms({
 						/>
 
 						<SaveButton
-							disabled={isDetailsPending}
+							disabled={isDetailsPending || !hasDetailsChanges}
 							testId="student-profile-details-submit"
 						>
 							{isDetailsPending ? "Saving..." : "Save changes"}
@@ -311,7 +388,7 @@ export function ProfileSecurityForms({
 					</form>
 				) : (
 					<form
-						action={submitPassword}
+						action={submitPasswordAndReset}
 						className="mx-auto mt-5 grid w-full gap-4 sm:mt-6 sm:max-w-[360px] sm:gap-5"
 						data-testid="student-password-change-form"
 						id="student-password-panel"
@@ -341,7 +418,14 @@ export function ProfileSecurityForms({
 									data-testid="student-profile-current-password"
 									id="student-profile-current-password"
 									name="currentPassword"
+									onChange={(event) =>
+										updatePasswordValue(
+											"currentPassword",
+											event.target.value,
+										)
+									}
 									type={showCurrentPassword ? "text" : "password"}
+									value={passwordValues.currentPassword}
 								/>
 								<PasswordVisibilityToggle
 									isVisible={showCurrentPassword}
@@ -382,7 +466,11 @@ export function ProfileSecurityForms({
 									data-testid="student-profile-new-password"
 									id="student-profile-new-password"
 									name="password"
+									onChange={(event) =>
+										updatePasswordValue("password", event.target.value)
+									}
 									type={showNewPassword ? "text" : "password"}
+									value={passwordValues.password}
 								/>
 								<PasswordVisibilityToggle
 									isVisible={showNewPassword}
@@ -423,7 +511,14 @@ export function ProfileSecurityForms({
 									data-testid="student-profile-confirm-password"
 									id="student-profile-confirm-password"
 									name="confirmPassword"
+									onChange={(event) =>
+										updatePasswordValue(
+											"confirmPassword",
+											event.target.value,
+										)
+									}
 									type={showConfirmPassword ? "text" : "password"}
+									value={passwordValues.confirmPassword}
 								/>
 								<PasswordVisibilityToggle
 									isVisible={showConfirmPassword}
@@ -450,7 +545,7 @@ export function ProfileSecurityForms({
 						/>
 
 						<SaveButton
-							disabled={isPasswordPending}
+							disabled={isPasswordPending || !isPasswordReadyToSubmit}
 							testId="student-profile-password-submit"
 						>
 							{isPasswordPending ? "Saving..." : "Save changes"}
