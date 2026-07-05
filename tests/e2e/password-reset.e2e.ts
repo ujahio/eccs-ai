@@ -165,7 +165,7 @@ test.describe("Student password reset", () => {
 
 		await loginStudent(page, email, validRegistration.password);
 		await expect(page.getByTestId("login-error-message")).toHaveText(
-			"Invalid email or password."
+			"We couldn’t sign you in with those details. Check your email and password and try again."
 		);
 
 		await loginStudent(page, email, newPassword);

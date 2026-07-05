@@ -89,7 +89,7 @@ function createAuthHarness() {
 				tokenVerifier,
 			}),
 		],
-	});
+});
 
 	return {
 		auth,
@@ -214,8 +214,10 @@ describe("cognitoSessionBridge", () => {
 		});
 		const body = await response.json();
 
-		expect(body.status).toBe("missing_profile");
-		expect(body.message).toBe("We could not load your account profile.");
+		expect(body.status).toBe("invalid_credentials");
+		expect(body.message).toBe(
+			"We couldn’t sign you in with those details. Check your email and password and try again."
+		);
 		expect(response.headers.get("set-cookie")).toBeNull();
 	});
 
@@ -232,8 +234,10 @@ describe("cognitoSessionBridge", () => {
 		});
 		const body = await response.json();
 
-		expect(body.status).toBe("unauthorized_role");
-		expect(body.message).toBe("This sign-in area is for student accounts.");
+		expect(body.status).toBe("invalid_credentials");
+		expect(body.message).toBe(
+			"We couldn’t sign you in with those details. Check your email and password and try again."
+		);
 		expect(response.headers.get("set-cookie")).toBeNull();
 	});
 });

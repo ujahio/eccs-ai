@@ -56,7 +56,8 @@ describe("LoginService", () => {
 
 		expect(result).toEqual({
 			status: "invalid_credentials",
-			message: "Invalid email or password."
+			message:
+				"We couldn’t sign you in with those details. Check your email and password and try again."
 		});
 	});
 });

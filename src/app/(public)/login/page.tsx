@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { LoginForm } from "@/features/auth/login/login-form";
+import { GENERIC_SIGN_IN_ERROR_MESSAGE } from "@/features/auth/login/messages";
 import {
 	initialLoginFormState,
 	type LoginFormState,
@@ -58,15 +59,15 @@ const authMessages: Record<
 	},
 	invalid_credentials: {
 		status: "error",
-		message: "Invalid email or password.",
+		message: GENERIC_SIGN_IN_ERROR_MESSAGE,
 	},
 	missing_profile: {
 		status: "error",
-		message: "We could not load your account profile.",
+		message: GENERIC_SIGN_IN_ERROR_MESSAGE,
 	},
 	unauthorized_role: {
 		status: "error",
-		message: "This sign-in area is for student accounts.",
+		message: GENERIC_SIGN_IN_ERROR_MESSAGE,
 	},
 	invalid_request: {
 		status: "error",
