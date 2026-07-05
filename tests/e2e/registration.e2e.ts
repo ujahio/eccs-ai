@@ -41,7 +41,7 @@ const validRegistration = {
 	password: "casework1"
 };
 const verificationEmailSentMessage =
-	"Check your email. Verification expires in 24 hours.";
+	"We just sent a verification link to your inbox. Click the link in that email to confirm your account.";
 
 type RegistrationFormValues = {
 	firstName?: string;

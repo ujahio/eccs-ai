@@ -39,7 +39,8 @@ const registrationMessages: Record<
 > = {
   verification_sent: {
     status: "success",
-    message: "Check your email. Verification expires in 24 hours."
+    message:
+      "We just sent a verification link to your inbox. Click the link in that email to confirm your account."
   }
 };
 

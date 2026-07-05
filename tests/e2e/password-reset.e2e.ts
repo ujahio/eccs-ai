@@ -13,7 +13,7 @@ const validRegistration = {
 };
 const newPassword = "newcase1";
 const verificationEmailSentMessage =
-	"Check your email. Verification expires in 24 hours.";
+	"We just sent a verification link to your inbox. Click the link in that email to confirm your account.";
 const resetRequestedMessage =
 	"If this account exists and has a verified email, a reset link has been sent. If you do not receive one, verify your email or contact support.";
 const invalidResetLinkMessage =

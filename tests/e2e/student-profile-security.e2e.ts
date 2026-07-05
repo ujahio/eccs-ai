@@ -13,7 +13,7 @@ const validRegistration = {
 };
 const changedPassword = "newcase1";
 const verificationEmailSentMessage =
-	"Check your email. Verification expires in 24 hours.";
+	"We just sent a verification link to your inbox. Click the link in that email to confirm your account.";
 
 async function fetchVerificationUrl(
 	request: APIRequestContext,

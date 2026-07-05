@@ -250,7 +250,8 @@ describe("RegistrationService", () => {
 
 		expect(result).toMatchObject({
 			status: "verification_sent",
-			message: "Check your email. Verification expires in 24 hours."
+			message:
+				"We just sent a verification link to your inbox. Click the link in that email to confirm your account."
 		});
 		expect(identity.created).toHaveLength(1);
 		expect(identity.created[0]).toMatchObject({
