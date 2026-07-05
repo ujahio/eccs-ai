@@ -38,7 +38,7 @@ export interface LoginProfileRepository {
 }
 
 export type LoginServiceResult =
-	| { status: "signed_in"; message: string; tokens: AuthSessionTokens }
+	| { status: "signed_in"; tokens: AuthSessionTokens }
 	| {
 			status: "validation_error";
 			message: string;
@@ -81,7 +81,6 @@ export class LoginService {
 
 			return {
 				status: "signed_in",
-				message: "Signed in.",
 				tokens
 			};
 		} catch (error) {

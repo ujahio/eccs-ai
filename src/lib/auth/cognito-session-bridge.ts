@@ -189,7 +189,6 @@ export function cognitoSessionBridge(
 
 						return bridgeResponse(ctx, options, {
 							status: "signed_in",
-							message: "Signed in.",
 							redirectTo: "/student",
 						} satisfies CognitoSignInResponse);
 					} catch (error) {

@@ -143,7 +143,6 @@ describe("cognitoSessionBridge", () => {
 
 		expect(body).toEqual({
 			status: "signed_in",
-			message: "Signed in.",
 			redirectTo: "/student",
 		});
 		expect(response.headers.get("set-cookie")).toContain(

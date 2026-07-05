@@ -80,15 +80,6 @@ export function LoginForm({ initialState }: LoginFormProps) {
       const result = (await response.json()) as CognitoSignInResponse;
 
       if (result.status === "signed_in") {
-        setState({
-          status: "success",
-          message: result.message,
-          values: {
-            email,
-            password: ""
-          },
-          errors: {}
-        });
         router.replace(result.redirectTo);
         router.refresh();
         return;
