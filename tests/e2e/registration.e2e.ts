@@ -257,9 +257,14 @@ test.describe("Student registration and email verification", () => {
 		await page.goto(verificationUrl);
 
 		await expect(page).toHaveURL(/\/login\?verification=verified/);
+		expect(new URL(page.url()).searchParams.has("email")).toBe(false);
+		await expect(page.getByTestId("login-email")).toHaveValue("");
 		await expect(page.getByTestId("login-success-message")).toHaveText(
 			"Your email has been verified. Please sign in."
 		);
+
+		await page.goto("/student");
+		await expect(page).toHaveURL(/\/login$/);
 	});
 
 	test("verified student can sign in and reach the student dashboard", async ({
