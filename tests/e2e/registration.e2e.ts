@@ -279,6 +279,7 @@ test.describe("Student registration and email verification", () => {
 		const email = uniqueEmail();
 
 		await registerVerifiedAndLoginStudent(page, request, email);
+		await page.getByTestId("student-account-menu-trigger").click();
 		await page.getByTestId("student-logout-button").click();
 
 		await expect(page).toHaveURL(/\/login$/);
