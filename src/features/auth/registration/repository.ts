@@ -28,11 +28,16 @@ export type StudentProfileRecord = {
 	fullName: string;
 	role: "student";
 	emailVerifiedAt: number;
+	pendingEmail?: string;
+	pendingEmailVerificationTokenHash?: string;
+	pendingEmailVerificationExpiresAt?: number;
+	pendingEmailVerificationRequestedAt?: number;
 	canAccessCases: boolean;
 	createdAt: number;
 	updatedAt: number;
 	// Millisecond epoch for exact comparison with Better Auth session dates.
 	sessionsInvalidatedAt?: number;
+	sessionInvalidationExemptToken?: string;
 };
 
 export class DuplicatePendingRegistrationError extends Error {

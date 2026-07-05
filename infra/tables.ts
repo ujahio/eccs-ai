@@ -29,6 +29,7 @@ export const userProfileTable = new sst.aws.Dynamo("UserProfileTable", {
 	fields: {
 		profileId: "string",
 		emailNormalized: "string",
+		pendingEmailVerificationTokenHash: "string",
 		role: "string"
 	},
 	primaryIndex: {
@@ -41,6 +42,10 @@ export const userProfileTable = new sst.aws.Dynamo("UserProfileTable", {
 		},
 		RoleIndex: {
 			hashKey: "role",
+			projection: "all"
+		},
+		PendingEmailVerificationTokenHashIndex: {
+			hashKey: "pendingEmailVerificationTokenHash",
 			projection: "all"
 		}
 	}

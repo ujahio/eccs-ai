@@ -51,4 +51,37 @@ describe("isSessionInvalidated", () => {
 			)
 		).toBe(false);
 	});
+
+	it("allows only the explicitly exempted current session token", () => {
+		const invalidatedProfile = {
+			...profile,
+			sessionsInvalidatedAt: new Date(
+				"2026-01-01T00:03:00.000Z"
+			).getTime(),
+			sessionInvalidationExemptToken: "keep-this-session"
+		};
+
+		expect(
+			isSessionInvalidated(
+				{
+					session: {
+						createdAt: new Date("2026-01-01T00:01:00.000Z"),
+						token: "keep-this-session"
+					}
+				},
+				invalidatedProfile
+			)
+		).toBe(false);
+		expect(
+			isSessionInvalidated(
+				{
+					session: {
+						createdAt: new Date("2026-01-01T00:01:00.000Z"),
+						token: "other-session"
+					}
+				},
+				invalidatedProfile
+			)
+		).toBe(true);
+	});
 });

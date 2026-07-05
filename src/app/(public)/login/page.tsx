@@ -69,6 +69,28 @@ const resetMessages: Record<string, Pick<LoginFormState, "status" | "message">> 
     }
   };
 
+const emailChangeMessages: Record<
+  string,
+  Pick<LoginFormState, "status" | "message">
+> = {
+  verified: {
+    status: "success",
+    message: "Your email address has been updated. Please sign in."
+  },
+  expired: {
+    status: "blocked",
+    message: "This email change link has expired."
+  },
+  invalid: {
+    status: "error",
+    message: "This email change link is invalid."
+  },
+  used: {
+    status: "blocked",
+    message: "This email change link has already been used."
+  }
+};
+
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const verification = Array.isArray(params?.verification)
@@ -80,24 +102,33 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const reset = Array.isArray(params?.reset)
     ? params?.reset[0]
     : params?.reset;
+  const emailChange = Array.isArray(params?.emailChange)
+    ? params?.emailChange[0]
+    : params?.emailChange;
   const hasVerificationParam = params?.verification !== undefined;
   const hasAuthParam = params?.auth !== undefined;
   const hasResetParam = params?.reset !== undefined;
+  const hasEmailChangeParam = params?.emailChange !== undefined;
   const verificationState = verification
     ? verificationMessages[verification]
     : undefined;
   const authState = auth ? authMessages[auth] : undefined;
   const resetState = reset ? resetMessages[reset] : undefined;
+  const emailChangeState = emailChange
+    ? emailChangeMessages[emailChange]
+    : undefined;
 
   if (
     (hasVerificationParam && !verificationState) ||
     (hasAuthParam && !authState) ||
-    (hasResetParam && !resetState)
+    (hasResetParam && !resetState) ||
+    (hasEmailChangeParam && !emailChangeState)
   ) {
     redirect("/login");
   }
 
-  const statusState = verificationState ?? authState ?? resetState;
+  const statusState =
+    verificationState ?? authState ?? resetState ?? emailChangeState;
   const initialState: LoginFormState = statusState
     ? {
         ...initialLoginFormState,

@@ -43,6 +43,12 @@ import {
 	hasStudentCognitoGroup,
 	type CognitoGroupName
 } from "@/lib/auth/cognito-groups";
+import {
+	StudentEmailUnavailableError,
+	type StudentProfileEmailSender,
+	type StudentProfileIdentityProvider,
+	type StudentProfileRepository
+} from "@/features/student/profile-security/service";
 
 export type E2EEmailRecord =
 	| {
@@ -63,6 +69,13 @@ export type E2EEmailRecord =
 	| {
 			type: "password_changed";
 			to: string;
+			sentAt: number;
+	  }
+	| {
+			type: "student_email_change_verification";
+			to: string;
+			verificationUrl: string;
+			expiresInHours: number;
 			sentAt: number;
 	  };
 
@@ -128,7 +141,8 @@ export class InMemoryIdentityProvider
 	implements
 		RegistrationIdentityProvider,
 		LoginIdentityProvider,
-		PasswordResetIdentityProvider
+		PasswordResetIdentityProvider,
+		StudentProfileIdentityProvider
 {
 	async createPendingStudent(
 		input: CreatePendingStudentInput
@@ -257,7 +271,46 @@ export class InMemoryIdentityProvider
 		user.resetCodeConsumedAt = Date.now();
 	}
 
-	async invalidateCognitoSessions() {}
+	async invalidateCognitoSessions(_args: { emailNormalized: string }) {}
+
+	async updateStudentName(_args: {
+		emailNormalized: string;
+		firstName: string;
+		lastName: string;
+		fullName: string;
+	}) {}
+
+	async updateStudentEmail(args: {
+		currentEmailNormalized: string;
+		newEmailNormalized: string;
+	}) {
+		const store = getStore();
+		const user = store.users.get(args.currentEmailNormalized);
+
+		if (!user) {
+			throw new Error("User not found");
+		}
+
+		if (store.users.has(args.newEmailNormalized)) {
+			throw new StudentEmailUnavailableError();
+		}
+
+		store.users.delete(args.currentEmailNormalized);
+		store.users.set(args.newEmailNormalized, user);
+	}
+
+	async setStudentPassword(args: {
+		emailNormalized: string;
+		password: string;
+	}) {
+		const user = getStore().users.get(args.emailNormalized);
+
+		if (!user) {
+			throw new Error("User not found");
+		}
+
+		user.password = args.password;
+	}
 }
 
 export class InMemoryRegistrationRepository
@@ -265,6 +318,7 @@ export class InMemoryRegistrationRepository
 		RegistrationWorkflowRepository,
 		LoginProfileRepository,
 		PasswordResetProfileRepository,
+		StudentProfileRepository,
 		AppSessionInvalidator
 {
 	async getPendingByEmail(emailNormalized: string) {
@@ -385,6 +439,124 @@ export class InMemoryRegistrationRepository
 		return getStore().profiles.get(emailNormalized) ?? null;
 	}
 
+	async updateStudentName(args: {
+		profileId: string;
+		firstName: string;
+		lastName: string;
+		fullName: string;
+		updatedAt: number;
+	}) {
+		const store = getStore();
+		const profile = Array.from(store.profiles.values()).find(
+			(record) => record.profileId === args.profileId
+		);
+
+		if (!profile) {
+			return;
+		}
+
+		store.profiles.set(profile.emailNormalized, {
+			...profile,
+			firstName: args.firstName,
+			lastName: args.lastName,
+			fullName: args.fullName,
+			updatedAt: args.updatedAt
+		});
+	}
+
+	async storePendingEmailChange(args: {
+		profileId: string;
+		pendingEmail: string;
+		pendingEmailVerificationTokenHash: string;
+		pendingEmailVerificationExpiresAt: number;
+		pendingEmailVerificationRequestedAt: number;
+		updatedAt: number;
+	}) {
+		const store = getStore();
+		const profile = Array.from(store.profiles.values()).find(
+			(record) => record.profileId === args.profileId
+		);
+
+		if (!profile) {
+			return;
+		}
+
+		store.profiles.set(profile.emailNormalized, {
+			...profile,
+			pendingEmail: args.pendingEmail,
+			pendingEmailVerificationTokenHash:
+				args.pendingEmailVerificationTokenHash,
+			pendingEmailVerificationExpiresAt:
+				args.pendingEmailVerificationExpiresAt,
+			pendingEmailVerificationRequestedAt:
+				args.pendingEmailVerificationRequestedAt,
+			updatedAt: args.updatedAt
+		});
+	}
+
+	async findStudentProfileByPendingEmailTokenHash(tokenHash: string) {
+		return (
+			Array.from(getStore().profiles.values()).find(
+				(record) => record.pendingEmailVerificationTokenHash === tokenHash
+			) ?? null
+		);
+	}
+
+	async completePendingEmailChange(args: {
+		profileId: string;
+		currentEmailNormalized: string;
+		newEmailNormalized: string;
+		verifiedAt: number;
+		sessionsInvalidatedAt: number;
+		sessionInvalidationExemptToken?: string;
+	}) {
+		const store = getStore();
+		const profile = store.profiles.get(args.currentEmailNormalized);
+
+		if (!profile || profile.profileId !== args.profileId) {
+			return;
+		}
+
+		store.profiles.delete(args.currentEmailNormalized);
+		store.profiles.set(args.newEmailNormalized, {
+			...profile,
+			emailNormalized: args.newEmailNormalized,
+			emailVerifiedAt: args.verifiedAt,
+			pendingEmail: undefined,
+			pendingEmailVerificationTokenHash: undefined,
+			pendingEmailVerificationExpiresAt: undefined,
+			pendingEmailVerificationRequestedAt: undefined,
+			sessionsInvalidatedAt: args.sessionsInvalidatedAt,
+			sessionInvalidationExemptToken:
+				args.sessionInvalidationExemptToken,
+			updatedAt: args.verifiedAt
+		});
+	}
+
+	async invalidateOtherSessionsForUser(args: {
+		userId: string;
+		invalidatedAt: number;
+		updatedAt: number;
+		sessionInvalidationExemptToken?: string;
+	}) {
+		const store = getStore();
+		const profile = Array.from(store.profiles.values()).find(
+			(record) => record.profileId === args.userId
+		);
+
+		if (!profile) {
+			return;
+		}
+
+		store.profiles.set(profile.emailNormalized, {
+			...profile,
+			sessionsInvalidatedAt: args.invalidatedAt,
+			sessionInvalidationExemptToken:
+				args.sessionInvalidationExemptToken,
+			updatedAt: args.updatedAt
+		});
+	}
+
 	async invalidateSessionsForUser(args: {
 		userId: string;
 		invalidatedAt: number;
@@ -401,13 +573,17 @@ export class InMemoryRegistrationRepository
 		store.profiles.set(profile.emailNormalized, {
 			...profile,
 			sessionsInvalidatedAt: args.invalidatedAt,
+			sessionInvalidationExemptToken: undefined,
 			updatedAt: Math.floor(args.invalidatedAt / 1000)
 		});
 	}
 }
 
 export class InMemoryEmailSender
-	implements RegistrationEmailSender, PasswordResetEmailSender
+	implements
+		RegistrationEmailSender,
+		PasswordResetEmailSender,
+		StudentProfileEmailSender
 {
 	async sendRegistrationVerificationEmail(email: {
 		to: string;
@@ -464,6 +640,21 @@ export class InMemoryEmailSender
 		appendEmailRecord(record);
 	}
 
+	async sendEmailChangeVerificationEmail(email: {
+		to: string;
+		verificationUrl: string;
+		expiresInHours: number;
+	}) {
+		const record = {
+			type: "student_email_change_verification" as const,
+			...email,
+			sentAt: Date.now()
+		};
+
+		getStore().emails.push(record);
+		appendEmailRecord(record);
+	}
+
 	getLastPasswordResetUrl(emailNormalized: string): string | null {
 		const store = getStore();
 		const record = [...store.emails, ...readEmailRecords()]
@@ -479,6 +670,19 @@ export class InMemoryEmailSender
 		return [...store.emails, ...readEmailRecords()].some(
 			(e) => e.type === "password_changed" && e.to === emailNormalized
 		);
+	}
+
+	getLastEmailChangeVerificationUrl(emailNormalized: string): string | null {
+		const store = getStore();
+		const record = [...store.emails, ...readEmailRecords()]
+			.reverse()
+			.find(
+				(e) =>
+					e.type === "student_email_change_verification" &&
+					e.to === emailNormalized
+			);
+
+		return record && "verificationUrl" in record ? record.verificationUrl : null;
 	}
 }
 

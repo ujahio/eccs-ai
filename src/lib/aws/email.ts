@@ -6,9 +6,13 @@ import type {
 	RegistrationEmailSender,
 	RegistrationVerificationEmail,
 } from "@/features/auth/registration/email";
+import type { StudentProfileEmailSender } from "@/features/student/profile-security/service";
 
 export class ResendRegistrationEmailSender
-	implements RegistrationEmailSender, PasswordResetEmailSender
+	implements
+		RegistrationEmailSender,
+		PasswordResetEmailSender,
+		StudentProfileEmailSender
 {
 	private readonly client: Resend;
 
@@ -66,6 +70,25 @@ export class ResendRegistrationEmailSender
 				"Your E-Clinical Case Solutions password was changed.",
 				"",
 				"If you did not make this change, reset your password immediately."
+			].join("\n")
+		});
+	}
+
+	async sendEmailChangeVerificationEmail(email: {
+		to: string;
+		verificationUrl: string;
+		expiresInHours: number;
+	}) {
+		await this.client.emails.send({
+			from: this.sender,
+			to: email.to,
+			subject: "Verify your new ECCS email",
+			text: [
+				"Please verify this new email address for your E-Clinical Case Solutions account.",
+				`This link expires in ${email.expiresInHours} hours:`,
+				email.verificationUrl,
+				"",
+				"If you did not request this change, you can ignore this email."
 			].join("\n")
 		});
 	}
