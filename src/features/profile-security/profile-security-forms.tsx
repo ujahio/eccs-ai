@@ -308,10 +308,10 @@ export function ProfileSecurityForms({
 						id={personalPanelId}
 						role="tabpanel"
 					>
-						<div className="grid gap-4 sm:grid-cols-2">
+						<div className="grid items-start gap-4 sm:grid-cols-2">
 							<div className="grid gap-2">
 								<label
-									className="text-xs font-medium text-muted-gray"
+									className="text-xs font-medium leading-none text-muted-gray"
 									htmlFor={`${profileKind}-profile-first-name`}
 								>
 									First name
@@ -346,7 +346,7 @@ export function ProfileSecurityForms({
 
 							<div className="grid gap-2">
 								<label
-									className="text-xs font-medium text-muted-gray"
+									className="text-xs font-medium leading-none text-muted-gray"
 									htmlFor={`${profileKind}-profile-last-name`}
 								>
 									Last name
@@ -382,7 +382,7 @@ export function ProfileSecurityForms({
 
 						<div className="grid gap-2">
 							<label
-								className="text-xs font-medium text-muted-gray"
+								className="text-xs font-medium leading-none text-muted-gray"
 								htmlFor={`${profileKind}-profile-new-email`}
 							>
 								Email address
