@@ -29,6 +29,15 @@ export async function submitLoginForm(
 		};
 	}
 
+	if (result.status === "new_password_required") {
+		return {
+			status: "blocked",
+			message: "Set a new password to finish signing in.",
+			values,
+			errors: {}
+		};
+	}
+
 	if (result.status === "validation_error") {
 		return {
 			status: "error",

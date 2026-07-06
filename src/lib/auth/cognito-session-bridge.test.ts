@@ -1,12 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 import { betterAuth } from "better-auth";
-import { LoginBlockedUntilVerifiedError } from "@/features/auth/login/service";
-import type { StudentProfileRecord } from "@/features/auth/registration/repository";
+import {
+	LoginBlockedUntilVerifiedError,
+	type AuthSessionTokens,
+	type LoginAuthenticationResult,
+} from "@/features/auth/login/service";
+import type {
+	AppProfileRecord,
+	StudentProfileRecord,
+	TeacherProfileRecord,
+} from "@/features/auth/registration/repository";
 import { COGNITO_GROUPS } from "@/lib/auth/cognito-groups";
 import {
 	cognitoSessionBridge,
+	type AppSessionProfileRepository,
 	type CognitoSessionIdentityProvider,
-	type StudentSessionProfileRepository,
 } from "./cognito-session-bridge";
 import type {
 	CognitoIdTokenVerifier,
@@ -28,18 +36,43 @@ const profile: StudentProfileRecord = {
 	updatedAt: 1,
 };
 
+const teacherProfile: TeacherProfileRecord = {
+	profileId: "sub-teacher",
+	emailNormalized: "teacher@example.com",
+	firstName: "Taylor",
+	lastName: "Smith",
+	fullName: "Taylor Smith",
+	role: "teacher",
+	emailVerifiedAt: 1,
+	createdAt: 1,
+	updatedAt: 1,
+};
+
 class FakeIdentity implements CognitoSessionIdentityProvider {
 	nextError?: Error;
+	nextResult: LoginAuthenticationResult = {
+		accessToken: "access-token",
+		idToken: "id-token",
+	};
+	completeResult: AuthSessionTokens = {
+		accessToken: "access-token",
+		idToken: "id-token",
+	};
 
-	async authenticateStudent() {
+	async authenticateUser() {
 		if (this.nextError) {
 			throw this.nextError;
 		}
 
-		return {
-			accessToken: "access-token",
-			idToken: "id-token",
-		};
+		return this.nextResult;
+	}
+
+	async completeNewPasswordChallenge() {
+		if (this.nextError) {
+			throw this.nextError;
+		}
+
+		return this.completeResult;
 	}
 }
 
@@ -56,10 +89,10 @@ class FakeVerifier implements CognitoIdTokenVerifier {
 	}
 }
 
-class FakeProfiles implements StudentSessionProfileRepository {
-	result: StudentProfileRecord | null = profile;
+class FakeProfiles implements AppSessionProfileRepository {
+	result: AppProfileRecord | null = profile;
 
-	async getStudentProfileById() {
+	async getAppProfileById() {
 		return this.result;
 	}
 }
@@ -131,6 +164,19 @@ async function postFormSignIn(
 	);
 }
 
+async function postCompleteNewPassword(auth: AuthHarness, body: unknown) {
+	return auth.handler(
+		new Request("http://localhost:3001/api/auth/cognito/complete-new-password", {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				origin: "http://localhost:3001",
+			},
+			body: JSON.stringify(body),
+		})
+	);
+}
+
 describe("cognitoSessionBridge", () => {
 	it("creates a stateless Better Auth session after Cognito validation", async () => {
 		const { auth } = createAuthHarness();
@@ -165,6 +211,84 @@ describe("cognitoSessionBridge", () => {
 		expect(response.headers.get("location")).toBe(
 			"http://localhost:3001/student"
 		);
+		expect(response.headers.get("set-cookie")).toContain(
+			"better-auth.session"
+		);
+	});
+
+	it("creates a teacher session and redirects to the teacher dashboard", async () => {
+		const { auth, profiles, tokenVerifier } = createAuthHarness();
+		profiles.result = teacherProfile;
+		tokenVerifier.result = {
+			cognitoSub: teacherProfile.profileId,
+			emailNormalized: teacherProfile.emailNormalized,
+			emailVerified: true,
+			groups: [COGNITO_GROUPS.teacher],
+		};
+
+		const response = await postSignIn(auth, {
+			email: "teacher@example.com",
+			password: "casework1",
+		});
+		const body = await response.json();
+
+		expect(body).toEqual({
+			status: "signed_in",
+			redirectTo: "/teacher",
+		});
+		expect(response.headers.get("set-cookie")).toContain(
+			"better-auth.session"
+		);
+	});
+
+	it("returns a first-login password challenge without creating an app session", async () => {
+		const { auth, identity } = createAuthHarness();
+		identity.nextResult = {
+			challengeName: "NEW_PASSWORD_REQUIRED",
+			challengeSession: "challenge-session",
+		};
+
+		const response = await postSignIn(auth, {
+			email: "teacher@example.com",
+			password: "temporary1",
+		});
+		const body = await response.json();
+
+		expect(body).toEqual({
+			status: "new_password_required",
+			message: "Set a new password to finish signing in.",
+			challengeSession: "challenge-session",
+			values: {
+				email: "teacher@example.com",
+				password: "",
+			},
+			errors: {},
+		});
+		expect(response.headers.get("set-cookie")).toBeNull();
+	});
+
+	it("completes a first-login password challenge before creating a teacher session", async () => {
+		const { auth, profiles, tokenVerifier } = createAuthHarness();
+		profiles.result = teacherProfile;
+		tokenVerifier.result = {
+			cognitoSub: teacherProfile.profileId,
+			emailNormalized: teacherProfile.emailNormalized,
+			emailVerified: true,
+			groups: [COGNITO_GROUPS.teacher],
+		};
+
+		const response = await postCompleteNewPassword(auth, {
+			email: "teacher@example.com",
+			password: "newcase1",
+			confirmPassword: "newcase1",
+			challengeSession: "challenge-session",
+		});
+		const body = await response.json();
+
+		expect(body).toEqual({
+			status: "signed_in",
+			redirectTo: "/teacher",
+		});
 		expect(response.headers.get("set-cookie")).toContain(
 			"better-auth.session"
 		);
@@ -226,6 +350,46 @@ describe("cognitoSessionBridge", () => {
 		tokenVerifier.result = {
 			...tokenVerifier.result,
 			groups: [],
+		};
+
+		const response = await postSignIn(auth, {
+			email: "student@example.com",
+			password: "casework1",
+		});
+		const body = await response.json();
+
+		expect(body.status).toBe("invalid_credentials");
+		expect(body.message).toBe(
+			"We couldn’t sign you in with those details. Check your email and password and try again."
+		);
+		expect(response.headers.get("set-cookie")).toBeNull();
+	});
+
+	it("fails closed when Cognito and DynamoDB roles do not match", async () => {
+		const { auth, tokenVerifier } = createAuthHarness();
+		tokenVerifier.result = {
+			...tokenVerifier.result,
+			groups: [COGNITO_GROUPS.teacher],
+		};
+
+		const response = await postSignIn(auth, {
+			email: "student@example.com",
+			password: "casework1",
+		});
+		const body = await response.json();
+
+		expect(body.status).toBe("invalid_credentials");
+		expect(body.message).toBe(
+			"We couldn’t sign you in with those details. Check your email and password and try again."
+		);
+		expect(response.headers.get("set-cookie")).toBeNull();
+	});
+
+	it("fails closed when Cognito includes multiple known role groups", async () => {
+		const { auth, tokenVerifier } = createAuthHarness();
+		tokenVerifier.result = {
+			...tokenVerifier.result,
+			groups: [COGNITO_GROUPS.student, COGNITO_GROUPS.teacher],
 		};
 
 		const response = await postSignIn(auth, {

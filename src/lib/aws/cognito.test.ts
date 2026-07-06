@@ -3,7 +3,9 @@ import {
 	AdminUpdateUserAttributesCommand,
 	AdminUserGlobalSignOutCommand,
 	ConfirmForgotPasswordCommand,
-	ForgotPasswordCommand
+	ForgotPasswordCommand,
+	InitiateAuthCommand,
+	RespondToAuthChallengeCommand
 } from "@aws-sdk/client-cognito-identity-provider";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -11,7 +13,7 @@ import {
 	PasswordResetDeliveryUnavailableError,
 	PasswordResetRateLimitedError
 } from "@/features/auth/password-reset/service";
-import { StudentEmailUnavailableError } from "@/features/student/profile-security/service";
+import { ProfileSecurityEmailUnavailableError } from "@/features/profile-security/service";
 import { CognitoAuthAdapter } from "./cognito";
 
 vi.mock("server-only", () => ({}));
@@ -55,6 +57,70 @@ function createHarness() {
 }
 
 describe("CognitoAuthAdapter password reset", () => {
+	it("returns a first-login password challenge from Cognito sign-in", async () => {
+		const { adapter, client } = createHarness();
+		client.nextResponse = {
+			ChallengeName: "NEW_PASSWORD_REQUIRED",
+			Session: "challenge-session"
+		};
+
+		const result = await adapter.authenticateUser({
+			emailNormalized: "teacher@example.com",
+			password: "temporary1"
+		});
+
+		expect(client.sent[0]).toBeInstanceOf(InitiateAuthCommand);
+		expect((client.sent[0] as InitiateAuthCommand).input).toMatchObject({
+			ClientId: "user-pool-client-id",
+			AuthFlow: "USER_PASSWORD_AUTH",
+			AuthParameters: {
+				USERNAME: "teacher@example.com",
+				PASSWORD: "temporary1"
+			}
+		});
+		expect(result).toEqual({
+			challengeName: "NEW_PASSWORD_REQUIRED",
+			challengeSession: "challenge-session"
+		});
+	});
+
+	it("completes Cognito's first-login password challenge", async () => {
+		const { adapter, client } = createHarness();
+		client.nextResponse = {
+			AuthenticationResult: {
+				AccessToken: "access-token",
+				IdToken: "id-token",
+				RefreshToken: "refresh-token",
+				ExpiresIn: 3600
+			}
+		};
+
+		const result = await adapter.completeNewPasswordChallenge({
+			emailNormalized: "teacher@example.com",
+			newPassword: "newcase1",
+			challengeSession: "challenge-session"
+		});
+
+		expect(client.sent[0]).toBeInstanceOf(RespondToAuthChallengeCommand);
+		expect(
+			(client.sent[0] as RespondToAuthChallengeCommand).input
+		).toMatchObject({
+			ClientId: "user-pool-client-id",
+			ChallengeName: "NEW_PASSWORD_REQUIRED",
+			Session: "challenge-session",
+			ChallengeResponses: {
+				USERNAME: "teacher@example.com",
+				NEW_PASSWORD: "newcase1"
+			}
+		});
+		expect(result).toEqual({
+			accessToken: "access-token",
+			idToken: "id-token",
+			refreshToken: "refresh-token",
+			expiresIn: 3600
+		});
+	});
+
 	it("starts Cognito native forgot-password flow", async () => {
 		const { adapter, client } = createHarness();
 		client.nextResponse = {
@@ -208,7 +274,7 @@ describe("CognitoAuthAdapter password reset", () => {
 				currentEmailNormalized: "student@example.com",
 				newEmailNormalized: "taken@example.com"
 			})
-		).rejects.toBeInstanceOf(StudentEmailUnavailableError);
+		).rejects.toBeInstanceOf(ProfileSecurityEmailUnavailableError);
 	});
 
 	it("sets a permanent Cognito password for logged-in password changes", async () => {

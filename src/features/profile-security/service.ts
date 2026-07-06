@@ -3,27 +3,30 @@ import {
 	generateVerificationToken,
 	hashVerificationToken,
 } from "@/features/auth/registration/tokens";
-import type { StudentProfileRecord } from "@/features/auth/registration/repository";
+import type { AppProfileRecord } from "@/features/auth/registration/repository";
 import {
-	parseStudentEmailChangeInput,
-	parseStudentNameInput,
-	parseStudentPasswordChangeInput,
-	type StudentEmailChangeFieldErrors,
-	type StudentEmailChangeInput,
-	type StudentNameFieldErrors,
-	type StudentNameInput,
-	type StudentPasswordChangeFieldErrors,
-	type StudentPasswordChangeInput,
+	parseProfileSecurityEmailChangeInput,
+	parseProfileSecurityNameInput,
+	parseProfileSecurityPasswordChangeInput,
+	type ProfileSecurityEmailChangeFieldErrors,
+	type ProfileSecurityEmailChangeInput,
+	type ProfileSecurityNameFieldErrors,
+	type ProfileSecurityNameInput,
+	type ProfileSecurityPasswordChangeFieldErrors,
+	type ProfileSecurityPasswordChangeInput,
 } from "./schema";
 
-export class StudentEmailUnavailableError extends Error {
+export const EMAIL_ADDRESS_UNAVAILABLE_MESSAGE =
+	"We couldn't use that email address. Try another email or contact support.";
+
+export class ProfileSecurityEmailUnavailableError extends Error {
 	constructor() {
-		super("This email address is already in use.");
-		this.name = "StudentEmailUnavailableError";
+		super(EMAIL_ADDRESS_UNAVAILABLE_MESSAGE);
+		this.name = "ProfileSecurityEmailUnavailableError";
 	}
 }
 
-export type StudentProfileServiceConfig = {
+export type ProfileSecurityServiceConfig = {
 	appBaseUrl: string;
 	emailChangeTtlSeconds?: number;
 	nowSeconds?: () => number;
@@ -31,33 +34,33 @@ export type StudentProfileServiceConfig = {
 	generateToken?: () => string;
 };
 
-export interface StudentProfileIdentityProvider {
-	updateStudentName(args: {
+export interface ProfileSecurityIdentityProvider {
+	updateProfileName(args: {
 		emailNormalized: string;
 		firstName: string;
 		lastName: string;
 		fullName: string;
 	}): Promise<void>;
-	authenticateStudent(args: {
+	authenticateUser(args: {
 		emailNormalized: string;
 		password: string;
 	}): Promise<unknown>;
-	updateStudentEmail(args: {
+	updateProfileEmail(args: {
 		currentEmailNormalized: string;
 		newEmailNormalized: string;
 	}): Promise<void>;
-	setStudentPassword(args: {
+	setProfilePassword(args: {
 		emailNormalized: string;
 		password: string;
 	}): Promise<void>;
 	invalidateCognitoSessions(args: { emailNormalized: string }): Promise<void>;
 }
 
-export interface StudentProfileRepository {
-	getStudentProfileByEmail(
+export interface ProfileSecurityRepository {
+	getProfileByEmail(
 		emailNormalized: string,
-	): Promise<StudentProfileRecord | null>;
-	updateStudentName(args: {
+	): Promise<AppProfileRecord | null>;
+	updateProfileName(args: {
 		profileId: string;
 		firstName: string;
 		lastName: string;
@@ -72,9 +75,9 @@ export interface StudentProfileRepository {
 		pendingEmailVerificationRequestedAt: number;
 		updatedAt: number;
 	}): Promise<void>;
-	findStudentProfileByPendingEmailTokenHash(
+	findProfileByPendingEmailTokenHash(
 		tokenHash: string,
-	): Promise<StudentProfileRecord | null>;
+	): Promise<AppProfileRecord | null>;
 	completePendingEmailChange(args: {
 		profileId: string;
 		currentEmailNormalized: string;
@@ -91,7 +94,7 @@ export interface StudentProfileRepository {
 	}): Promise<void>;
 }
 
-export interface StudentProfileEmailSender {
+export interface ProfileSecurityEmailSender {
 	sendEmailChangeVerificationEmail(email: {
 		to: string;
 		verificationUrl: string;
@@ -100,52 +103,57 @@ export interface StudentProfileEmailSender {
 	sendPasswordChangedEmail(email: { to: string }): Promise<void>;
 }
 
-export type StudentNameServiceResult =
+export type ProfileSecurityNameServiceResult =
 	| { status: "name_updated"; message: string }
 	| {
 			status: "validation_error";
 			message: string;
-			fieldErrors: StudentNameFieldErrors;
-	  };
+			fieldErrors: ProfileSecurityNameFieldErrors;
+};
 
-export type StudentEmailChangeRequestServiceResult =
+export type ProfileSecurityEmailChangeRequestServiceResult =
 	| { status: "verification_sent"; message: string; pendingEmail: string }
 	| { status: "same_email"; message: string }
 	| { status: "email_unavailable"; message: string }
 	| {
 			status: "validation_error";
 			message: string;
-			fieldErrors: StudentEmailChangeFieldErrors;
+			fieldErrors: ProfileSecurityEmailChangeFieldErrors;
 	  };
 
-export type StudentEmailChangeVerificationServiceResult =
+export type ProfileSecurityEmailChangeVerificationServiceResult =
+	| {
+			status: "verified_current_session_kept";
+			message: string;
+			profile: AppProfileRecord;
+	  }
 	| { status: "verified_sign_in_required"; message: string }
 	| { status: "invalid"; message: string }
 	| { status: "expired"; message: string }
 	| { status: "already_used"; message: string };
 
-export type StudentPasswordChangeServiceResult =
+export type ProfileSecurityPasswordChangeServiceResult =
 	| { status: "password_changed"; message: string }
 	| { status: "invalid_current_password"; message: string }
 	| {
 			status: "validation_error";
 			message: string;
-			fieldErrors: StudentPasswordChangeFieldErrors;
+			fieldErrors: ProfileSecurityPasswordChangeFieldErrors;
 	  };
 
 const DEFAULT_EMAIL_CHANGE_TTL_SECONDS = 24 * 60 * 60;
 
-export class StudentProfileService {
+export class ProfileSecurityService {
 	private readonly config: Required<
-		Omit<StudentProfileServiceConfig, "generateToken">
+		Omit<ProfileSecurityServiceConfig, "generateToken">
 	> &
-		Pick<StudentProfileServiceConfig, "generateToken">;
+		Pick<ProfileSecurityServiceConfig, "generateToken">;
 
 	constructor(
-		private readonly identity: StudentProfileIdentityProvider,
-		private readonly profiles: StudentProfileRepository,
-		private readonly email: StudentProfileEmailSender,
-		config: StudentProfileServiceConfig,
+		private readonly identity: ProfileSecurityIdentityProvider,
+		private readonly profiles: ProfileSecurityRepository,
+		private readonly email: ProfileSecurityEmailSender,
+		config: ProfileSecurityServiceConfig,
 	) {
 		this.config = {
 			appBaseUrl: config.appBaseUrl,
@@ -158,10 +166,10 @@ export class StudentProfileService {
 	}
 
 	async updateName(
-		profile: StudentProfileRecord,
-		input: StudentNameInput,
-	): Promise<StudentNameServiceResult> {
-		const parsed = parseStudentNameInput(input);
+		profile: AppProfileRecord,
+		input: ProfileSecurityNameInput,
+	): Promise<ProfileSecurityNameServiceResult> {
+		const parsed = parseProfileSecurityNameInput(input);
 
 		if (!parsed.success) {
 			return {
@@ -173,13 +181,13 @@ export class StudentProfileService {
 
 		const now = this.config.nowSeconds();
 
-		await this.identity.updateStudentName({
+		await this.identity.updateProfileName({
 			emailNormalized: profile.emailNormalized,
 			firstName: parsed.data.firstName,
 			lastName: parsed.data.lastName,
 			fullName: parsed.data.fullName,
 		});
-		await this.profiles.updateStudentName({
+		await this.profiles.updateProfileName({
 			profileId: profile.profileId,
 			firstName: parsed.data.firstName,
 			lastName: parsed.data.lastName,
@@ -194,10 +202,10 @@ export class StudentProfileService {
 	}
 
 	async requestEmailChange(
-		profile: StudentProfileRecord,
-		input: StudentEmailChangeInput,
-	): Promise<StudentEmailChangeRequestServiceResult> {
-		const parsed = parseStudentEmailChangeInput(input);
+		profile: AppProfileRecord,
+		input: ProfileSecurityEmailChangeInput,
+	): Promise<ProfileSecurityEmailChangeRequestServiceResult> {
+		const parsed = parseProfileSecurityEmailChangeInput(input);
 
 		if (!parsed.success) {
 			return {
@@ -214,14 +222,14 @@ export class StudentProfileService {
 			};
 		}
 
-		const existing = await this.profiles.getStudentProfileByEmail(
+		const existing = await this.profiles.getProfileByEmail(
 			parsed.data.emailNormalized,
 		);
 
 		if (existing && existing.profileId !== profile.profileId) {
 			return {
 				status: "email_unavailable",
-				message: "This email address is already in use.",
+				message: EMAIL_ADDRESS_UNAVAILABLE_MESSAGE,
 			};
 		}
 
@@ -254,7 +262,11 @@ export class StudentProfileService {
 
 	async verifyEmailChange(args: {
 		token: string | null;
-	}): Promise<StudentEmailChangeVerificationServiceResult> {
+		currentSession?: {
+			profileId: string;
+			token: string | null;
+		};
+	}): Promise<ProfileSecurityEmailChangeVerificationServiceResult> {
 		if (!args.token) {
 			return {
 				status: "invalid",
@@ -265,7 +277,7 @@ export class StudentProfileService {
 		const now = this.config.nowSeconds();
 		const tokenHash = hashVerificationToken(args.token);
 		const profile =
-			await this.profiles.findStudentProfileByPendingEmailTokenHash(tokenHash);
+			await this.profiles.findProfileByPendingEmailTokenHash(tokenHash);
 
 		if (!profile || !profile.pendingEmail) {
 			return {
@@ -295,15 +307,15 @@ export class StudentProfileService {
 		}
 
 		try {
-			await this.identity.updateStudentEmail({
+			await this.identity.updateProfileEmail({
 				currentEmailNormalized: profile.emailNormalized,
 				newEmailNormalized: profile.pendingEmail,
 			});
 		} catch (error) {
-			if (error instanceof StudentEmailUnavailableError) {
+			if (error instanceof ProfileSecurityEmailUnavailableError) {
 				return {
 					status: "invalid",
-					message: "This email address is already in use.",
+					message: EMAIL_ADDRESS_UNAVAILABLE_MESSAGE,
 				};
 			}
 
@@ -311,6 +323,10 @@ export class StudentProfileService {
 		}
 
 		const sessionsInvalidatedAt = this.config.nowMilliseconds();
+		const sessionInvalidationExemptToken =
+			args.currentSession?.profileId === profile.profileId
+				? (args.currentSession.token ?? undefined)
+				: undefined;
 
 		await this.identity.invalidateCognitoSessions({
 			emailNormalized: profile.pendingEmail,
@@ -321,7 +337,27 @@ export class StudentProfileService {
 			newEmailNormalized: profile.pendingEmail,
 			verifiedAt: now,
 			sessionsInvalidatedAt,
+			sessionInvalidationExemptToken,
 		});
+
+		if (sessionInvalidationExemptToken) {
+			return {
+				status: "verified_current_session_kept",
+				message: "Your email address has been updated.",
+				profile: {
+					...profile,
+					emailNormalized: profile.pendingEmail,
+					emailVerifiedAt: now,
+					pendingEmail: undefined,
+					pendingEmailVerificationTokenHash: undefined,
+					pendingEmailVerificationExpiresAt: undefined,
+					pendingEmailVerificationRequestedAt: undefined,
+					sessionsInvalidatedAt,
+					sessionInvalidationExemptToken,
+					updatedAt: now,
+				} as AppProfileRecord,
+			};
+		}
 
 		return {
 			status: "verified_sign_in_required",
@@ -330,11 +366,11 @@ export class StudentProfileService {
 	}
 
 	async changePassword(args: {
-		profile: StudentProfileRecord;
-		input: StudentPasswordChangeInput;
+		profile: AppProfileRecord;
+		input: ProfileSecurityPasswordChangeInput;
 		currentSessionToken: string | null;
-	}): Promise<StudentPasswordChangeServiceResult> {
-		const parsed = parseStudentPasswordChangeInput(args.input);
+	}): Promise<ProfileSecurityPasswordChangeServiceResult> {
+		const parsed = parseProfileSecurityPasswordChangeInput(args.input);
 
 		if (!parsed.success) {
 			return {
@@ -345,7 +381,7 @@ export class StudentProfileService {
 		}
 
 		try {
-			await this.identity.authenticateStudent({
+			await this.identity.authenticateUser({
 				emailNormalized: args.profile.emailNormalized,
 				password: parsed.data.currentPassword,
 			});
@@ -363,7 +399,7 @@ export class StudentProfileService {
 		const invalidatedAt = this.config.nowMilliseconds();
 		const updatedAt = this.config.nowSeconds();
 
-		await this.identity.setStudentPassword({
+		await this.identity.setProfilePassword({
 			emailNormalized: args.profile.emailNormalized,
 			password: parsed.data.password,
 		});

@@ -1,16 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { InvalidLoginCredentialsError } from "@/features/auth/login/service";
-import type { StudentProfileRecord } from "@/features/auth/registration/repository";
+import type {
+	AppProfileRecord,
+	TeacherProfileRecord,
+} from "@/features/auth/registration/repository";
 import { hashVerificationToken } from "@/features/auth/registration/tokens";
 import {
-	StudentEmailUnavailableError,
-	StudentProfileService,
-	type StudentProfileEmailSender,
-	type StudentProfileIdentityProvider,
-	type StudentProfileRepository,
+	ProfileSecurityEmailUnavailableError,
+	ProfileSecurityService,
+	type ProfileSecurityEmailSender,
+	type ProfileSecurityIdentityProvider,
+	type ProfileSecurityRepository,
 } from "./service";
 
-const baseProfile: StudentProfileRecord = {
+const baseProfile: AppProfileRecord = {
 	profileId: "profile-1",
 	emailNormalized: "student@example.com",
 	firstName: "Jordan",
@@ -23,7 +26,19 @@ const baseProfile: StudentProfileRecord = {
 	updatedAt: 500,
 };
 
-class FakeIdentity implements StudentProfileIdentityProvider {
+const teacherProfile: TeacherProfileRecord = {
+	profileId: "teacher-profile-1",
+	emailNormalized: "teacher@example.com",
+	firstName: "Taylor",
+	lastName: "Smith",
+	fullName: "Taylor Smith",
+	role: "teacher",
+	emailVerifiedAt: 500,
+	createdAt: 500,
+	updatedAt: 500,
+};
+
+class FakeIdentity implements ProfileSecurityIdentityProvider {
 	nameUpdates: Array<{
 		emailNormalized: string;
 		firstName: string;
@@ -40,7 +55,7 @@ class FakeIdentity implements StudentProfileIdentityProvider {
 	invalidPassword = false;
 	emailUnavailable = false;
 
-	async updateStudentName(args: {
+	async updateProfileName(args: {
 		emailNormalized: string;
 		firstName: string;
 		lastName: string;
@@ -49,7 +64,7 @@ class FakeIdentity implements StudentProfileIdentityProvider {
 		this.nameUpdates.push(args);
 	}
 
-	async authenticateStudent(args: {
+	async authenticateUser(args: {
 		emailNormalized: string;
 		password: string;
 	}) {
@@ -62,18 +77,18 @@ class FakeIdentity implements StudentProfileIdentityProvider {
 		return {};
 	}
 
-	async updateStudentEmail(args: {
+	async updateProfileEmail(args: {
 		currentEmailNormalized: string;
 		newEmailNormalized: string;
 	}) {
 		if (this.emailUnavailable) {
-			throw new StudentEmailUnavailableError();
+			throw new ProfileSecurityEmailUnavailableError();
 		}
 
 		this.emailUpdates.push(args);
 	}
 
-	async setStudentPassword(args: {
+	async setProfilePassword(args: {
 		emailNormalized: string;
 		password: string;
 	}) {
@@ -85,8 +100,8 @@ class FakeIdentity implements StudentProfileIdentityProvider {
 	}
 }
 
-class FakeProfiles implements StudentProfileRepository {
-	records = new Map<string, StudentProfileRecord>([
+class FakeProfiles implements ProfileSecurityRepository {
+	records = new Map<string, AppProfileRecord>([
 		[baseProfile.emailNormalized, baseProfile],
 	]);
 	nameUpdates: Array<{
@@ -110,6 +125,7 @@ class FakeProfiles implements StudentProfileRepository {
 		newEmailNormalized: string;
 		verifiedAt: number;
 		sessionsInvalidatedAt: number;
+		sessionInvalidationExemptToken?: string;
 	}> = [];
 	sessionInvalidations: Array<{
 		userId: string;
@@ -118,11 +134,11 @@ class FakeProfiles implements StudentProfileRepository {
 		sessionInvalidationExemptToken?: string;
 	}> = [];
 
-	async getStudentProfileByEmail(emailNormalized: string) {
+	async getProfileByEmail(emailNormalized: string) {
 		return this.records.get(emailNormalized) ?? null;
 	}
 
-	async updateStudentName(args: {
+	async updateProfileName(args: {
 		profileId: string;
 		firstName: string;
 		lastName: string;
@@ -167,7 +183,7 @@ class FakeProfiles implements StudentProfileRepository {
 		}
 	}
 
-	async findStudentProfileByPendingEmailTokenHash(tokenHash: string) {
+	async findProfileByPendingEmailTokenHash(tokenHash: string) {
 		return (
 			Array.from(this.records.values()).find(
 				(record) => record.pendingEmailVerificationTokenHash === tokenHash,
@@ -181,6 +197,7 @@ class FakeProfiles implements StudentProfileRepository {
 		newEmailNormalized: string;
 		verifiedAt: number;
 		sessionsInvalidatedAt: number;
+		sessionInvalidationExemptToken?: string;
 	}) {
 		this.completedEmailChanges.push(args);
 		const existing = this.records.get(args.currentEmailNormalized);
@@ -195,6 +212,8 @@ class FakeProfiles implements StudentProfileRepository {
 				pendingEmailVerificationExpiresAt: undefined,
 				pendingEmailVerificationRequestedAt: undefined,
 				sessionsInvalidatedAt: args.sessionsInvalidatedAt,
+				sessionInvalidationExemptToken:
+					args.sessionInvalidationExemptToken,
 				updatedAt: args.verifiedAt,
 			});
 		}
@@ -216,7 +235,7 @@ class FakeProfiles implements StudentProfileRepository {
 	}
 }
 
-class FakeEmail implements StudentProfileEmailSender {
+class FakeEmail implements ProfileSecurityEmailSender {
 	emailChangeEmails: Array<{
 		to: string;
 		verificationUrl: string;
@@ -248,7 +267,7 @@ function createHarness(options: {
 	let nowSeconds = options.nowSeconds ?? 1_000;
 	let nowMilliseconds = options.nowMilliseconds ?? 1_000_000;
 	const tokens = [...(options.tokens ?? ["email-token"])];
-	const service = new StudentProfileService(identity, profiles, email, {
+	const service = new ProfileSecurityService(identity, profiles, email, {
 		appBaseUrl: "https://eccs.example",
 		nowSeconds: () => nowSeconds,
 		nowMilliseconds: () => nowMilliseconds,
@@ -269,7 +288,7 @@ function createHarness(options: {
 	};
 }
 
-describe("StudentProfileService", () => {
+describe("ProfileSecurityService", () => {
 	it("updates the student name in identity and profile storage", async () => {
 		const { identity, profiles, service } = createHarness();
 
@@ -355,6 +374,8 @@ describe("StudentProfileService", () => {
 			}),
 		).resolves.toMatchObject({
 			status: "email_unavailable",
+			message:
+				"We couldn't use that email address. Try another email or contact support.",
 		});
 	});
 
@@ -387,6 +408,83 @@ describe("StudentProfileService", () => {
 			emailNormalized: "new@example.com",
 			pendingEmail: undefined,
 			sessionsInvalidatedAt: 1_000_000,
+		});
+	});
+
+	it("keeps the current session when verifying from the matching profile session", async () => {
+		const { profiles, service } = createHarness({
+			tokens: ["verify-current-session"],
+		});
+
+		await service.requestEmailChange(baseProfile, {
+			email: "kept@example.com",
+		});
+
+		const result = await service.verifyEmailChange({
+			token: "verify-current-session",
+			currentSession: {
+				profileId: "profile-1",
+				token: "current-session-token",
+			},
+		});
+
+		expect(result).toMatchObject({
+			status: "verified_current_session_kept",
+			message: "Your email address has been updated.",
+			profile: {
+				profileId: "profile-1",
+				emailNormalized: "kept@example.com",
+				role: "student",
+				sessionInvalidationExemptToken: "current-session-token",
+				sessionsInvalidatedAt: 1_000_000,
+			},
+		});
+		expect(profiles.completedEmailChanges).toEqual([
+			{
+				profileId: "profile-1",
+				currentEmailNormalized: "student@example.com",
+				newEmailNormalized: "kept@example.com",
+				verifiedAt: 1_000,
+				sessionsInvalidatedAt: 1_000_000,
+				sessionInvalidationExemptToken: "current-session-token",
+			},
+		]);
+		expect(profiles.records.get("kept@example.com")).toMatchObject({
+			emailNormalized: "kept@example.com",
+			sessionInvalidationExemptToken: "current-session-token",
+		});
+	});
+
+	it("keeps the current teacher session when verifying a teacher email change", async () => {
+		const { profiles, service } = createHarness({
+			tokens: ["verify-teacher-session"],
+		});
+		profiles.records.set(teacherProfile.emailNormalized, teacherProfile);
+
+		await service.requestEmailChange(teacherProfile, {
+			email: "teacher-new@example.com",
+		});
+
+		const result = await service.verifyEmailChange({
+			token: "verify-teacher-session",
+			currentSession: {
+				profileId: "teacher-profile-1",
+				token: "teacher-session-token",
+			},
+		});
+
+		expect(result).toMatchObject({
+			status: "verified_current_session_kept",
+			profile: {
+				profileId: "teacher-profile-1",
+				emailNormalized: "teacher-new@example.com",
+				role: "teacher",
+				sessionInvalidationExemptToken: "teacher-session-token",
+			},
+		});
+		expect(profiles.records.get("teacher-new@example.com")).toMatchObject({
+			role: "teacher",
+			sessionInvalidationExemptToken: "teacher-session-token",
 		});
 	});
 

@@ -15,8 +15,9 @@ import type {
 	AppSessionInvalidator,
 	PasswordResetProfileRepository
 } from "@/features/auth/password-reset/service";
-import type { StudentProfileRepository } from "@/features/student/profile-security/service";
+import type { ProfileSecurityRepository } from "@/features/profile-security/service";
 import type {
+	AppProfileRecord,
 	PendingRegistrationRecord,
 	RegistrationWorkflowRepository,
 	StudentProfileRecord
@@ -32,7 +33,7 @@ export class DynamoAuthRepository
 		RegistrationWorkflowRepository,
 		LoginProfileRepository,
 		PasswordResetProfileRepository,
-		StudentProfileRepository,
+		ProfileSecurityRepository,
 		AppSessionInvalidator
 {
 	private readonly documentClient: DynamoDBDocumentClient;
@@ -186,6 +187,10 @@ export class DynamoAuthRepository
 	}
 
 	async upsertStudentProfile(profile: StudentProfileRecord) {
+		await this.upsertAppProfile(profile);
+	}
+
+	async upsertAppProfile(profile: AppProfileRecord) {
 		await this.documentClient.send(
 			new PutCommand({
 				TableName: this.profileTableName,
@@ -195,6 +200,10 @@ export class DynamoAuthRepository
 	}
 
 	async hasStudentProfile(emailNormalized: string) {
+		return this.hasAppProfile(emailNormalized);
+	}
+
+	async hasAppProfile(emailNormalized: string) {
 		const response = await this.documentClient.send(
 			new QueryCommand({
 				TableName: this.profileTableName,
@@ -211,6 +220,12 @@ export class DynamoAuthRepository
 	}
 
 	async getStudentProfileById(profileId: string) {
+		const profile = await this.getAppProfileById(profileId);
+
+		return profile?.role === "student" ? profile : null;
+	}
+
+	async getAppProfileById(profileId: string) {
 		const response = await this.documentClient.send(
 			new GetCommand({
 				TableName: this.profileTableName,
@@ -218,12 +233,16 @@ export class DynamoAuthRepository
 			})
 		);
 
-		const profile = response.Item as StudentProfileRecord | undefined;
+		return (response.Item as AppProfileRecord | undefined) ?? null;
+	}
+
+	async getStudentProfileByEmail(emailNormalized: string) {
+		const profile = await this.getProfileByEmail(emailNormalized);
 
 		return profile?.role === "student" ? profile : null;
 	}
 
-	async getStudentProfileByEmail(emailNormalized: string) {
+	async getProfileByEmail(emailNormalized: string) {
 		const response = await this.documentClient.send(
 			new QueryCommand({
 				TableName: this.profileTableName,
@@ -236,12 +255,20 @@ export class DynamoAuthRepository
 			})
 		);
 
-		const profile = response.Items?.[0] as StudentProfileRecord | undefined;
-
-		return profile?.role === "student" ? profile : null;
+		return (response.Items?.[0] as AppProfileRecord | undefined) ?? null;
 	}
 
 	async updateStudentName(args: {
+		profileId: string;
+		firstName: string;
+		lastName: string;
+		fullName: string;
+		updatedAt: number;
+	}) {
+		await this.updateProfileName(args);
+	}
+
+	async updateProfileName(args: {
 		profileId: string;
 		firstName: string;
 		lastName: string;
@@ -254,16 +281,12 @@ export class DynamoAuthRepository
 				Key: { profileId: args.profileId },
 				UpdateExpression:
 					"SET firstName = :firstName, lastName = :lastName, fullName = :fullName, updatedAt = :updatedAt",
-				ConditionExpression: "attribute_exists(profileId) AND #role = :student",
-				ExpressionAttributeNames: {
-					"#role": "role"
-				},
+				ConditionExpression: "attribute_exists(profileId)",
 				ExpressionAttributeValues: {
 					":firstName": args.firstName,
 					":lastName": args.lastName,
 					":fullName": args.fullName,
-					":updatedAt": args.updatedAt,
-					":student": "student"
+					":updatedAt": args.updatedAt
 				}
 			})
 		);
@@ -289,23 +312,25 @@ export class DynamoAuthRepository
 						"pendingEmailVerificationRequestedAt = :requestedAt",
 						"updatedAt = :updatedAt"
 					].join(", "),
-				ConditionExpression: "attribute_exists(profileId) AND #role = :student",
-				ExpressionAttributeNames: {
-					"#role": "role"
-				},
+				ConditionExpression: "attribute_exists(profileId)",
 				ExpressionAttributeValues: {
 					":pendingEmail": args.pendingEmail,
 					":tokenHash": args.pendingEmailVerificationTokenHash,
 					":expiresAt": args.pendingEmailVerificationExpiresAt,
 					":requestedAt": args.pendingEmailVerificationRequestedAt,
-					":updatedAt": args.updatedAt,
-					":student": "student"
+					":updatedAt": args.updatedAt
 				}
 			})
 		);
 	}
 
 	async findStudentProfileByPendingEmailTokenHash(tokenHash: string) {
+		const profile = await this.findProfileByPendingEmailTokenHash(tokenHash);
+
+		return profile?.role === "student" ? profile : null;
+	}
+
+	async findProfileByPendingEmailTokenHash(tokenHash: string) {
 		const response = await this.documentClient.send(
 			new QueryCommand({
 				TableName: this.profileTableName,
@@ -319,9 +344,7 @@ export class DynamoAuthRepository
 			})
 		);
 
-		const profile = response.Items?.[0] as StudentProfileRecord | undefined;
-
-		return profile?.role === "student" ? profile : null;
+		return (response.Items?.[0] as AppProfileRecord | undefined) ?? null;
 	}
 
 	async completePendingEmailChange(args: {
@@ -332,27 +355,44 @@ export class DynamoAuthRepository
 		sessionsInvalidatedAt: number;
 		sessionInvalidationExemptToken?: string;
 	}) {
+		const setExpressions = [
+			"emailNormalized = :newEmail",
+			"emailVerifiedAt = :verifiedAt",
+			"sessionsInvalidatedAt = :sessionsInvalidatedAt",
+			"updatedAt = :verifiedAt"
+		];
+		const removeExpressions = [
+			"pendingEmail",
+			"pendingEmailVerificationTokenHash",
+			"pendingEmailVerificationExpiresAt",
+			"pendingEmailVerificationRequestedAt"
+		];
+		const expressionAttributeValues: Record<string, unknown> = {
+			":currentEmail": args.currentEmailNormalized,
+			":newEmail": args.newEmailNormalized,
+			":verifiedAt": args.verifiedAt,
+			":sessionsInvalidatedAt": args.sessionsInvalidatedAt
+		};
+
+		if (args.sessionInvalidationExemptToken) {
+			setExpressions.push("sessionInvalidationExemptToken = :exemptToken");
+			expressionAttributeValues[":exemptToken"] =
+				args.sessionInvalidationExemptToken;
+		} else {
+			removeExpressions.push("sessionInvalidationExemptToken");
+		}
+
 		await this.documentClient.send(
 			new UpdateCommand({
 				TableName: this.profileTableName,
 				Key: { profileId: args.profileId },
-				UpdateExpression:
-					[
-						"SET emailNormalized = :newEmail, emailVerifiedAt = :verifiedAt, sessionsInvalidatedAt = :sessionsInvalidatedAt, updatedAt = :verifiedAt",
-						"REMOVE pendingEmail, pendingEmailVerificationTokenHash, pendingEmailVerificationExpiresAt, pendingEmailVerificationRequestedAt, sessionInvalidationExemptToken"
-					].join(" "),
+				UpdateExpression: [
+					`SET ${setExpressions.join(", ")}`,
+					`REMOVE ${removeExpressions.join(", ")}`
+				].join(" "),
 				ConditionExpression:
-					"emailNormalized = :currentEmail AND pendingEmail = :newEmail AND #role = :student",
-				ExpressionAttributeNames: {
-					"#role": "role"
-				},
-				ExpressionAttributeValues: {
-					":currentEmail": args.currentEmailNormalized,
-					":newEmail": args.newEmailNormalized,
-					":verifiedAt": args.verifiedAt,
-					":sessionsInvalidatedAt": args.sessionsInvalidatedAt,
-					":student": "student"
-				}
+					"emailNormalized = :currentEmail AND pendingEmail = :newEmail",
+				ExpressionAttributeValues: expressionAttributeValues
 			})
 		);
 	}

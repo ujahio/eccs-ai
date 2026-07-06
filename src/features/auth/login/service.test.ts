@@ -3,26 +3,28 @@ import {
 	InvalidLoginCredentialsError,
 	LoginBlockedUntilVerifiedError,
 	LoginService,
+	type LoginAuthenticationResult,
 	type LoginIdentityProvider,
 	type LoginProfileRepository
 } from "./service";
 
 class FakeLoginIdentity implements LoginIdentityProvider {
 	nextError?: Error;
+	nextResult: LoginAuthenticationResult = { accessToken: "access-token" };
 
-	async authenticateStudent() {
+	async authenticateUser() {
 		if (this.nextError) {
 			throw this.nextError;
 		}
 
-		return { accessToken: "access-token" };
+		return this.nextResult;
 	}
 }
 
 class FakeProfileRepository implements LoginProfileRepository {
 	hasProfile = true;
 
-	async hasStudentProfile() {
+	async hasAppProfile() {
 		return this.hasProfile;
 	}
 }
@@ -58,6 +60,25 @@ describe("LoginService", () => {
 			status: "invalid_credentials",
 			message:
 				"We couldn’t sign you in with those details. Check your email and password and try again."
+		});
+	});
+
+	it("returns a first-login password challenge without signing in", async () => {
+		const identity = new FakeLoginIdentity();
+		identity.nextResult = {
+			challengeName: "NEW_PASSWORD_REQUIRED",
+			challengeSession: "challenge-session",
+		};
+		const service = new LoginService(identity, new FakeProfileRepository());
+
+		const result = await service.login({
+			email: "teacher@example.com",
+			password: "temporary1",
+		});
+
+		expect(result).toEqual({
+			status: "new_password_required",
+			challengeSession: "challenge-session",
 		});
 	});
 });

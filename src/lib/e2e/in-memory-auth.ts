@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type {
 	AuthSessionTokens,
+	LoginAuthenticationResult,
 	LoginIdentityProvider,
 	LoginProfileRepository
 } from "@/features/auth/login/service";
@@ -30,6 +31,7 @@ import type {
 import { StudentAlreadyExistsError } from "@/features/auth/registration/identity";
 import type { RegistrationEmailSender } from "@/features/auth/registration/email";
 import type {
+	AppProfileRecord,
 	PendingRegistrationRecord,
 	RegistrationWorkflowRepository,
 	StudentProfileRecord
@@ -40,15 +42,14 @@ import {
 } from "@/features/auth/registration/repository";
 import {
 	COGNITO_GROUPS,
-	hasStudentCognitoGroup,
 	type CognitoGroupName
 } from "@/lib/auth/cognito-groups";
 import {
-	StudentEmailUnavailableError,
-	type StudentProfileEmailSender,
-	type StudentProfileIdentityProvider,
-	type StudentProfileRepository
-} from "@/features/student/profile-security/service";
+	ProfileSecurityEmailUnavailableError,
+	type ProfileSecurityEmailSender,
+	type ProfileSecurityIdentityProvider,
+	type ProfileSecurityRepository
+} from "@/features/profile-security/service";
 
 export type E2EEmailRecord =
 	| {
@@ -72,7 +73,7 @@ export type E2EEmailRecord =
 			sentAt: number;
 	  }
 	| {
-			type: "student_email_change_verification";
+			type: "email_change_verification";
 			to: string;
 			verificationUrl: string;
 			expiresInHours: number;
@@ -81,14 +82,17 @@ export type E2EEmailRecord =
 
 type E2EAuthStoreShape = {
 	registrations: Map<string, PendingRegistrationRecord>;
-	profiles: Map<string, StudentProfileRecord>;
+	profiles: Map<string, AppProfileRecord>;
 	users: Map<
 		string,
 		{
 			cognitoSub: string;
 			enabled: boolean;
+			emailVerified: boolean;
 			groups: CognitoGroupName[];
 			password: string;
+			forcePasswordChange?: boolean;
+			challengeSession?: string;
 			resetCode?: string;
 			resetCodeConsumedAt?: number;
 			resetRequestCount?: number;
@@ -142,7 +146,7 @@ export class InMemoryIdentityProvider
 		RegistrationIdentityProvider,
 		LoginIdentityProvider,
 		PasswordResetIdentityProvider,
-		StudentProfileIdentityProvider
+		ProfileSecurityIdentityProvider
 {
 	async createPendingStudent(
 		input: CreatePendingStudentInput
@@ -158,6 +162,7 @@ export class InMemoryIdentityProvider
 		store.users.set(input.emailNormalized, {
 			cognitoSub,
 			enabled: false,
+			emailVerified: false,
 			groups: [],
 			password: input.password
 		});
@@ -178,6 +183,7 @@ export class InMemoryIdentityProvider
 		}
 
 		user.enabled = true;
+		user.emailVerified = true;
 		user.groups = [COGNITO_GROUPS.student];
 	}
 
@@ -185,10 +191,10 @@ export class InMemoryIdentityProvider
 		getStore().users.delete(emailNormalized);
 	}
 
-	async authenticateStudent(args: {
+	async authenticateUser(args: {
 		emailNormalized: string;
 		password: string;
-	}): Promise<AuthSessionTokens> {
+	}): Promise<LoginAuthenticationResult> {
 		const store = getStore();
 		const user = store.users.get(args.emailNormalized);
 
@@ -200,8 +206,17 @@ export class InMemoryIdentityProvider
 			throw new InvalidLoginCredentialsError();
 		}
 
-		if (!user.enabled) {
+		if (!user.enabled || !user.emailVerified) {
 			throw new LoginBlockedUntilVerifiedError();
+		}
+
+		if (user.forcePasswordChange) {
+			user.challengeSession = `e2e-new-password-${args.emailNormalized}-${Date.now()}`;
+
+			return {
+				challengeName: "NEW_PASSWORD_REQUIRED",
+				challengeSession: user.challengeSession,
+			};
 		}
 
 		return {
@@ -212,10 +227,53 @@ export class InMemoryIdentityProvider
 		};
 	}
 
-	async isStudentLoginEligible(args: { emailNormalized: string }) {
+	async completeNewPasswordChallenge(args: {
+		emailNormalized: string;
+		newPassword: string;
+		challengeSession: string;
+	}): Promise<AuthSessionTokens> {
 		const user = getStore().users.get(args.emailNormalized);
 
-		return Boolean(user?.enabled && hasStudentCognitoGroup(user.groups));
+		if (
+			!user ||
+			!user.enabled ||
+			!user.emailVerified ||
+			!user.forcePasswordChange ||
+			user.challengeSession !== args.challengeSession
+		) {
+			throw new InvalidLoginCredentialsError();
+		}
+
+		user.password = args.newPassword;
+		user.forcePasswordChange = false;
+		user.challengeSession = undefined;
+
+		return {
+			accessToken: `e2e-access-${args.emailNormalized}`,
+			idToken: `e2e-id-${args.emailNormalized}`,
+			refreshToken: `e2e-refresh-${args.emailNormalized}`,
+			expiresIn: 3600,
+		};
+	}
+
+	async isStudentLoginEligible(args: { emailNormalized: string }) {
+		return this.isRoleLoginEligible({
+			emailNormalized: args.emailNormalized,
+			role: "student",
+		});
+	}
+
+	async isRoleLoginEligible(args: {
+		emailNormalized: string;
+		role: "student" | "teacher";
+	}) {
+		const user = getStore().users.get(args.emailNormalized);
+
+		return Boolean(
+			user?.enabled &&
+				user.emailVerified &&
+				user.groups.includes(COGNITO_GROUPS[args.role])
+		);
 	}
 
 	async requestPasswordReset(args: { emailNormalized: string }) {
@@ -273,14 +331,14 @@ export class InMemoryIdentityProvider
 
 	async invalidateCognitoSessions(_args: { emailNormalized: string }) {}
 
-	async updateStudentName(_args: {
+	async updateProfileName(_args: {
 		emailNormalized: string;
 		firstName: string;
 		lastName: string;
 		fullName: string;
 	}) {}
 
-	async updateStudentEmail(args: {
+	async updateProfileEmail(args: {
 		currentEmailNormalized: string;
 		newEmailNormalized: string;
 	}) {
@@ -292,14 +350,14 @@ export class InMemoryIdentityProvider
 		}
 
 		if (store.users.has(args.newEmailNormalized)) {
-			throw new StudentEmailUnavailableError();
+			throw new ProfileSecurityEmailUnavailableError();
 		}
 
 		store.users.delete(args.currentEmailNormalized);
 		store.users.set(args.newEmailNormalized, user);
 	}
 
-	async setStudentPassword(args: {
+	async setProfilePassword(args: {
 		emailNormalized: string;
 		password: string;
 	}) {
@@ -311,6 +369,29 @@ export class InMemoryIdentityProvider
 
 		user.password = args.password;
 	}
+
+	async updateStudentName(args: {
+		emailNormalized: string;
+		firstName: string;
+		lastName: string;
+		fullName: string;
+	}) {
+		await this.updateProfileName(args);
+	}
+
+	async updateStudentEmail(args: {
+		currentEmailNormalized: string;
+		newEmailNormalized: string;
+	}) {
+		await this.updateProfileEmail(args);
+	}
+
+	async setStudentPassword(args: {
+		emailNormalized: string;
+		password: string;
+	}) {
+		await this.setProfilePassword(args);
+	}
 }
 
 export class InMemoryRegistrationRepository
@@ -318,7 +399,7 @@ export class InMemoryRegistrationRepository
 		RegistrationWorkflowRepository,
 		LoginProfileRepository,
 		PasswordResetProfileRepository,
-		StudentProfileRepository,
+		ProfileSecurityRepository,
 		AppSessionInvalidator
 {
 	async getPendingByEmail(emailNormalized: string) {
@@ -403,6 +484,10 @@ export class InMemoryRegistrationRepository
 	}
 
 	async upsertStudentProfile(profile: StudentProfileRecord) {
+		await this.upsertAppProfile(profile);
+	}
+
+	async upsertAppProfile(profile: AppProfileRecord) {
 		getStore().profiles.set(profile.emailNormalized, profile);
 	}
 
@@ -424,10 +509,20 @@ export class InMemoryRegistrationRepository
 	async recordCleanupFailure() {}
 
 	async hasStudentProfile(emailNormalized: string) {
+		return this.hasAppProfile(emailNormalized);
+	}
+
+	async hasAppProfile(emailNormalized: string) {
 		return getStore().profiles.has(emailNormalized);
 	}
 
 	async getStudentProfileById(profileId: string) {
+		const profile = await this.getAppProfileById(profileId);
+
+		return profile?.role === "student" ? profile : null;
+	}
+
+	async getAppProfileById(profileId: string) {
 		return (
 			Array.from(getStore().profiles.values()).find(
 				(profile) => profile.profileId === profileId
@@ -436,10 +531,26 @@ export class InMemoryRegistrationRepository
 	}
 
 	async getStudentProfileByEmail(emailNormalized: string) {
+		const profile = await this.getProfileByEmail(emailNormalized);
+
+		return profile?.role === "student" ? profile : null;
+	}
+
+	async getProfileByEmail(emailNormalized: string) {
 		return getStore().profiles.get(emailNormalized) ?? null;
 	}
 
 	async updateStudentName(args: {
+		profileId: string;
+		firstName: string;
+		lastName: string;
+		fullName: string;
+		updatedAt: number;
+	}) {
+		await this.updateProfileName(args);
+	}
+
+	async updateProfileName(args: {
 		profileId: string;
 		firstName: string;
 		lastName: string;
@@ -495,6 +606,12 @@ export class InMemoryRegistrationRepository
 	}
 
 	async findStudentProfileByPendingEmailTokenHash(tokenHash: string) {
+		const profile = await this.findProfileByPendingEmailTokenHash(tokenHash);
+
+		return profile?.role === "student" ? profile : null;
+	}
+
+	async findProfileByPendingEmailTokenHash(tokenHash: string) {
 		return (
 			Array.from(getStore().profiles.values()).find(
 				(record) => record.pendingEmailVerificationTokenHash === tokenHash
@@ -579,11 +696,51 @@ export class InMemoryRegistrationRepository
 	}
 }
 
+export function bootstrapE2ETeacher(input: {
+	email: string;
+	firstName: string;
+	lastName: string;
+	temporaryPassword: string;
+	emailVerified?: boolean;
+	forcePasswordChange?: boolean;
+}) {
+	const store = getStore();
+	const emailNormalized = input.email.trim().toLowerCase();
+	const now = Math.floor(Date.now() / 1000);
+	const cognitoSub = `e2e-sub-${emailNormalized}`;
+	const fullName = `${input.firstName.trim()} ${input.lastName.trim()}`.trim();
+
+	store.users.set(emailNormalized, {
+		cognitoSub,
+		enabled: true,
+		emailVerified: input.emailVerified ?? true,
+		groups: [COGNITO_GROUPS.teacher],
+		password: input.temporaryPassword,
+		forcePasswordChange: input.forcePasswordChange ?? true,
+	});
+	store.profiles.set(emailNormalized, {
+		profileId: cognitoSub,
+		emailNormalized,
+		firstName: input.firstName.trim(),
+		lastName: input.lastName.trim(),
+		fullName,
+		role: "teacher",
+		emailVerifiedAt: input.emailVerified === false ? 0 : now,
+		createdAt: now,
+		updatedAt: now,
+	});
+
+	return {
+		emailNormalized,
+		profileId: cognitoSub,
+	};
+}
+
 export class InMemoryEmailSender
 	implements
 		RegistrationEmailSender,
 		PasswordResetEmailSender,
-		StudentProfileEmailSender
+		ProfileSecurityEmailSender
 {
 	async sendRegistrationVerificationEmail(email: {
 		to: string;
@@ -646,7 +803,7 @@ export class InMemoryEmailSender
 		expiresInHours: number;
 	}) {
 		const record = {
-			type: "student_email_change_verification" as const,
+			type: "email_change_verification" as const,
 			...email,
 			sentAt: Date.now()
 		};
@@ -678,7 +835,7 @@ export class InMemoryEmailSender
 			.reverse()
 			.find(
 				(e) =>
-					e.type === "student_email_change_verification" &&
+					e.type === "email_change_verification" &&
 					e.to === emailNormalized
 			);
 

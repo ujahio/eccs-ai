@@ -61,6 +61,10 @@ const authMessages: Record<
 		status: "error",
 		message: GENERIC_SIGN_IN_ERROR_MESSAGE,
 	},
+	new_password_required: {
+		status: "blocked",
+		message: "Set a new password to finish signing in.",
+	},
 	missing_profile: {
 		status: "error",
 		message: GENERIC_SIGN_IN_ERROR_MESSAGE,

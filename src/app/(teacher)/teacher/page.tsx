@@ -20,7 +20,12 @@ export default function TeacherDashboardPage() {
         <p className="text-sm font-semibold uppercase text-brand-teal">
           Teacher area
         </p>
-        <h1 className="mt-3 text-2xl font-semibold">Dashboard</h1>
+        <h1
+          className="mt-3 text-2xl font-semibold"
+          data-testid="teacher-dashboard-heading"
+        >
+          Dashboard
+        </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-gray">
           This shell establishes the educator route where case authoring,
           publishing status, and learner responses will live in future slices.

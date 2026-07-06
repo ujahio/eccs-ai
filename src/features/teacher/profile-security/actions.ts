@@ -5,32 +5,29 @@ import {
 	submitProfileSecurityPersonalDetailsForm,
 } from "@/features/profile-security/actions";
 import type {
-	ProfileSecurityPersonalDetailsFormState,
 	ProfileSecurityPasswordChangeFormState,
+	ProfileSecurityPersonalDetailsFormState,
 } from "@/features/profile-security/state";
-import {
-	requireStudentSession,
-	sessionToken,
-} from "@/lib/auth/session";
+import { requireTeacherSession, sessionToken } from "@/lib/auth/session";
 
-export async function submitStudentPersonalDetailsForm(
+export async function submitTeacherPersonalDetailsForm(
 	_state: ProfileSecurityPersonalDetailsFormState,
 	formData: FormData,
 ): Promise<ProfileSecurityPersonalDetailsFormState> {
-	const { profile } = await requireStudentSession();
+	const { profile } = await requireTeacherSession();
 
 	return submitProfileSecurityPersonalDetailsForm({
 		profile,
 		formData,
-		pathToRevalidate: "/student/profile",
+		pathToRevalidate: "/teacher/profile",
 	});
 }
 
-export async function submitStudentPasswordChangeForm(
+export async function submitTeacherPasswordChangeForm(
 	_state: ProfileSecurityPasswordChangeFormState,
 	formData: FormData,
 ): Promise<ProfileSecurityPasswordChangeFormState> {
-	const { session, profile } = await requireStudentSession();
+	const { session, profile } = await requireTeacherSession();
 
 	return submitProfileSecurityPasswordChangeForm({
 		profile,

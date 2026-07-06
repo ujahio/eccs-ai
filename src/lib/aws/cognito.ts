@@ -14,12 +14,15 @@ import {
 	CognitoIdentityProviderClient,
 	ConfirmForgotPasswordCommand,
 	ForgotPasswordCommand,
-	InitiateAuthCommand
+	InitiateAuthCommand,
+	RespondToAuthChallengeCommand
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
+	type AuthSessionTokens,
 	InvalidLoginCredentialsError,
 	LoginBlockedUntilVerifiedError,
-	type LoginIdentityProvider
+	type LoginIdentityProvider,
+	type LoginAuthenticationResult
 } from "@/features/auth/login/service";
 import {
 	InvalidPasswordResetCodeError,
@@ -35,20 +38,21 @@ import {
 	type RegistrationIdentityProvider
 } from "@/features/auth/registration/identity";
 import {
-	StudentEmailUnavailableError,
-	type StudentProfileIdentityProvider
-} from "@/features/student/profile-security/service";
+	ProfileSecurityEmailUnavailableError,
+	type ProfileSecurityIdentityProvider
+} from "@/features/profile-security/service";
 import {
 	COGNITO_GROUPS,
-	hasStudentCognitoGroup
+	hasCognitoGroupForRole
 } from "@/lib/auth/cognito-groups";
+import type { AppRole } from "@/lib/auth/roles";
 
 export class CognitoAuthAdapter
 	implements
 		RegistrationIdentityProvider,
 		LoginIdentityProvider,
 		PasswordResetIdentityProvider,
-		StudentProfileIdentityProvider
+		ProfileSecurityIdentityProvider
 {
 	private readonly client: CognitoIdentityProviderClient;
 
@@ -155,10 +159,10 @@ export class CognitoAuthAdapter
 		}
 	}
 
-	async authenticateStudent(args: {
+	async authenticateUser(args: {
 		emailNormalized: string;
 		password: string;
-	}) {
+	}): Promise<LoginAuthenticationResult> {
 		try {
 			const auth = await this.client.send(
 				new InitiateAuthCommand({
@@ -170,6 +174,13 @@ export class CognitoAuthAdapter
 					}
 				})
 			);
+
+			if (auth.ChallengeName === "NEW_PASSWORD_REQUIRED" && auth.Session) {
+				return {
+					challengeName: "NEW_PASSWORD_REQUIRED",
+					challengeSession: auth.Session
+				};
+			}
 
 			const result = auth.AuthenticationResult;
 
@@ -205,7 +216,71 @@ export class CognitoAuthAdapter
 		}
 	}
 
+	async authenticateStudent(args: {
+		emailNormalized: string;
+		password: string;
+	}) {
+		return this.authenticateUser(args);
+	}
+
+	async completeNewPasswordChallenge(args: {
+		emailNormalized: string;
+		newPassword: string;
+		challengeSession: string;
+	}): Promise<AuthSessionTokens> {
+		try {
+			const auth = await this.client.send(
+				new RespondToAuthChallengeCommand({
+					ClientId: this.userPoolClientId,
+					ChallengeName: "NEW_PASSWORD_REQUIRED",
+					Session: args.challengeSession,
+					ChallengeResponses: {
+						USERNAME: args.emailNormalized,
+						NEW_PASSWORD: args.newPassword
+					}
+				})
+			);
+			const result = auth.AuthenticationResult;
+
+			if (!result?.AccessToken) {
+				throw new InvalidLoginCredentialsError();
+			}
+
+			return {
+				accessToken: result.AccessToken,
+				idToken: result.IdToken,
+				refreshToken: result.RefreshToken,
+				expiresIn: result.ExpiresIn
+			};
+		} catch (error) {
+			const name = errorName(error);
+
+			if (
+				name === "NotAuthorizedException" ||
+				name === "UserNotFoundException" ||
+				name === "InvalidPasswordException" ||
+				name === "InvalidParameterException" ||
+				name === "CodeMismatchException" ||
+				name === "ExpiredCodeException"
+			) {
+				throw new InvalidLoginCredentialsError();
+			}
+
+			throw error;
+		}
+	}
+
 	async isStudentLoginEligible(args: { emailNormalized: string }) {
+		return this.isRoleLoginEligible({
+			emailNormalized: args.emailNormalized,
+			role: "student"
+		});
+	}
+
+	async isRoleLoginEligible(args: {
+		emailNormalized: string;
+		role: AppRole;
+	}) {
 		try {
 			const user = await this.client.send(
 				new AdminGetUserCommand({
@@ -229,8 +304,9 @@ export class CognitoAuthAdapter
 				})
 			);
 
-			return hasStudentCognitoGroup(
-				groups.Groups?.map((group) => group.GroupName ?? "") ?? []
+			return hasCognitoGroupForRole(
+				groups.Groups?.map((group) => group.GroupName ?? "") ?? [],
+				args.role
 			);
 		} catch (error) {
 			if (errorName(error) === "UserNotFoundException") {
@@ -339,6 +415,15 @@ export class CognitoAuthAdapter
 		lastName: string;
 		fullName: string;
 	}) {
+		await this.updateProfileName(args);
+	}
+
+	async updateProfileName(args: {
+		emailNormalized: string;
+		firstName: string;
+		lastName: string;
+		fullName: string;
+	}) {
 		const username = await this.getCognitoUsername(args.emailNormalized);
 
 		await this.client.send(
@@ -355,6 +440,13 @@ export class CognitoAuthAdapter
 	}
 
 	async updateStudentEmail(args: {
+		currentEmailNormalized: string;
+		newEmailNormalized: string;
+	}) {
+		await this.updateProfileEmail(args);
+	}
+
+	async updateProfileEmail(args: {
 		currentEmailNormalized: string;
 		newEmailNormalized: string;
 	}) {
@@ -375,7 +467,7 @@ export class CognitoAuthAdapter
 			const name = errorName(error);
 
 			if (name === "AliasExistsException" || name === "UsernameExistsException") {
-				throw new StudentEmailUnavailableError();
+				throw new ProfileSecurityEmailUnavailableError();
 			}
 
 			throw error;
@@ -383,6 +475,13 @@ export class CognitoAuthAdapter
 	}
 
 	async setStudentPassword(args: {
+		emailNormalized: string;
+		password: string;
+	}) {
+		await this.setProfilePassword(args);
+	}
+
+	async setProfilePassword(args: {
 		emailNormalized: string;
 		password: string;
 	}) {

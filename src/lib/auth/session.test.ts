@@ -1,5 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
-import { isSessionInvalidated } from "./session";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { StudentProfileRecord } from "@/features/auth/registration/repository";
 
 vi.mock("server-only", () => ({}));
@@ -9,6 +8,12 @@ vi.mock("next/headers", () => ({
 vi.mock("next/navigation", () => ({
 	redirect: vi.fn()
 }));
+
+let isSessionInvalidated: typeof import("./session").isSessionInvalidated;
+
+beforeAll(async () => {
+	({ isSessionInvalidated } = await import("./session"));
+});
 
 const profile: StudentProfileRecord = {
 	profileId: "profile-1",
