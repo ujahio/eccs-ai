@@ -52,7 +52,7 @@ export class E2ECognitoIdTokenVerifier implements CognitoIdTokenVerifier {
 		return {
 			cognitoSub: user.cognitoSub,
 			emailNormalized,
-			emailVerified: true,
+			emailVerified: user.emailVerified,
 			groups: user.groups,
 		};
 	}

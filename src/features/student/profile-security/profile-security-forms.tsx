@@ -24,6 +24,7 @@ type ProfileSecurityFormsProps = {
 	firstName: string;
 	lastName: string;
 	pendingEmail?: string;
+	profileKind?: "student" | "teacher";
 	personalDetailsAction: (
 		previousState: StudentPersonalDetailsFormState,
 		formData: FormData,
@@ -128,9 +129,12 @@ export function ProfileSecurityForms({
 	firstName,
 	lastName,
 	pendingEmail,
+	profileKind = "student",
 	personalDetailsAction,
 	passwordAction,
 }: ProfileSecurityFormsProps) {
+	const personalPanelId = `${profileKind}-personal-details-panel`;
+	const passwordPanelId = `${profileKind}-password-panel`;
 	const [activeTab, setActiveTab] = useState<TabId>("personal");
 	const [detailsState, submitDetails, isDetailsPending] = useActionState(
 		personalDetailsAction,
@@ -233,14 +237,14 @@ export function ProfileSecurityForms({
 					role="tablist"
 				>
 					<button
-						aria-controls="student-personal-details-panel"
+						aria-controls={personalPanelId}
 						aria-selected={activeTab === "personal"}
 						className={`${tabButtonBase} ${
 							activeTab === "personal"
 								? "border-primary-action text-primary-text"
 								: "border-transparent text-muted-gray hover:text-primary-text"
 						}`}
-						data-testid="student-profile-personal-tab"
+						data-testid={`${profileKind}-profile-personal-tab`}
 						onClick={() => setActiveTab("personal")}
 						role="tab"
 						type="button"
@@ -248,14 +252,14 @@ export function ProfileSecurityForms({
 						Personal details
 					</button>
 					<button
-						aria-controls="student-password-panel"
+						aria-controls={passwordPanelId}
 						aria-selected={activeTab === "password"}
 						className={`${tabButtonBase} ${
 							activeTab === "password"
 								? "border-primary-action text-primary-text"
 								: "border-transparent text-muted-gray hover:text-primary-text"
 						}`}
-						data-testid="student-profile-password-tab"
+						data-testid={`${profileKind}-profile-password-tab`}
 						onClick={() => setActiveTab("password")}
 						role="tab"
 						type="button"
@@ -268,29 +272,29 @@ export function ProfileSecurityForms({
 					<form
 						action={submitDetails}
 						className="mx-auto mt-5 grid w-full max-w-[520px] gap-4 sm:mt-6 sm:gap-5"
-						data-testid="student-personal-details-form"
-						id="student-personal-details-panel"
+						data-testid={`${profileKind}-personal-details-form`}
+						id={personalPanelId}
 						role="tabpanel"
 					>
 						<div className="grid gap-4 sm:grid-cols-2">
 							<div className="grid gap-2">
 								<label
 									className="text-xs font-medium text-muted-gray"
-									htmlFor="student-profile-first-name"
+									htmlFor={`${profileKind}-profile-first-name`}
 								>
 									First name
 								</label>
 								<input
 									aria-describedby={
 										firstNameError
-											? "student-profile-first-name-error"
+											? `${profileKind}-profile-first-name-error`
 											: undefined
 									}
 									aria-invalid={Boolean(firstNameError)}
 									autoComplete="given-name"
 									className={inputClasses(Boolean(firstNameError))}
-									data-testid="student-profile-first-name"
-									id="student-profile-first-name"
+									data-testid={`${profileKind}-profile-first-name`}
+									id={`${profileKind}-profile-first-name`}
 									name="firstName"
 									onChange={(event) =>
 										updateDetailsValue("firstName", event.target.value)
@@ -301,8 +305,8 @@ export function ProfileSecurityForms({
 								{firstNameError ? (
 									<p
 										className="text-xs font-medium leading-5 text-error-red"
-										data-testid="student-profile-first-name-error"
-										id="student-profile-first-name-error"
+										data-testid={`${profileKind}-profile-first-name-error`}
+										id={`${profileKind}-profile-first-name-error`}
 									>
 										{firstNameError}
 									</p>
@@ -312,21 +316,21 @@ export function ProfileSecurityForms({
 							<div className="grid gap-2">
 								<label
 									className="text-xs font-medium text-muted-gray"
-									htmlFor="student-profile-last-name"
+									htmlFor={`${profileKind}-profile-last-name`}
 								>
 									Last name
 								</label>
 								<input
 									aria-describedby={
 										lastNameError
-											? "student-profile-last-name-error"
+											? `${profileKind}-profile-last-name-error`
 											: undefined
 									}
 									aria-invalid={Boolean(lastNameError)}
 									autoComplete="family-name"
 									className={inputClasses(Boolean(lastNameError))}
-									data-testid="student-profile-last-name"
-									id="student-profile-last-name"
+									data-testid={`${profileKind}-profile-last-name`}
+									id={`${profileKind}-profile-last-name`}
 									name="lastName"
 									onChange={(event) =>
 										updateDetailsValue("lastName", event.target.value)
@@ -337,8 +341,8 @@ export function ProfileSecurityForms({
 								{lastNameError ? (
 									<p
 										className="text-xs font-medium leading-5 text-error-red"
-										data-testid="student-profile-last-name-error"
-										id="student-profile-last-name-error"
+										data-testid={`${profileKind}-profile-last-name-error`}
+										id={`${profileKind}-profile-last-name-error`}
 									>
 										{lastNameError}
 									</p>
@@ -349,19 +353,21 @@ export function ProfileSecurityForms({
 						<div className="grid gap-2">
 							<label
 								className="text-xs font-medium text-muted-gray"
-								htmlFor="student-profile-new-email"
+								htmlFor={`${profileKind}-profile-new-email`}
 							>
 								Email address
 							</label>
 							<input
 								aria-describedby={
-									emailError ? "student-profile-new-email-error" : undefined
+									emailError
+										? `${profileKind}-profile-new-email-error`
+										: undefined
 								}
 								aria-invalid={Boolean(emailError)}
 								autoComplete="email"
 								className={inputClasses(Boolean(emailError))}
-								data-testid="student-profile-new-email"
-								id="student-profile-new-email"
+								data-testid={`${profileKind}-profile-new-email`}
+								id={`${profileKind}-profile-new-email`}
 								inputMode="email"
 								name="email"
 								onChange={(event) =>
@@ -371,10 +377,10 @@ export function ProfileSecurityForms({
 								value={detailsValues.email}
 							/>
 							{emailError ? (
-								<p
-									className="text-xs font-medium leading-5 text-error-red"
-									data-testid="student-profile-new-email-error"
-									id="student-profile-new-email-error"
+									<p
+										className="text-xs font-medium leading-5 text-error-red"
+										data-testid={`${profileKind}-profile-new-email-error`}
+										id={`${profileKind}-profile-new-email-error`}
 								>
 									{emailError}
 								</p>
@@ -384,19 +390,19 @@ export function ProfileSecurityForms({
 									status: "notice",
 									message: pendingEmailMessage,
 								}}
-								testId="student-pending-email"
-								testIdPrefix="student-pending-email"
+								testId={`${profileKind}-pending-email`}
+								testIdPrefix={`${profileKind}-pending-email`}
 							/>
 						</div>
 
 						<StatusMessage
 							state={displayedDetailsState}
-							testIdPrefix="student-details"
+							testIdPrefix={`${profileKind}-details`}
 						/>
 
 						<SaveButton
 							disabled={isDetailsPending || !hasDetailsChanges}
-							testId="student-profile-details-submit"
+							testId={`${profileKind}-profile-details-submit`}
 						>
 							{isDetailsPending ? "Saving..." : "Save changes"}
 						</SaveButton>
@@ -405,14 +411,14 @@ export function ProfileSecurityForms({
 					<form
 						action={submitPasswordAndReset}
 						className="mx-auto mt-5 grid w-full gap-4 sm:mt-6 sm:max-w-[360px] sm:gap-5"
-						data-testid="student-password-change-form"
-						id="student-password-panel"
+						data-testid={`${profileKind}-password-change-form`}
+						id={passwordPanelId}
 						role="tabpanel"
 					>
 						<div className="grid gap-2">
 							<label
 								className="text-xs font-medium text-muted-gray"
-								htmlFor="student-profile-current-password"
+								htmlFor={`${profileKind}-profile-current-password`}
 							>
 								Current password
 							</label>
@@ -424,14 +430,14 @@ export function ProfileSecurityForms({
 								<input
 									aria-describedby={
 										currentPasswordError
-											? "student-profile-current-password-error"
+											? `${profileKind}-profile-current-password-error`
 											: undefined
 									}
 									aria-invalid={Boolean(currentPasswordError)}
 									autoComplete="current-password"
 									className={authPasswordInputClasses}
-									data-testid="student-profile-current-password"
-									id="student-profile-current-password"
+									data-testid={`${profileKind}-profile-current-password`}
+									id={`${profileKind}-profile-current-password`}
 									name="currentPassword"
 									onChange={(event) =>
 										updatePasswordValue(
@@ -447,14 +453,14 @@ export function ProfileSecurityForms({
 									onToggle={() =>
 										setShowCurrentPassword((visible) => !visible)
 									}
-									testId="student-profile-current-password-toggle"
+									testId={`${profileKind}-profile-current-password-toggle`}
 								/>
 							</span>
 							{currentPasswordError ? (
 								<p
 									className="text-xs font-medium leading-5 text-error-red"
-									data-testid="student-profile-current-password-error"
-									id="student-profile-current-password-error"
+									data-testid={`${profileKind}-profile-current-password-error`}
+									id={`${profileKind}-profile-current-password-error`}
 								>
 									{currentPasswordError}
 								</p>
@@ -464,7 +470,7 @@ export function ProfileSecurityForms({
 						<div className="grid gap-2">
 							<label
 								className="text-xs font-medium text-muted-gray"
-								htmlFor="student-profile-new-password"
+								htmlFor={`${profileKind}-profile-new-password`}
 							>
 								New password
 							</label>
@@ -472,14 +478,14 @@ export function ProfileSecurityForms({
 								<input
 									aria-describedby={
 										passwordError
-											? "student-profile-new-password-error"
+											? `${profileKind}-profile-new-password-error`
 											: undefined
 									}
 									aria-invalid={Boolean(passwordError)}
 									autoComplete="new-password"
 									className={authPasswordInputClasses}
-									data-testid="student-profile-new-password"
-									id="student-profile-new-password"
+									data-testid={`${profileKind}-profile-new-password`}
+									id={`${profileKind}-profile-new-password`}
 									name="password"
 									onChange={(event) =>
 										updatePasswordValue("password", event.target.value)
@@ -490,14 +496,14 @@ export function ProfileSecurityForms({
 								<PasswordVisibilityToggle
 									isVisible={showNewPassword}
 									onToggle={() => setShowNewPassword((visible) => !visible)}
-									testId="student-profile-new-password-toggle"
+									testId={`${profileKind}-profile-new-password-toggle`}
 								/>
 							</span>
 							{passwordError ? (
 								<p
 									className="text-xs font-medium leading-5 text-error-red"
-									data-testid="student-profile-new-password-error"
-									id="student-profile-new-password-error"
+									data-testid={`${profileKind}-profile-new-password-error`}
+									id={`${profileKind}-profile-new-password-error`}
 								>
 									{passwordError}
 								</p>
@@ -507,7 +513,7 @@ export function ProfileSecurityForms({
 						<div className="grid gap-2">
 							<label
 								className="text-xs font-medium text-muted-gray"
-								htmlFor="student-profile-confirm-password"
+								htmlFor={`${profileKind}-profile-confirm-password`}
 							>
 								Confirm new password
 							</label>
@@ -517,14 +523,14 @@ export function ProfileSecurityForms({
 								<input
 									aria-describedby={
 										confirmPasswordError
-											? "student-profile-confirm-password-error"
+											? `${profileKind}-profile-confirm-password-error`
 											: undefined
 									}
 									aria-invalid={Boolean(confirmPasswordError)}
 									autoComplete="new-password"
 									className={authPasswordInputClasses}
-									data-testid="student-profile-confirm-password"
-									id="student-profile-confirm-password"
+									data-testid={`${profileKind}-profile-confirm-password`}
+									id={`${profileKind}-profile-confirm-password`}
 									name="confirmPassword"
 									onChange={(event) =>
 										updatePasswordValue(
@@ -540,14 +546,14 @@ export function ProfileSecurityForms({
 									onToggle={() =>
 										setShowConfirmPassword((visible) => !visible)
 									}
-									testId="student-profile-confirm-password-toggle"
+									testId={`${profileKind}-profile-confirm-password-toggle`}
 								/>
 							</span>
 							{confirmPasswordError ? (
 								<p
 									className="text-xs font-medium leading-5 text-error-red"
-									data-testid="student-profile-confirm-password-error"
-									id="student-profile-confirm-password-error"
+									data-testid={`${profileKind}-profile-confirm-password-error`}
+									id={`${profileKind}-profile-confirm-password-error`}
 								>
 									{confirmPasswordError}
 								</p>
@@ -556,12 +562,12 @@ export function ProfileSecurityForms({
 
 						<StatusMessage
 							state={passwordState}
-							testIdPrefix="student-password"
+							testIdPrefix={`${profileKind}-password`}
 						/>
 
 						<SaveButton
 							disabled={isPasswordPending || !isPasswordReadyToSubmit}
-							testId="student-profile-password-submit"
+							testId={`${profileKind}-profile-password-submit`}
 						>
 							{isPasswordPending ? "Saving..." : "Save changes"}
 						</SaveButton>

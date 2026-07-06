@@ -7,7 +7,7 @@ import { getAuthResources } from "@/lib/aws/resources";
 import { getE2EAdapters, isE2EMode } from "@/lib/e2e/in-memory-auth";
 import { StudentProfileService } from "./service";
 
-export function createStudentProfileService() {
+export function createProfileSecurityService() {
 	if (isE2EMode()) {
 		const { identity, repository, email } = getE2EAdapters();
 
@@ -35,3 +35,5 @@ export function createStudentProfileService() {
 		appBaseUrl: resources.appBaseUrl,
 	});
 }
+
+export const createStudentProfileService = createProfileSecurityService;

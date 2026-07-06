@@ -1,4 +1,8 @@
-import { normalizeEmail } from "../registration/schema";
+import {
+	failedPasswordRequirements,
+	normalizeEmail,
+	type PasswordRequirement,
+} from "../registration/schema";
 
 export type LoginInput = {
 	email: string;
@@ -6,6 +10,17 @@ export type LoginInput = {
 };
 
 export type LoginFieldErrors = Partial<Record<keyof LoginInput, string>>;
+
+export type CompleteNewPasswordInput = {
+	email: string;
+	password: string;
+	confirmPassword: string;
+	challengeSession: string;
+};
+
+export type CompleteNewPasswordFieldErrors = Partial<
+	Record<"password" | "confirmPassword", string>
+>;
 
 export type ParsedLoginInput =
 	| {
@@ -15,6 +30,16 @@ export type ParsedLoginInput =
 	| {
 			success: false;
 			fieldErrors: LoginFieldErrors;
+	  };
+
+export type ParsedCompleteNewPasswordInput =
+	| {
+			success: true;
+			data: CompleteNewPasswordInput & { emailNormalized: string };
+	  }
+	| {
+			success: false;
+			fieldErrors: CompleteNewPasswordFieldErrors;
 	  };
 
 export function parseLoginInput(input: LoginInput): ParsedLoginInput {
@@ -49,4 +74,51 @@ export function loginInputFromFormData(formData: FormData): LoginInput {
 		email: String(formData.get("email") ?? ""),
 		password: String(formData.get("password") ?? "")
 	};
+}
+
+export function parseCompleteNewPasswordInput(
+	input: CompleteNewPasswordInput
+): ParsedCompleteNewPasswordInput {
+	const password = input.password;
+	const confirmPassword = input.confirmPassword;
+	const challengeSession = input.challengeSession.trim();
+	const fieldErrors: CompleteNewPasswordFieldErrors = {};
+	const missingPasswordRequirements = failedPasswordRequirements(password);
+
+	if (missingPasswordRequirements.length > 0) {
+		fieldErrors.password = passwordRequirementMessage(
+			missingPasswordRequirements
+		);
+	}
+
+	if (!confirmPassword) {
+		fieldErrors.confirmPassword = "Confirm your new password.";
+	} else if (password && password !== confirmPassword) {
+		fieldErrors.confirmPassword = "Passwords do not match.";
+	}
+
+	if (!challengeSession) {
+		fieldErrors.password = "Start sign-in again before setting your password.";
+	}
+
+	if (Object.keys(fieldErrors).length > 0) {
+		return { success: false, fieldErrors };
+	}
+
+	return {
+		success: true,
+		data: {
+			email: input.email.trim(),
+			emailNormalized: normalizeEmail(input.email),
+			password,
+			confirmPassword,
+			challengeSession,
+		},
+	};
+}
+
+function passwordRequirementMessage(requirements: PasswordRequirement[]) {
+	return `Password is missing: ${requirements
+		.map((requirement) => requirement.label.toLowerCase())
+		.join(", ")}.`;
 }

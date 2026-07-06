@@ -6,10 +6,15 @@ import { DynamoAuthRepository } from "@/lib/aws/dynamodb";
 import { CognitoAuthAdapter } from "@/lib/aws/cognito";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import { getE2EAdapters, isE2EMode } from "@/lib/e2e/in-memory-auth";
+import type { AppRole } from "@/lib/auth/roles";
 import { getAuth } from "./auth";
-import type { StudentProfileRecord } from "@/features/auth/registration/repository";
+import type {
+	AppProfileRecord,
+	StudentProfileRecord,
+	TeacherProfileRecord,
+} from "@/features/auth/registration/repository";
 
-export async function requireStudentSession() {
+export async function requireRoleSession(role: AppRole) {
 	const requestHeaders = await headers();
 	const session = await getAuth().api.getSession({
 		headers: requestHeaders,
@@ -19,9 +24,9 @@ export async function requireStudentSession() {
 		redirect("/login");
 	}
 
-	const profile = await getStudentProfile(session.user.id);
+	const profile = await getAppProfile(session.user.id);
 
-	if (!profile || profile.role !== "student") {
+	if (!profile || profile.role !== role) {
 		redirect("/login");
 	}
 
@@ -29,7 +34,7 @@ export async function requireStudentSession() {
 		redirect("/login");
 	}
 
-	const isLoginEligible = await isStudentLoginEligible(profile);
+	const isLoginEligible = await isRoleLoginEligible(profile);
 
 	if (!isLoginEligible) {
 		redirect("/login");
@@ -41,6 +46,24 @@ export async function requireStudentSession() {
 	};
 }
 
+export async function requireStudentSession() {
+	const result = await requireRoleSession("student");
+
+	return {
+		session: result.session,
+		profile: result.profile as StudentProfileRecord,
+	};
+}
+
+export async function requireTeacherSession() {
+	const result = await requireRoleSession("teacher");
+
+	return {
+		session: result.session,
+		profile: result.profile as TeacherProfileRecord,
+	};
+}
+
 export function isSessionInvalidated(
 	session: {
 		session?: {
@@ -49,7 +72,7 @@ export function isSessionInvalidated(
 			token?: string;
 		};
 	} | null,
-	profile: StudentProfileRecord
+	profile: AppProfileRecord
 ) {
 	if (!profile.sessionsInvalidatedAt) {
 		return false;
@@ -95,25 +118,26 @@ export function sessionCreatedAtMilliseconds(
 	return null;
 }
 
-async function getStudentProfile(profileId: string) {
+async function getAppProfile(profileId: string) {
 	if (isE2EMode()) {
 		const { repository } = getE2EAdapters();
 
-		return repository.getStudentProfileById(profileId);
+		return repository.getAppProfileById(profileId);
 	}
 
 	const resources = getSessionAuthResources();
 	const repository = new DynamoAuthRepository("", resources.userProfileTableName);
 
-	return repository.getStudentProfileById(profileId);
+	return repository.getAppProfileById(profileId);
 }
 
-async function isStudentLoginEligible(profile: StudentProfileRecord) {
+async function isRoleLoginEligible(profile: AppProfileRecord) {
 	if (isE2EMode()) {
 		const { identity } = getE2EAdapters();
 
-		return identity.isStudentLoginEligible({
+		return identity.isRoleLoginEligible({
 			emailNormalized: profile.emailNormalized,
+			role: profile.role,
 		});
 	}
 
@@ -123,7 +147,8 @@ async function isStudentLoginEligible(profile: StudentProfileRecord) {
 		resources.userPoolClientId
 	);
 
-	return identity.isStudentLoginEligible({
+	return identity.isRoleLoginEligible({
 		emailNormalized: profile.emailNormalized,
+		role: profile.role,
 	});
 }

@@ -9,36 +9,48 @@ import {
 	InvalidLoginCredentialsError,
 	LoginBlockedUntilVerifiedError,
 	type AuthSessionTokens,
+	type LoginAuthenticationResult,
+	isNewPasswordRequiredChallenge,
 } from "@/features/auth/login/service";
 import { GENERIC_SIGN_IN_ERROR_MESSAGE } from "@/features/auth/login/messages";
-import { parseLoginInput } from "@/features/auth/login/schema";
+import {
+	parseCompleteNewPasswordInput,
+	parseLoginInput,
+} from "@/features/auth/login/schema";
 import type {
+	CognitoCompleteNewPasswordResponse,
 	CognitoSessionBridgeStatus,
 	CognitoSignInResponse,
 } from "@/features/auth/login/api";
-import type { StudentProfileRecord } from "@/features/auth/registration/repository";
-import { hasStudentCognitoGroup } from "@/lib/auth/cognito-groups";
+import type { AppProfileRecord } from "@/features/auth/registration/repository";
+import { roleFromCognitoGroups } from "@/lib/auth/cognito-groups";
+import { redirectPathForRole } from "@/lib/auth/roles";
 import type { CognitoIdTokenVerifier } from "./cognito-id-token-verifier";
 
 type AuthEndpointContext = Parameters<typeof setSessionCookie>[0];
 
 export interface CognitoSessionIdentityProvider {
-	authenticateStudent(args: {
+	authenticateUser(args: {
 		emailNormalized: string;
 		password: string;
+	}): Promise<LoginAuthenticationResult>;
+	completeNewPasswordChallenge(args: {
+		emailNormalized: string;
+		newPassword: string;
+		challengeSession: string;
 	}): Promise<AuthSessionTokens>;
 }
 
-export interface StudentSessionProfileRepository {
-	getStudentProfileById(
+export interface AppSessionProfileRepository {
+	getAppProfileById(
 		profileId: string,
-	): Promise<StudentProfileRecord | null>;
+	): Promise<AppProfileRecord | null>;
 }
 
 export type CognitoSessionBridgeOptions = {
 	appBaseUrl: string;
 	identity: CognitoSessionIdentityProvider;
-	profiles: StudentSessionProfileRepository;
+	profiles: AppSessionProfileRepository;
 	tokenVerifier: CognitoIdTokenVerifier;
 	trustedOrigins?: string[];
 };
@@ -46,6 +58,13 @@ export type CognitoSessionBridgeOptions = {
 const signInBodySchema = z.object({
 	email: z.string().optional(),
 	password: z.string().optional(),
+});
+
+const completeNewPasswordBodySchema = z.object({
+	email: z.string().optional(),
+	password: z.string().optional(),
+	confirmPassword: z.string().optional(),
+	challengeSession: z.string().optional(),
 });
 
 export function cognitoSessionBridge(
@@ -93,105 +112,28 @@ export function cognitoSessionBridge(
 					}
 
 					try {
-						const tokens = await options.identity.authenticateStudent({
+						const authResult = await options.identity.authenticateUser({
 							emailNormalized: parsed.data.emailNormalized,
 							password: parsed.data.password,
 						});
 
-						if (!tokens.idToken) {
-							return bridgeResponse(
-								ctx,
-								options,
-								failure(
-									"invalid_credentials",
-									GENERIC_SIGN_IN_ERROR_MESSAGE,
-									input,
-								),
-							);
+						if (isNewPasswordRequiredChallenge(authResult)) {
+							return bridgeResponse(ctx, options, {
+								status: "new_password_required",
+								message: "Set a new password to finish signing in.",
+								challengeSession: authResult.challengeSession,
+								values: { email: input.email, password: "" },
+								errors: {},
+							} satisfies CognitoSignInResponse);
 						}
 
-						const verified = await options.tokenVerifier.verifyIdToken(
-							tokens.idToken,
-						);
+						const response = await createSessionFromTokens(ctx, options, {
+							emailNormalized: parsed.data.emailNormalized,
+							tokens: authResult,
+							input,
+						});
 
-						if (!verified.emailVerified) {
-							return bridgeResponse(
-								ctx,
-								options,
-								failure(
-									"verify_email",
-									"Verify your email before signing in.",
-									input,
-								),
-							);
-						}
-
-						if (verified.emailNormalized !== parsed.data.emailNormalized) {
-							return bridgeResponse(
-								ctx,
-								options,
-								failure(
-									"invalid_credentials",
-									GENERIC_SIGN_IN_ERROR_MESSAGE,
-									input,
-								),
-							);
-						}
-
-						if (!hasStudentCognitoGroup(verified.groups)) {
-							return bridgeResponse(
-								ctx,
-								options,
-								failure(
-									"invalid_credentials",
-									GENERIC_SIGN_IN_ERROR_MESSAGE,
-									input,
-								),
-							);
-						}
-
-						const profile = await options.profiles.getStudentProfileById(
-							verified.cognitoSub,
-						);
-
-						if (
-							!profile ||
-							profile.emailNormalized !== verified.emailNormalized
-						) {
-							return bridgeResponse(
-								ctx,
-								options,
-								failure(
-									"invalid_credentials",
-									GENERIC_SIGN_IN_ERROR_MESSAGE,
-									input,
-								),
-							);
-						}
-
-						if (profile.role !== "student") {
-							return bridgeResponse(
-								ctx,
-								options,
-								failure(
-									"invalid_credentials",
-									GENERIC_SIGN_IN_ERROR_MESSAGE,
-									input,
-								),
-							);
-						}
-
-						const user = await upsertBetterAuthUser(ctx, profile);
-						const session = await ctx.context.internalAdapter.createSession(
-							user.id,
-						);
-
-						await setSessionCookie(ctx, { session, user });
-
-						return bridgeResponse(ctx, options, {
-							status: "signed_in",
-							redirectTo: "/student",
-						} satisfies CognitoSignInResponse);
+						return bridgeResponse(ctx, options, response);
 					} catch (error) {
 						if (error instanceof LoginBlockedUntilVerifiedError) {
 							return bridgeResponse(
@@ -221,13 +163,169 @@ export function cognitoSessionBridge(
 					}
 				},
 			),
+			cognitoCompleteNewPassword: createAuthEndpoint(
+				"/cognito/complete-new-password",
+				{
+					method: "POST",
+					body: completeNewPasswordBodySchema,
+					metadata: {
+						allowedMediaTypes: ["application/json"],
+					},
+					requireRequest: true,
+				},
+				async (ctx) => {
+					const input = {
+						email: ctx.body.email ?? "",
+						password: ctx.body.password ?? "",
+						confirmPassword: ctx.body.confirmPassword ?? "",
+						challengeSession: ctx.body.challengeSession ?? "",
+					};
+					const parsed = parseCompleteNewPasswordInput(input);
+
+					if (!isSameOriginRequest(ctx.request.headers, options)) {
+						return ctx.json(
+							completePasswordFailure(
+								"invalid_request",
+								"Invalid password completion request.",
+								input.email,
+							),
+						);
+					}
+
+					if (!parsed.success) {
+						return ctx.json({
+							status: "validation_error",
+							message: "Check the highlighted fields and try again.",
+							values: {
+								email: input.email,
+								password: "",
+								confirmPassword: "",
+							},
+							errors: toFormErrors(parsed.fieldErrors),
+						} satisfies CognitoCompleteNewPasswordResponse);
+					}
+
+					try {
+						const tokens =
+							await options.identity.completeNewPasswordChallenge({
+								emailNormalized: parsed.data.emailNormalized,
+								newPassword: parsed.data.password,
+								challengeSession: parsed.data.challengeSession,
+							});
+						const response = await createSessionFromTokens(ctx, options, {
+							emailNormalized: parsed.data.emailNormalized,
+							tokens,
+							input: {
+								email: input.email,
+								password: "",
+							},
+						});
+
+						return ctx.json(
+							toCompletePasswordResponse(response, input.email),
+						);
+					} catch (error) {
+						if (error instanceof LoginBlockedUntilVerifiedError) {
+							return ctx.json(
+								completePasswordFailure(
+									"verify_email",
+									"Verify your email before signing in.",
+									input.email,
+								),
+							);
+						}
+
+						if (error instanceof InvalidLoginCredentialsError) {
+							return ctx.json(
+								completePasswordFailure(
+									"invalid_credentials",
+									GENERIC_SIGN_IN_ERROR_MESSAGE,
+									input.email,
+								),
+							);
+						}
+
+						throw error;
+					}
+				},
+			),
 		},
+	};
+}
+
+async function createSessionFromTokens(
+	ctx: AuthEndpointContext,
+	options: CognitoSessionBridgeOptions,
+	args: {
+		emailNormalized: string;
+		tokens: AuthSessionTokens;
+		input: { email: string; password: string };
+	},
+): Promise<CognitoSignInResponse> {
+	if (!args.tokens.idToken) {
+		return failure(
+			"invalid_credentials",
+			GENERIC_SIGN_IN_ERROR_MESSAGE,
+			args.input,
+		);
+	}
+
+	const verified = await options.tokenVerifier.verifyIdToken(args.tokens.idToken);
+
+	if (!verified.emailVerified) {
+		return failure("verify_email", "Verify your email before signing in.", args.input);
+	}
+
+	if (verified.emailNormalized !== args.emailNormalized) {
+		return failure(
+			"invalid_credentials",
+			GENERIC_SIGN_IN_ERROR_MESSAGE,
+			args.input,
+		);
+	}
+
+	const role = roleFromCognitoGroups(verified.groups);
+
+	if (!role) {
+		return failure(
+			"invalid_credentials",
+			GENERIC_SIGN_IN_ERROR_MESSAGE,
+			args.input,
+		);
+	}
+
+	const profile = await options.profiles.getAppProfileById(verified.cognitoSub);
+
+	if (!profile || profile.emailNormalized !== verified.emailNormalized) {
+		return failure(
+			"invalid_credentials",
+			GENERIC_SIGN_IN_ERROR_MESSAGE,
+			args.input,
+		);
+	}
+
+	if (profile.role !== role) {
+		return failure(
+			"invalid_credentials",
+			GENERIC_SIGN_IN_ERROR_MESSAGE,
+			args.input,
+		);
+	}
+
+	const user = await upsertBetterAuthUser(ctx, profile);
+	const session = await ctx.context.internalAdapter.createSession(user.id);
+
+	await setSessionCookie(ctx, { session, user });
+
+	return {
+		status: "signed_in",
+		redirectTo: redirectPathForRole(profile.role),
 	};
 }
 
 async function upsertBetterAuthUser(
 	ctx: AuthEndpointContext,
-	profile: StudentProfileRecord,
+	profile: AppProfileRecord,
 ): Promise<User> {
 	const userData = {
 		id: profile.profileId,
@@ -288,7 +386,10 @@ function requiredRequest(ctx: AuthEndpointContext) {
 }
 
 function failure(
-	status: Exclude<CognitoSessionBridgeStatus, "signed_in" | "validation_error">,
+	status: Exclude<
+		CognitoSessionBridgeStatus,
+		"signed_in" | "new_password_required" | "validation_error"
+	>,
 	message: string,
 	input: { email: string; password: string },
 ): CognitoSignInResponse {
@@ -301,6 +402,45 @@ function failure(
 		},
 		errors: {},
 	};
+}
+
+function completePasswordFailure(
+	status: Exclude<
+		CognitoCompleteNewPasswordResponse["status"],
+		"signed_in" | "validation_error"
+	>,
+	message: string,
+	email: string,
+): CognitoCompleteNewPasswordResponse {
+	return {
+		status,
+		message,
+		values: {
+			email,
+			password: "",
+			confirmPassword: "",
+		},
+		errors: {},
+	};
+}
+
+function toCompletePasswordResponse(
+	response: CognitoSignInResponse,
+	email: string,
+): CognitoCompleteNewPasswordResponse {
+	if (response.status === "signed_in") {
+		return response;
+	}
+
+	if (response.status === "new_password_required") {
+		return completePasswordFailure(
+			"invalid_credentials",
+			GENERIC_SIGN_IN_ERROR_MESSAGE,
+			email,
+		);
+	}
+
+	return completePasswordFailure(response.status, response.message, email);
 }
 
 function loginRedirectUrl(

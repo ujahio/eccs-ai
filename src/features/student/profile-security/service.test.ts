@@ -40,7 +40,7 @@ class FakeIdentity implements StudentProfileIdentityProvider {
 	invalidPassword = false;
 	emailUnavailable = false;
 
-	async updateStudentName(args: {
+	async updateProfileName(args: {
 		emailNormalized: string;
 		firstName: string;
 		lastName: string;
@@ -49,7 +49,7 @@ class FakeIdentity implements StudentProfileIdentityProvider {
 		this.nameUpdates.push(args);
 	}
 
-	async authenticateStudent(args: {
+	async authenticateUser(args: {
 		emailNormalized: string;
 		password: string;
 	}) {
@@ -62,7 +62,7 @@ class FakeIdentity implements StudentProfileIdentityProvider {
 		return {};
 	}
 
-	async updateStudentEmail(args: {
+	async updateProfileEmail(args: {
 		currentEmailNormalized: string;
 		newEmailNormalized: string;
 	}) {
@@ -73,7 +73,7 @@ class FakeIdentity implements StudentProfileIdentityProvider {
 		this.emailUpdates.push(args);
 	}
 
-	async setStudentPassword(args: {
+	async setProfilePassword(args: {
 		emailNormalized: string;
 		password: string;
 	}) {
@@ -118,11 +118,11 @@ class FakeProfiles implements StudentProfileRepository {
 		sessionInvalidationExemptToken?: string;
 	}> = [];
 
-	async getStudentProfileByEmail(emailNormalized: string) {
+	async getProfileByEmail(emailNormalized: string) {
 		return this.records.get(emailNormalized) ?? null;
 	}
 
-	async updateStudentName(args: {
+	async updateProfileName(args: {
 		profileId: string;
 		firstName: string;
 		lastName: string;
@@ -167,7 +167,7 @@ class FakeProfiles implements StudentProfileRepository {
 		}
 	}
 
-	async findStudentProfileByPendingEmailTokenHash(tokenHash: string) {
+	async findProfileByPendingEmailTokenHash(tokenHash: string) {
 		return (
 			Array.from(this.records.values()).find(
 				(record) => record.pendingEmailVerificationTokenHash === tokenHash,

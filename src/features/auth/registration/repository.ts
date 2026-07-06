@@ -1,3 +1,5 @@
+import type { AppRole } from "@/lib/auth/roles";
+
 export type PendingRegistrationStatus = "pending" | "verified";
 
 export type PendingRegistrationRecord = {
@@ -20,25 +22,35 @@ export type PendingRegistrationRecord = {
 	cleanupError?: string;
 };
 
-export type StudentProfileRecord = {
+export type BaseAppProfileRecord = {
 	profileId: string;
 	emailNormalized: string;
 	firstName: string;
 	lastName: string;
 	fullName: string;
-	role: "student";
+	role: AppRole;
 	emailVerifiedAt: number;
 	pendingEmail?: string;
 	pendingEmailVerificationTokenHash?: string;
 	pendingEmailVerificationExpiresAt?: number;
 	pendingEmailVerificationRequestedAt?: number;
-	canAccessCases: boolean;
 	createdAt: number;
 	updatedAt: number;
 	// Millisecond epoch for exact comparison with Better Auth session dates.
 	sessionsInvalidatedAt?: number;
 	sessionInvalidationExemptToken?: string;
 };
+
+export type StudentProfileRecord = BaseAppProfileRecord & {
+	role: "student";
+	canAccessCases: boolean;
+};
+
+export type TeacherProfileRecord = BaseAppProfileRecord & {
+	role: "teacher";
+};
+
+export type AppProfileRecord = StudentProfileRecord | TeacherProfileRecord;
 
 export class DuplicatePendingRegistrationError extends Error {
 	constructor() {

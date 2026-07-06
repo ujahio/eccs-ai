@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+	bootstrapE2ETeacher,
 	getE2EAuthStore,
 	isE2EMode,
 	resetE2EAuthStore
@@ -28,6 +29,39 @@ export async function DELETE() {
 	resetE2EAuthStore();
 
 	return NextResponse.json({ reset: true });
+}
+
+export async function POST(request: Request) {
+	if (!isE2EMode()) {
+		return NextResponse.json(
+			{ error: "This endpoint is only available in e2e mode." },
+			{ status: 403 }
+		);
+	}
+
+	const body = await request.json().catch(() => null);
+
+	if (body?.action !== "bootstrap_teacher") {
+		return NextResponse.json(
+			{ error: "Unsupported e2e auth state action." },
+			{ status: 400 }
+		);
+	}
+
+	const result = bootstrapE2ETeacher({
+		email: String(body.email ?? ""),
+		firstName: String(body.firstName ?? ""),
+		lastName: String(body.lastName ?? ""),
+		temporaryPassword: String(body.temporaryPassword ?? ""),
+		emailVerified:
+			typeof body.emailVerified === "boolean" ? body.emailVerified : true,
+		forcePasswordChange:
+			typeof body.forcePasswordChange === "boolean"
+				? body.forcePasswordChange
+				: true,
+	});
+
+	return NextResponse.json({ teacher: result });
 }
 
 export async function PATCH(request: Request) {
@@ -61,6 +95,14 @@ export async function PATCH(request: Request) {
 		user.enabled = body.enabled;
 	}
 
+	if (typeof body.emailVerified === "boolean") {
+		user.emailVerified = body.emailVerified;
+	}
+
+	if (typeof body.forcePasswordChange === "boolean") {
+		user.forcePasswordChange = body.forcePasswordChange;
+	}
+
 	if (Array.isArray(body.groups)) {
 		user.groups = body.groups.filter(isKnownCognitoGroup);
 	}
@@ -69,6 +111,7 @@ export async function PATCH(request: Request) {
 		user: {
 			email,
 			enabled: user.enabled,
+			emailVerified: user.emailVerified,
 			groups: user.groups
 		}
 	});

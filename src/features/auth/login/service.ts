@@ -8,6 +8,15 @@ export type AuthSessionTokens = {
 	expiresIn?: number;
 };
 
+export type NewPasswordRequiredChallenge = {
+	challengeName: "NEW_PASSWORD_REQUIRED";
+	challengeSession: string;
+};
+
+export type LoginAuthenticationResult =
+	| AuthSessionTokens
+	| NewPasswordRequiredChallenge;
+
 export type LoginFailureReason =
 	| "invalid_credentials"
 	| "verify_email";
@@ -27,18 +36,19 @@ export class InvalidLoginCredentialsError extends Error {
 }
 
 export interface LoginIdentityProvider {
-	authenticateStudent(args: {
+	authenticateUser(args: {
 		emailNormalized: string;
 		password: string;
-	}): Promise<AuthSessionTokens>;
+	}): Promise<LoginAuthenticationResult>;
 }
 
 export interface LoginProfileRepository {
-	hasStudentProfile(emailNormalized: string): Promise<boolean>;
+	hasAppProfile(emailNormalized: string): Promise<boolean>;
 }
 
 export type LoginServiceResult =
 	| { status: "signed_in"; tokens: AuthSessionTokens }
+	| { status: "new_password_required"; challengeSession: string }
 	| {
 			status: "validation_error";
 			message: string;
@@ -64,11 +74,11 @@ export class LoginService {
 		}
 
 		try {
-			const tokens = await this.identity.authenticateStudent({
+			const authResult = await this.identity.authenticateUser({
 				emailNormalized: parsed.data.emailNormalized,
 				password: parsed.data.password
 			});
-			const hasProfile = await this.profiles.hasStudentProfile(
+			const hasProfile = await this.profiles.hasAppProfile(
 				parsed.data.emailNormalized
 			);
 
@@ -79,9 +89,16 @@ export class LoginService {
 				};
 			}
 
+			if (isNewPasswordRequiredChallenge(authResult)) {
+				return {
+					status: "new_password_required",
+					challengeSession: authResult.challengeSession
+				};
+			}
+
 			return {
 				status: "signed_in",
-				tokens
+				tokens: authResult
 			};
 		} catch (error) {
 			if (error instanceof LoginBlockedUntilVerifiedError) {
@@ -101,4 +118,10 @@ export class LoginService {
 			throw error;
 		}
 	}
+}
+
+export function isNewPasswordRequiredChallenge(
+	result: LoginAuthenticationResult
+): result is NewPasswordRequiredChallenge {
+	return "challengeName" in result && result.challengeName === "NEW_PASSWORD_REQUIRED";
 }

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createStudentProfileService } from "@/features/student/profile-security/server";
+import { createProfileSecurityService } from "@/features/student/profile-security/server";
 
 const LOGIN_EMAIL_CHANGE_MESSAGES = {
 	verified_sign_in_required: "verified",
@@ -11,7 +11,7 @@ const LOGIN_EMAIL_CHANGE_MESSAGES = {
 export async function GET(request: Request) {
 	const url = new URL(request.url);
 	const token = url.searchParams.get("token");
-	const service = createStudentProfileService();
+	const service = createProfileSecurityService();
 	const result = await service.verifyEmailChange({
 		token,
 	});
