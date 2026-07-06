@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { ArrowRightIcon } from "@/components/ui/arrow-right-icon";
 import { Button } from "@/components/ui/button";
-import { fieldError, inputClasses } from "@/features/auth/form-helpers";
+import {
+	FieldError,
+	fieldError,
+	inputClasses
+} from "@/features/auth/form-helpers";
+import { useNotifications } from "@/components/ui/notifications";
 import {
 	initialPasswordResetRequestFormState,
 	type PasswordResetRequestFormState
@@ -27,11 +32,17 @@ export function PasswordResetRequestForm({
 		action,
 		initialState ?? initialPasswordResetRequestFormState
 	);
+	const { dismissByKey } = useNotifications();
 	const emailError = fieldError(state, "email");
+
+	function submitAndClearStatus(formData: FormData) {
+		dismissByKey("forgot-password-status");
+		formAction(formData);
+	}
 
 	return (
 		<form
-			action={formAction}
+			action={submitAndClearStatus}
 			className="mt-7"
 			data-testid="forgot-password-form"
 		>
@@ -58,13 +69,12 @@ export function PasswordResetRequestForm({
 					type="email"
 				/>
 				{emailError ? (
-					<p
-						className="text-xs font-medium leading-5 text-error-red"
-						data-testid="forgot-password-email-error"
+					<FieldError
 						id="forgot-password-email-error"
+						testId="forgot-password-email-error"
 					>
 						{emailError}
-					</p>
+					</FieldError>
 				) : null}
 			</div>
 

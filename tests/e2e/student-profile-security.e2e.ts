@@ -164,7 +164,9 @@ test.describe("Student profile security", () => {
 		await page.getByTestId("student-profile-last-name").fill("Chen");
 		await page.getByTestId("student-profile-details-submit").click();
 		await expect(
-			page.getByTestId("student-details-success-message"),
+			page
+				.getByTestId("notification-viewport")
+				.getByTestId("student-details-success-message"),
 		).toHaveText("Your name has been updated.");
 
 		await page.getByTestId("student-profile-new-email").fill(newEmail);
@@ -175,8 +177,13 @@ test.describe("Student profile security", () => {
 			"We sent a verification link to your new email address.",
 		);
 		await expect(
-			page.getByTestId("student-details-success-message"),
-		).toHaveCount(0);
+			page
+				.getByTestId("notification-viewport")
+				.getByTestId("student-email-verification-sent-message"),
+		).toHaveText("We sent a verification link to your new email address.");
+		await expect(page.getByTestId("student-details-success-message")).toHaveCount(
+			0,
+		);
 
 		const emailChangeUrl = await fetchEmailChangeVerificationUrl(
 			request,
@@ -234,5 +241,51 @@ test.describe("Student profile security", () => {
 
 		await loginStudent(page, newEmail, changedPassword);
 		await expect(page).toHaveURL(/\/student$/);
+	});
+
+	test("profile success notifications auto-clear and do not compete with later email errors", async ({
+		page,
+		request,
+	}) => {
+		const email = uniqueEmail("profile-notifications");
+		const unavailableEmail = uniqueEmail("profile-unavailable");
+
+		await registerStudent(page, email);
+		await verifyStudentEmail(page, request, email);
+		await registerStudent(page, unavailableEmail);
+		await verifyStudentEmail(page, request, unavailableEmail);
+
+		await loginStudent(page, email, validRegistration.password);
+		await expect(page).toHaveURL(/\/student$/);
+		await page.goto("/student/profile");
+
+		await page.getByTestId("student-profile-first-name").fill("Alex");
+		await page.getByTestId("student-profile-last-name").fill("Chen");
+		await page.getByTestId("student-profile-details-submit").click();
+
+		const detailsNotification = page
+			.getByTestId("notification-viewport")
+			.getByTestId("student-details-success-message");
+
+		await expect(detailsNotification).toHaveText("Your name has been updated.");
+		await expect(detailsNotification).toHaveCount(0, { timeout: 7000 });
+
+		await page.getByTestId("student-profile-last-name").fill("Morgan");
+		await page.getByTestId("student-profile-details-submit").click();
+		await expect(
+			page
+				.getByTestId("notification-viewport")
+				.getByTestId("student-details-success-message"),
+		).toHaveText("Your name has been updated.");
+
+		await page.getByTestId("student-profile-new-email").fill(unavailableEmail);
+		await page.getByTestId("student-profile-details-submit").click();
+
+		await expect(page.getByTestId("student-details-success-message")).toHaveCount(
+			0,
+		);
+		await expect(page.getByTestId("student-details-error-message")).toHaveText(
+			"We couldn't use that email address. Try another email or contact support.",
+		);
 	});
 });

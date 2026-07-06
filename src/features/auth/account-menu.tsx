@@ -4,6 +4,7 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useNotifications } from "@/components/ui/notifications";
 
 type AccountMenuItem = {
 	href: string;
@@ -38,8 +39,9 @@ export function AccountMenu({
 	logoutErrorTestId,
 }: AccountMenuProps) {
 	const router = useRouter();
+	const { dismissByKey, notify } = useNotifications();
 	const [isPending, setIsPending] = useState(false);
-	const [error, setError] = useState("");
+	const logoutNotificationKey = `${menuId}-logout`;
 
 	async function handleLogout() {
 		if (isPending) {
@@ -47,7 +49,7 @@ export function AccountMenu({
 		}
 
 		setIsPending(true);
-		setError("");
+		dismissByKey(logoutNotificationKey);
 
 		try {
 			const response = await fetch("/api/auth/sign-out", {
@@ -67,7 +69,12 @@ export function AccountMenu({
 			router.replace("/login");
 			router.refresh();
 		} catch {
-			setError("We could not sign you out. Please try again.");
+			notify({
+				tone: "error",
+				message: "We could not sign you out. Please try again.",
+				testId: logoutErrorTestId,
+				dedupeKey: logoutNotificationKey,
+			});
 			setIsPending(false);
 		}
 	}
@@ -136,18 +143,6 @@ export function AccountMenu({
 						>
 							{isPending ? "Signing out" : "Sign out"}
 						</DropdownMenu.Item>
-						{error ? (
-							<>
-								<DropdownMenu.Separator className="my-2 h-px bg-border-gray" />
-								<p
-									className="px-4 pb-1 text-xs font-medium leading-5 text-error-red"
-									data-testid={logoutErrorTestId}
-									role="alert"
-								>
-									{error}
-								</p>
-							</>
-						) : null}
 					</DropdownMenu.Content>
 				</DropdownMenu.Portal>
 			</DropdownMenu.Root>

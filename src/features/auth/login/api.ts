@@ -21,7 +21,7 @@ export type CognitoSignInResponse =
 				email: string;
 				password: "";
 			};
-			errors: {};
+			errors: Partial<Record<"email" | "password", string[]>>;
 	  }
 	| {
 			status: Exclude<
