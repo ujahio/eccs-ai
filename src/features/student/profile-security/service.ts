@@ -16,9 +16,12 @@ import {
 	type StudentPasswordChangeInput,
 } from "./schema";
 
+export const EMAIL_ADDRESS_UNAVAILABLE_MESSAGE =
+	"We couldn't use that email address. Try another email or contact support.";
+
 export class StudentEmailUnavailableError extends Error {
 	constructor() {
-		super("This email address is already in use.");
+		super(EMAIL_ADDRESS_UNAVAILABLE_MESSAGE);
 		this.name = "StudentEmailUnavailableError";
 	}
 }
@@ -226,7 +229,7 @@ export class ProfileSecurityService {
 		if (existing && existing.profileId !== profile.profileId) {
 			return {
 				status: "email_unavailable",
-				message: "This email address is already in use.",
+				message: EMAIL_ADDRESS_UNAVAILABLE_MESSAGE,
 			};
 		}
 
@@ -308,7 +311,7 @@ export class ProfileSecurityService {
 			if (error instanceof StudentEmailUnavailableError) {
 				return {
 					status: "invalid",
-					message: "This email address is already in use.",
+					message: EMAIL_ADDRESS_UNAVAILABLE_MESSAGE,
 				};
 			}
 

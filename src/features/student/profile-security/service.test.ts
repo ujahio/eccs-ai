@@ -355,6 +355,8 @@ describe("StudentProfileService", () => {
 			}),
 		).resolves.toMatchObject({
 			status: "email_unavailable",
+			message:
+				"We couldn't use that email address. Try another email or contact support.",
 		});
 	});
 
