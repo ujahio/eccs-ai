@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import { Nunito_Sans } from "next/font/google";
+import {
+  NotificationProvider,
+  NotificationViewport
+} from "@/components/ui/notifications";
 import "./globals.css";
 
 const nunitoSans = Nunito_Sans({
@@ -20,7 +24,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={nunitoSans.variable}>
-      <body>{children}</body>
+      <body>
+        <NotificationProvider>
+          {children}
+          <NotificationViewport />
+        </NotificationProvider>
+      </body>
     </html>
   );
 }

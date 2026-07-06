@@ -1,5 +1,6 @@
 "use client";
 
+import { useSuccessNotification } from "@/components/ui/notifications";
 import {
 	AuthStatusMessage,
 	type StatusTone
@@ -29,16 +30,24 @@ export function PasswordResetStatusMessage({
 	state: PasswordResetStatusState;
 	testIdPrefix: "forgot-password" | "reset-password";
 }) {
-	if (!state.message) {
+	const config = statusMessageConfig[state.status];
+	const testId = `${testIdPrefix}-${config.suffix}-message`;
+	const isSuccess = state.status === "success";
+	useSuccessNotification({
+		enabled: isSuccess,
+		message: state.message,
+		testId,
+		dedupeKey: `${testIdPrefix}-status`
+	});
+
+	if (!state.message || isSuccess) {
 		return null;
 	}
-
-	const config = statusMessageConfig[state.status];
 
 	return (
 		<AuthStatusMessage
 			role={state.status === "error" ? "alert" : "status"}
-			testId={`${testIdPrefix}-${config.suffix}-message`}
+			testId={testId}
 			tone={config.tone}
 		>
 			{state.message}

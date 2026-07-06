@@ -2,7 +2,12 @@
 
 import { useActionState, useState } from "react";
 import {
+	useNotifications,
+	useSuccessNotification,
+} from "@/components/ui/notifications";
+import {
 	AuthStatusMessage,
+	FieldError,
 	PasswordVisibilityToggle,
 	authPasswordInputClasses,
 	fieldError,
@@ -60,18 +65,12 @@ function StatusMessage({
 		return null;
 	}
 
-	const tone: StatusTone =
-		state.status === "success"
-			? "success"
-			: state.status === "notice"
-				? "warning"
-				: "error";
-	const suffix =
-		state.status === "success"
-			? "success"
-			: state.status === "notice"
-				? "notice"
-				: "error";
+	if (state.status === "success") {
+		return null;
+	}
+
+	const tone: StatusTone = state.status === "notice" ? "warning" : "error";
+	const suffix = state.status === "notice" ? "notice" : "error";
 
 	return (
 		<AuthStatusMessage
@@ -153,6 +152,7 @@ export function ProfileSecurityForms({
 		passwordAction,
 		initialProfileSecurityPasswordChangeFormState,
 	);
+	const { dismissByKey } = useNotifications();
 	const [passwordValues, setPasswordValues] = useState<PasswordValues>({
 		currentPassword: "",
 		password: "",
@@ -199,6 +199,27 @@ export function ProfileSecurityForms({
 			(isEmailChangeRequestSuccess ? detailsState.values.email : undefined),
 	);
 
+	useSuccessNotification({
+		enabled:
+			detailsState.status === "success" && !isEmailChangeRequestSuccess,
+		message: detailsState.message,
+		testId: `${profileKind}-details-success-message`,
+		dedupeKey: `${profileKind}-details`,
+	});
+	useSuccessNotification({
+		enabled:
+			detailsState.status === "success" && isEmailChangeRequestSuccess,
+		message: detailsState.message,
+		testId: `${profileKind}-email-verification-sent-message`,
+		dedupeKey: `${profileKind}-email-change`,
+	});
+	useSuccessNotification({
+		enabled: passwordState.status === "success",
+		message: passwordState.message,
+		testId: `${profileKind}-password-success-message`,
+		dedupeKey: `${profileKind}-password`,
+	});
+
 	function updateDetailsValue<Field extends keyof DetailsValues>(
 		field: Field,
 		value: DetailsValues[Field],
@@ -220,12 +241,20 @@ export function ProfileSecurityForms({
 	}
 
 	function submitPasswordAndReset(formData: FormData) {
+		dismissByKey(`${profileKind}-password`);
 		submitPassword(formData);
 		setPasswordValues({
 			currentPassword: "",
 			password: "",
 			confirmPassword: "",
 		});
+	}
+
+	function submitDetailsAndClear(formData: FormData) {
+		dismissByKey(`${profileKind}-details`);
+		dismissByKey(`${profileKind}-email-change`);
+		dismissByKey(`${profileKind}-email-status`);
+		submitDetails(formData);
 	}
 
 	return (
@@ -270,7 +299,7 @@ export function ProfileSecurityForms({
 
 				{activeTab === "personal" ? (
 					<form
-						action={submitDetails}
+						action={submitDetailsAndClear}
 						className="mx-auto mt-5 grid w-full max-w-[520px] gap-4 sm:mt-6 sm:gap-5"
 						data-testid={`${profileKind}-personal-details-form`}
 						id={personalPanelId}
@@ -303,13 +332,12 @@ export function ProfileSecurityForms({
 									value={detailsValues.firstName}
 								/>
 								{firstNameError ? (
-									<p
-										className="text-xs font-medium leading-5 text-error-red"
-										data-testid={`${profileKind}-profile-first-name-error`}
+									<FieldError
 										id={`${profileKind}-profile-first-name-error`}
+										testId={`${profileKind}-profile-first-name-error`}
 									>
 										{firstNameError}
-									</p>
+									</FieldError>
 								) : null}
 							</div>
 
@@ -339,13 +367,12 @@ export function ProfileSecurityForms({
 									value={detailsValues.lastName}
 								/>
 								{lastNameError ? (
-									<p
-										className="text-xs font-medium leading-5 text-error-red"
-										data-testid={`${profileKind}-profile-last-name-error`}
+									<FieldError
 										id={`${profileKind}-profile-last-name-error`}
+										testId={`${profileKind}-profile-last-name-error`}
 									>
 										{lastNameError}
-									</p>
+									</FieldError>
 								) : null}
 							</div>
 						</div>
@@ -377,13 +404,12 @@ export function ProfileSecurityForms({
 								value={detailsValues.email}
 							/>
 							{emailError ? (
-									<p
-										className="text-xs font-medium leading-5 text-error-red"
-										data-testid={`${profileKind}-profile-new-email-error`}
-										id={`${profileKind}-profile-new-email-error`}
+								<FieldError
+									id={`${profileKind}-profile-new-email-error`}
+									testId={`${profileKind}-profile-new-email-error`}
 								>
 									{emailError}
-								</p>
+								</FieldError>
 							) : null}
 							<StatusMessage
 								state={{
@@ -457,13 +483,12 @@ export function ProfileSecurityForms({
 								/>
 							</span>
 							{currentPasswordError ? (
-								<p
-									className="text-xs font-medium leading-5 text-error-red"
-									data-testid={`${profileKind}-profile-current-password-error`}
+								<FieldError
 									id={`${profileKind}-profile-current-password-error`}
+									testId={`${profileKind}-profile-current-password-error`}
 								>
 									{currentPasswordError}
-								</p>
+								</FieldError>
 							) : null}
 						</div>
 
@@ -500,13 +525,12 @@ export function ProfileSecurityForms({
 								/>
 							</span>
 							{passwordError ? (
-								<p
-									className="text-xs font-medium leading-5 text-error-red"
-									data-testid={`${profileKind}-profile-new-password-error`}
+								<FieldError
 									id={`${profileKind}-profile-new-password-error`}
+									testId={`${profileKind}-profile-new-password-error`}
 								>
 									{passwordError}
-								</p>
+								</FieldError>
 							) : null}
 						</div>
 
@@ -550,13 +574,12 @@ export function ProfileSecurityForms({
 								/>
 							</span>
 							{confirmPasswordError ? (
-								<p
-									className="text-xs font-medium leading-5 text-error-red"
-									data-testid={`${profileKind}-profile-confirm-password-error`}
+								<FieldError
 									id={`${profileKind}-profile-confirm-password-error`}
+									testId={`${profileKind}-profile-confirm-password-error`}
 								>
 									{confirmPasswordError}
-								</p>
+								</FieldError>
 							) : null}
 						</div>
 

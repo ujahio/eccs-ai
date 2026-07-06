@@ -4,7 +4,12 @@ import { useActionState, useState } from "react";
 import { ArrowRightIcon } from "@/components/ui/arrow-right-icon";
 import { Button } from "@/components/ui/button";
 import {
+	useNotifications,
+	useSuccessNotification,
+} from "@/components/ui/notifications";
+import {
 	AuthStatusMessage,
+	FieldError,
 	PasswordVisibilityToggle,
 	authPasswordInputClasses,
 	fieldError,
@@ -69,22 +74,25 @@ function PasswordRequirements({
 }
 
 function StatusMessage({ state }: { state: RegistrationFormState }) {
-	if (!state.message) {
-		return null;
-	}
-
 	const isSuccess = state.status === "success";
 	const isNotice = state.status === "notice";
-	const tone: StatusTone = isSuccess
-		? "success"
-		: isNotice
-			? "warning"
-			: "error";
 	const testId = isSuccess
 		? "register-success-message"
 		: isNotice
 			? "register-resend-notice"
 			: "register-error-message";
+	useSuccessNotification({
+		enabled: isSuccess,
+		message: state.message,
+		testId,
+		dedupeKey: "registration-status",
+	});
+
+	if (!state.message || isSuccess) {
+		return null;
+	}
+
+	const tone: StatusTone = isNotice ? "warning" : "error";
 
 	return (
 		<AuthStatusMessage
@@ -146,13 +154,12 @@ function PasswordField({
 				showFailed={showFailedPasswordRequirements}
 			/>
 			{passwordError ? (
-				<p
-					className="text-xs font-medium leading-5 text-error-red"
-					data-testid="register-password-error"
+				<FieldError
 					id="register-password-error"
+					testId="register-password-error"
 				>
 					{passwordError}
-				</p>
+				</FieldError>
 			) : null}
 		</div>
 	);
@@ -166,6 +173,7 @@ export function RegistrationForm({
 		action,
 		initialState ?? initialRegistrationFormState,
 	);
+	const { dismissByKey } = useNotifications();
 	const firstNameError = fieldError(state, "firstName");
 	const lastNameError = fieldError(state, "lastName");
 	const emailError = fieldError(state, "email");
@@ -173,8 +181,17 @@ export function RegistrationForm({
 	const passwordFieldKey =
 		state.status === "success" ? `success-${state.message}` : "editing";
 
+	function submitAndClearStatus(formData: FormData) {
+		dismissByKey("registration-status");
+		formAction(formData);
+	}
+
 	return (
-		<form action={formAction} className="mt-7" data-testid="register-form">
+		<form
+			action={submitAndClearStatus}
+			className="mt-7"
+			data-testid="register-form"
+		>
 			<div className="grid gap-5">
 				<div className="grid items-start gap-5 sm:grid-cols-2">
 					<div className="grid gap-2">
@@ -199,13 +216,12 @@ export function RegistrationForm({
 							type="text"
 						/>
 						{firstNameError ? (
-							<p
-								className="text-xs font-medium leading-5 text-error-red"
-								data-testid="register-first-name-error"
+							<FieldError
 								id="register-first-name-error"
+								testId="register-first-name-error"
 							>
 								{firstNameError}
-							</p>
+							</FieldError>
 						) : null}
 					</div>
 
@@ -231,13 +247,12 @@ export function RegistrationForm({
 							type="text"
 						/>
 						{lastNameError ? (
-							<p
-								className="text-xs font-medium leading-5 text-error-red"
-								data-testid="register-last-name-error"
+							<FieldError
 								id="register-last-name-error"
+								testId="register-last-name-error"
 							>
 								{lastNameError}
-							</p>
+							</FieldError>
 						) : null}
 					</div>
 				</div>
@@ -263,13 +278,12 @@ export function RegistrationForm({
 						type="email"
 					/>
 					{emailError ? (
-						<p
-							className="text-xs font-medium leading-5 text-error-red"
-							data-testid="register-email-error"
+						<FieldError
 							id="register-email-error"
+							testId="register-email-error"
 						>
 							{emailError}
-						</p>
+						</FieldError>
 					) : null}
 				</div>
 

@@ -3,7 +3,10 @@
 import { useActionState, useState } from "react";
 import { ArrowRightIcon } from "@/components/ui/arrow-right-icon";
 import { Button } from "@/components/ui/button";
+import { InlineMessage } from "@/components/ui/inline-message";
+import { useNotifications } from "@/components/ui/notifications";
 import {
+	FieldError,
 	PasswordVisibilityToggle,
 	authPasswordInputClasses,
 	fieldError,
@@ -32,6 +35,7 @@ export function PasswordResetConfirmForm({
 		action,
 		initialPasswordResetConfirmFormState(code)
 	);
+	const { dismissByKey } = useNotifications();
 	const [showPassword, setShowPassword] = useState(false);
 	const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 	const emailError = fieldError(state, "email");
@@ -39,8 +43,17 @@ export function PasswordResetConfirmForm({
 	const passwordError = fieldError(state, "password");
 	const confirmPasswordError = fieldError(state, "confirmPassword");
 
+	function submitAndClearStatus(formData: FormData) {
+		dismissByKey("reset-password-status");
+		formAction(formData);
+	}
+
 	return (
-		<form action={formAction} className="mt-7" data-testid="reset-password-form">
+		<form
+			action={submitAndClearStatus}
+			className="mt-7"
+			data-testid="reset-password-form"
+		>
 			<input
 				data-testid="reset-password-code"
 				name="code"
@@ -71,23 +84,23 @@ export function PasswordResetConfirmForm({
 						type="email"
 					/>
 					{emailError ? (
-						<p
-							className="text-xs font-medium leading-5 text-error-red"
-							data-testid="reset-password-email-error"
+						<FieldError
 							id="reset-password-email-error"
+							testId="reset-password-email-error"
 						>
 							{emailError}
-						</p>
+						</FieldError>
 					) : null}
 				</div>
 
 				{codeError ? (
-					<p
-						className="border border-error-red bg-white px-4 py-3 text-sm leading-6 text-error-red"
-						data-testid="reset-password-code-error"
+					<InlineMessage
+						role="alert"
+						testId="reset-password-code-error"
+						tone="error"
 					>
 						{codeError}
-					</p>
+					</InlineMessage>
 				) : null}
 
 				<div className="grid gap-2">
@@ -118,13 +131,12 @@ export function PasswordResetConfirmForm({
 						/>
 					</span>
 					{passwordError ? (
-						<p
-							className="text-xs font-medium leading-5 text-error-red"
-							data-testid="reset-password-new-password-error"
+						<FieldError
 							id="reset-password-new-password-error"
+							testId="reset-password-new-password-error"
 						>
 							{passwordError}
-						</p>
+						</FieldError>
 					) : null}
 				</div>
 
@@ -162,13 +174,12 @@ export function PasswordResetConfirmForm({
 						/>
 					</span>
 					{confirmPasswordError ? (
-						<p
-							className="text-xs font-medium leading-5 text-error-red"
-							data-testid="reset-password-confirm-password-error"
+						<FieldError
 							id="reset-password-confirm-password-error"
+							testId="reset-password-confirm-password-error"
 						>
 							{confirmPasswordError}
-						</p>
+						</FieldError>
 					) : null}
 				</div>
 			</div>

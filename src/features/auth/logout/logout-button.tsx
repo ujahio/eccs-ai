@@ -3,15 +3,16 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useNotifications } from "@/components/ui/notifications";
 
 export function LogoutButton() {
 	const router = useRouter();
+	const { dismissByKey, notify } = useNotifications();
 	const [isPending, setIsPending] = useState(false);
-	const [error, setError] = useState("");
 
 	async function handleLogout() {
 		setIsPending(true);
-		setError("");
+		dismissByKey("student-standalone-logout");
 
 		try {
 			const response = await fetch("/api/auth/sign-out", {
@@ -31,22 +32,18 @@ export function LogoutButton() {
 			router.replace("/login");
 			router.refresh();
 		} catch {
-			setError("We could not sign you out. Please try again.");
+			notify({
+				tone: "error",
+				message: "We could not sign you out. Please try again.",
+				testId: "student-logout-error",
+				dedupeKey: "student-standalone-logout",
+			});
 			setIsPending(false);
 		}
 	}
 
 	return (
 		<div className="flex items-center gap-3">
-			{error ? (
-				<p
-					className="hidden text-xs font-medium text-error-red sm:block"
-					data-testid="student-logout-error"
-					role="alert"
-				>
-					{error}
-				</p>
-			) : null}
 			<Button
 				data-testid="student-logout-button"
 				disabled={isPending}
