@@ -33,7 +33,7 @@ export TEACHER_TEMP_PASSWORD
 Dry run:
 
 ```bash
-bunx sst shell --stage localdev -- bun scripts/bootstrap-teacher.ts \
+bunx sst shell --stage ailocal -- bun scripts/bootstrap-teacher.ts \
   --email teacher@example.com \
   --first-name Taylor \
   --last-name Smith
@@ -42,7 +42,7 @@ bunx sst shell --stage localdev -- bun scripts/bootstrap-teacher.ts \
 Apply for a new teacher user:
 
 ```bash
-bunx sst shell --stage localdev -- bun scripts/bootstrap-teacher.ts \
+bunx sst shell --stage ailocal -- bun scripts/bootstrap-teacher.ts \
   --email teacher@example.com \
   --first-name Taylor \
   --last-name Smith \
@@ -52,7 +52,7 @@ bunx sst shell --stage localdev -- bun scripts/bootstrap-teacher.ts \
 Apply and force a fresh temporary password for an existing complete teacher identity:
 
 ```bash
-bunx sst shell --stage localdev -- bun scripts/bootstrap-teacher.ts \
+bunx sst shell --stage ailocal -- bun scripts/bootstrap-teacher.ts \
   --email teacher@example.com \
   --first-name Taylor \
   --last-name Smith \
@@ -63,7 +63,7 @@ bunx sst shell --stage localdev -- bun scripts/bootstrap-teacher.ts \
 Optional password variable override:
 
 ```bash
-bunx sst shell --stage localdev -- bun scripts/bootstrap-teacher.ts \
+bunx sst shell --stage ailocal -- bun scripts/bootstrap-teacher.ts \
   --email teacher@example.com \
   --first-name Taylor \
   --last-name Smith \
@@ -218,14 +218,14 @@ Expected profile fields:
 - For a single-account rollback, use the teacher cleanup script in dry-run mode first:
 
 ```bash
-bunx sst shell --stage localdev -- bun scripts/cleanup-teacher.ts \
+bunx sst shell --stage ailocal -- bun scripts/cleanup-teacher.ts \
   --email teacher@example.com
 ```
 
 - Apply the rollback only after reviewing the plan:
 
 ```bash
-bunx sst shell --stage localdev -- bun scripts/cleanup-teacher.ts \
+bunx sst shell --stage ailocal -- bun scripts/cleanup-teacher.ts \
   --email teacher@example.com \
   --apply
 ```
@@ -241,5 +241,5 @@ bunx sst shell --stage localdev -- bun scripts/cleanup-teacher.ts \
   - refuses non-teacher profile records and Cognito users that are already in the `student` group
   - leaves the shared Cognito `teacher` group intact
 - Use single-account rollback when only the bootstrapped teacher identity was wrong.
-- Use full stage teardown when the entire `localdev` environment should be discarded and recreated; that is broader than this script and will remove more than the teacher account.
+- Use full stage teardown when the entire `ailocal` environment should be discarded and recreated; that is broader than this script and will remove more than the teacher account.
 - This is a one-time operational bootstrap. Re-running the bootstrap for the same teacher remains safe for reconciliation after cleanup.

@@ -106,10 +106,7 @@ export async function main(argv = process.argv.slice(2)) {
 
 	const context = createBootstrapContext();
 
-	const existingUser = await getCognitoUser(
-		context,
-		desired.emailNormalized,
-	);
+	const existingUser = await getCognitoUser(context, desired.emailNormalized);
 	const existingProfilesForEmail = await getProfilesByEmail(
 		context,
 		desired.emailNormalized,
@@ -117,8 +114,9 @@ export async function main(argv = process.argv.slice(2)) {
 	const duplicateProfilesForEmail = existingProfilesForEmail.filter(
 		(profile) => profile.emailNormalized === desired.emailNormalized,
 	);
-	const existingProfile =
-		existingUser?.sub ? await getProfileById(context, existingUser.sub) : null;
+	const existingProfile = existingUser?.sub
+		? await getProfileById(context, existingUser.sub)
+		: null;
 	const teacherProfiles = await getTeacherProfiles(context);
 	const teacherUsers = await listTeacherUsers(context);
 	const mismatchedEmailProfiles = existingUser
@@ -304,7 +302,8 @@ export function getSingleTeacherIdentityBlocker(args: {
 }) {
 	const desiredEmailNormalized = normalizeEmail(args.desiredEmailNormalized);
 	const conflictingProfiles = args.teacherProfiles.filter(
-		(profile) => normalizeEmail(profile.emailNormalized) !== desiredEmailNormalized,
+		(profile) =>
+			normalizeEmail(profile.emailNormalized) !== desiredEmailNormalized,
 	);
 	const conflictingUsers = args.teacherUsers.filter(
 		(user) => getUserEmailNormalized(user) !== desiredEmailNormalized,
@@ -384,7 +383,9 @@ export function getExistingTeacherReconciliationBlocker(args: {
 	const missingEvidence: string[] = [];
 
 	if (!hasTeacherGroup) {
-		missingEvidence.push(`- Cognito user is not in the ${TEACHER_GROUP} group.`);
+		missingEvidence.push(
+			`- Cognito user is not in the ${TEACHER_GROUP} group.`,
+		);
 	}
 
 	if (!args.existingProfile) {
@@ -450,9 +451,7 @@ function buildPlan(args: {
 				`Reset a temporary password from $${args.passwordEnv} and put the user back into Cognito's first-login password-change flow.`,
 			);
 		} else if (isFirstLoginPasswordChangeRequired(existingUser)) {
-			actions.push(
-				"Leave the existing temporary password challenge in place.",
-			);
+			actions.push("Leave the existing temporary password challenge in place.");
 		} else {
 			actions.push("Leave the existing password unchanged.");
 		}
@@ -510,7 +509,9 @@ function buildProfileRecord(args: {
 	};
 }
 
-function desiredUserAttributes(desiredState: DesiredTeacherState): AttributeType[] {
+function desiredUserAttributes(
+	desiredState: DesiredTeacherState,
+): AttributeType[] {
 	return [
 		{ Name: "email", Value: desiredState.emailNormalized },
 		{ Name: "email_verified", Value: "true" },
@@ -601,10 +602,7 @@ async function requireCognitoUser(
 	return user;
 }
 
-function mapCognitoUser(
-	user: AdminGetUserCommandOutput,
-	groups: string[],
-) {
+function mapCognitoUser(user: AdminGetUserCommandOutput, groups: string[]) {
 	const attributes = listToRecord(user.UserAttributes ?? []);
 	const sub = attributes.sub;
 
@@ -627,7 +625,9 @@ function mapCognitoGroupUser(user: UserType): CognitoUserState {
 	const sub = attributes.sub;
 
 	if (!sub) {
-		throw new Error("Cognito teacher group user is missing the required sub attribute.");
+		throw new Error(
+			"Cognito teacher group user is missing the required sub attribute.",
+		);
 	}
 
 	return {
@@ -640,10 +640,7 @@ function mapCognitoGroupUser(user: UserType): CognitoUserState {
 	};
 }
 
-async function getProfileById(
-	context: BootstrapContext,
-	profileId: string,
-) {
+async function getProfileById(context: BootstrapContext, profileId: string) {
 	const response = await context.dynamo.send(
 		new GetCommand({
 			TableName: context.userProfileTableName,
@@ -700,10 +697,7 @@ async function getTeacherProfiles(context: BootstrapContext) {
 	return profiles;
 }
 
-async function listUserGroups(
-	context: BootstrapContext,
-	username: string,
-) {
+async function listUserGroups(context: BootstrapContext, username: string) {
 	const response = await context.cognito.send(
 		new AdminListGroupsForUserCommand({
 			UserPoolId: context.userPoolId,
@@ -711,7 +705,9 @@ async function listUserGroups(
 		}),
 	);
 
-	return response.Groups?.map((group) => group.GroupName ?? "").filter(Boolean) ?? [];
+	return (
+		response.Groups?.map((group) => group.GroupName ?? "").filter(Boolean) ?? []
+	);
 }
 
 async function listTeacherUsers(context: BootstrapContext) {
@@ -831,7 +827,7 @@ function printHelp() {
 	console.log(`One-time teacher bootstrap script
 
 Usage:
-  bunx sst shell --stage localdev -- bun scripts/bootstrap-teacher.ts \\
+  bunx sst shell --stage ailocal -- bun scripts/bootstrap-teacher.ts \\
     --email teacher@example.com \\
     --first-name Taylor \\
     --last-name Smith

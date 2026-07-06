@@ -117,6 +117,6 @@ private implementation details of the component file.
 Scripts that interact with resources created by SST must be TypeScript files
 under `scripts/` and read linked resource names or IDs from `Resource` imported
 from `sst`. Run those scripts through `sst shell`, for example
-`bunx sst shell --stage localdev -- bun scripts/example.ts`, so linked resources
+`bunx sst shell --stage ailocal -- bun scripts/example.ts`, so linked resources
 are available to the process. Do not duplicate SST resource names in standalone
 environment variables.

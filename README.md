@@ -6,7 +6,7 @@ The product UI source of truth is [DESIGN.md](./DESIGN.md). Implementation work 
 
 ## Local Stage
 
-Use `localdev` as the local SST stage name.
+Use `ailocal` as the local SST stage name.
 
 Run the Next.js app through SST dev so local resource links and environment
 bindings come from SST:
@@ -35,7 +35,7 @@ bun run test:e2e
 bun run build
 ```
 
-The dev script runs `sst dev --stage localdev` and starts Next.js as the child app
+The dev script runs `sst dev --stage ailocal` and starts Next.js as the child app
 on `http://localhost:3001`.
 Do not run `next dev` by itself for normal local development.
 
@@ -47,7 +47,7 @@ Before running SST locally:
 
 1. Confirm AWS OIDC authentication is configured for the app environment.
 2. Bootstrap or initialize SST only through SST's supported workflow.
-3. Run local infrastructure commands with `--stage localdev`.
+3. Run local infrastructure commands with `--stage ailocal`.
 4. Configure Resend API credentials and sender/domain verification for stages that send real email.
 5. Use `bun run test:e2e:local` for isolated local auth flows backed by the in-memory e2e harness.
 

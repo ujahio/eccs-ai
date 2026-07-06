@@ -69,7 +69,9 @@ const cognitoUser = await getCognitoUser(emailNormalized);
 const profileBySub = cognitoUser ? await getProfileById(cognitoUser.sub) : null;
 const profilesByEmail = await getProfilesByEmail(emailNormalized);
 const fallbackProfileCandidates = profileBySub
-	? profilesByEmail.filter((profile) => profile.profileId !== profileBySub.profileId)
+	? profilesByEmail.filter(
+			(profile) => profile.profileId !== profileBySub.profileId,
+		)
 	: profilesByEmail;
 
 if (profileBySub && fallbackProfileCandidates.length > 0) {
@@ -125,7 +127,11 @@ if (targetProfile && targetProfile.role !== TEACHER_GROUP) {
 	);
 }
 
-if (cognitoUser && !cognitoUser.groups.includes(TEACHER_GROUP) && !targetProfile) {
+if (
+	cognitoUser &&
+	!cognitoUser.groups.includes(TEACHER_GROUP) &&
+	!targetProfile
+) {
 	fail(
 		`Refusing to delete ${emailNormalized} because no teacher Cognito group or teacher app profile was found for this account.`,
 	);
@@ -159,7 +165,9 @@ if (cognitoUser) {
 	);
 	console.log(`Deleted Cognito user ${cognitoUser.username}.`);
 } else {
-	console.log(`No Cognito user found for ${emailNormalized}; skipping Cognito deletion.`);
+	console.log(
+		`No Cognito user found for ${emailNormalized}; skipping Cognito deletion.`,
+	);
 }
 
 if (targetProfile) {
@@ -173,7 +181,9 @@ if (targetProfile) {
 		`Deleted UserProfileTable record ${targetProfile.profileId} (${profileLookupPath}).`,
 	);
 } else {
-	console.log(`No UserProfileTable record found for ${emailNormalized}; skipping DynamoDB deletion.`);
+	console.log(
+		`No UserProfileTable record found for ${emailNormalized}; skipping DynamoDB deletion.`,
+	);
 }
 
 console.log(
@@ -181,7 +191,7 @@ console.log(
 		"",
 		"Teacher cleanup complete.",
 		`Cognito group ${TEACHER_GROUP} was not modified.`,
-		"Use full stage teardown when you want to discard the entire localdev environment; use this script only for a single-account rollback.",
+		"Use full stage teardown when you want to discard the entire ailocal environment; use this script only for a single-account rollback.",
 	].join("\n"),
 );
 
@@ -220,9 +230,7 @@ function printPlan(args: {
 	}
 }
 
-async function getCognitoUser(
-	email: string,
-): Promise<CognitoUserState | null> {
+async function getCognitoUser(email: string): Promise<CognitoUserState | null> {
 	try {
 		const response = await cognito.send(
 			new AdminGetUserCommand({
@@ -247,10 +255,7 @@ async function getCognitoUser(
 	}
 }
 
-function mapCognitoUser(
-	user: AdminGetUserCommandOutput,
-	groups: string[],
-) {
+function mapCognitoUser(user: AdminGetUserCommandOutput, groups: string[]) {
 	const attributes = listToRecord(user.UserAttributes ?? []);
 	const sub = attributes.sub;
 
@@ -276,7 +281,9 @@ async function listUserGroups(username: string) {
 		}),
 	);
 
-	return response.Groups?.map((group) => group.GroupName ?? "").filter(Boolean) ?? [];
+	return (
+		response.Groups?.map((group) => group.GroupName ?? "").filter(Boolean) ?? []
+	);
 }
 
 async function getProfileById(profileId: string) {
@@ -357,7 +364,7 @@ function printHelp() {
 	console.log(`Teacher bootstrap cleanup script
 
 Usage:
-  bunx sst shell --stage localdev -- bun scripts/cleanup-teacher.ts \\
+  bunx sst shell --stage ailocal -- bun scripts/cleanup-teacher.ts \\
     --email teacher@example.com
 
 Options:
