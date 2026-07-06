@@ -2,11 +2,20 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useEffect, useState } from "react";
+import {
+	type FormEvent,
+	useState,
+	useSyncExternalStore,
+} from "react";
 import { ArrowRightIcon } from "@/components/ui/arrow-right-icon";
 import { Button } from "@/components/ui/button";
 import {
+	useNotifications,
+	useSuccessNotification,
+} from "@/components/ui/notifications";
+import {
 	AuthStatusMessage,
+	FieldError,
 	PasswordVisibilityToggle,
 	authPasswordInputClasses,
 	fieldError,
@@ -36,23 +45,47 @@ const initialCompleteNewPasswordState: CompleteNewPasswordState = {
 	errors: {},
 };
 
-function StatusMessage({ state }: { state: LoginFormState }) {
-	if (!state.message) {
-		return null;
-	}
+function subscribeToHydrationStore() {
+	return () => {};
+}
 
+function getHydratedClientSnapshot() {
+	return true;
+}
+
+function getServerHydrationSnapshot() {
+	return false;
+}
+
+function useHydratedClientFlag() {
+	return useSyncExternalStore(
+		subscribeToHydrationStore,
+		getHydratedClientSnapshot,
+		getServerHydrationSnapshot,
+	);
+}
+
+function StatusMessage({ state }: { state: LoginFormState }) {
 	const isBlocked = state.status === "blocked";
 	const isSuccess = state.status === "success";
-	const tone: StatusTone = isSuccess
-		? "success"
-		: isBlocked
-			? "warning"
-			: "error";
 	const testId = isSuccess
 		? "login-success-message"
 		: isBlocked
 			? "login-blocked-message"
 			: "login-error-message";
+	useSuccessNotification({
+		enabled: isSuccess,
+		message: state.message,
+		testId,
+		dedupeKey: "login-status",
+		trigger: state,
+	});
+
+	if (!state.message || isSuccess) {
+		return null;
+	}
+
+	const tone: StatusTone = isBlocked ? "warning" : "error";
 
 	return (
 		<AuthStatusMessage
@@ -93,7 +126,8 @@ function CompletePasswordStatusMessage({
 
 export function LoginForm({ initialState }: LoginFormProps) {
 	const router = useRouter();
-	const [isClientReady, setIsClientReady] = useState(false);
+	const { dismissByKey } = useNotifications();
+	const isClientReady = useHydratedClientFlag();
 	const [showPassword, setShowPassword] = useState(false);
 	const [showNewPassword, setShowNewPassword] = useState(false);
 	const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -115,12 +149,9 @@ export function LoginForm({ initialState }: LoginFormProps) {
 		"confirmPassword",
 	);
 
-	useEffect(() => {
-		setIsClientReady(true);
-	}, []);
-
 	async function handleSubmit(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault();
+		dismissByKey("login-status");
 		setIsPending(true);
 
 		const formData = new FormData(event.currentTarget);
@@ -266,13 +297,12 @@ export function LoginForm({ initialState }: LoginFormProps) {
 							/>
 						</span>
 						{newPasswordError ? (
-							<p
-								className="text-xs font-medium leading-5 text-error-red"
-								data-testid="teacher-first-login-new-password-error"
+							<FieldError
 								id="teacher-first-login-new-password-error"
+								testId="teacher-first-login-new-password-error"
 							>
 								{newPasswordError}
-							</p>
+							</FieldError>
 						) : null}
 					</div>
 
@@ -308,13 +338,12 @@ export function LoginForm({ initialState }: LoginFormProps) {
 							/>
 						</span>
 						{confirmPasswordError ? (
-							<p
-								className="text-xs font-medium leading-5 text-error-red"
-								data-testid="teacher-first-login-confirm-password-error"
+							<FieldError
 								id="teacher-first-login-confirm-password-error"
+								testId="teacher-first-login-confirm-password-error"
 							>
 								{confirmPasswordError}
-							</p>
+							</FieldError>
 						) : null}
 					</div>
 				</div>
@@ -379,13 +408,12 @@ export function LoginForm({ initialState }: LoginFormProps) {
 						type="email"
 					/>
 					{emailError ? (
-						<p
-							className="text-xs font-medium leading-5 text-error-red"
-							data-testid="login-email-error"
+						<FieldError
 							id="login-email-error"
+							testId="login-email-error"
 						>
 							{emailError}
-						</p>
+						</FieldError>
 					) : null}
 				</div>
 
@@ -419,13 +447,12 @@ export function LoginForm({ initialState }: LoginFormProps) {
 						/>
 					</span>
 					{passwordError ? (
-						<p
-							className="text-xs font-medium leading-5 text-error-red"
-							data-testid="login-password-error"
+						<FieldError
 							id="login-password-error"
+							testId="login-password-error"
 						>
 							{passwordError}
-						</p>
+						</FieldError>
 					) : null}
 				</div>
 			</div>
