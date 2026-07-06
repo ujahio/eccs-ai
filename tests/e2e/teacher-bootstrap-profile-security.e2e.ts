@@ -146,12 +146,24 @@ test.describe("Teacher bootstrap and profile security", () => {
 			"We sent a verification link to your new email address.",
 		);
 
+		const emailSessionContext = await browser.newContext();
+		const emailSessionPage = await emailSessionContext.newPage();
+		await login(emailSessionPage, email, permanentPassword);
+		await expect(emailSessionPage).toHaveURL(/\/teacher$/);
+
 		const emailChangeUrl = await fetchEmailChangeVerificationUrl(
 			request,
 			newEmail,
 		);
 		await page.goto(emailChangeUrl);
-		await expect(page).toHaveURL(/\/login\?emailChange=verified$/);
+		await expect(page).toHaveURL(/\/teacher\/profile\?email=verified$/);
+		await expect(page.getByTestId("teacher-email-verified-message")).toHaveText(
+			"Your email address has been updated.",
+		);
+
+		await emailSessionPage.goto("/teacher");
+		await expect(emailSessionPage).toHaveURL(/\/login$/);
+		await emailSessionContext.close();
 
 		await login(page, email, permanentPassword);
 		await expect(page.getByTestId("login-error-message")).toHaveText(

@@ -45,11 +45,11 @@ import {
 	type CognitoGroupName
 } from "@/lib/auth/cognito-groups";
 import {
-	StudentEmailUnavailableError,
-	type StudentProfileEmailSender,
-	type StudentProfileIdentityProvider,
-	type StudentProfileRepository
-} from "@/features/student/profile-security/service";
+	ProfileSecurityEmailUnavailableError,
+	type ProfileSecurityEmailSender,
+	type ProfileSecurityIdentityProvider,
+	type ProfileSecurityRepository
+} from "@/features/profile-security/service";
 
 export type E2EEmailRecord =
 	| {
@@ -73,7 +73,7 @@ export type E2EEmailRecord =
 			sentAt: number;
 	  }
 	| {
-			type: "student_email_change_verification";
+			type: "email_change_verification";
 			to: string;
 			verificationUrl: string;
 			expiresInHours: number;
@@ -146,7 +146,7 @@ export class InMemoryIdentityProvider
 		RegistrationIdentityProvider,
 		LoginIdentityProvider,
 		PasswordResetIdentityProvider,
-		StudentProfileIdentityProvider
+		ProfileSecurityIdentityProvider
 {
 	async createPendingStudent(
 		input: CreatePendingStudentInput
@@ -350,7 +350,7 @@ export class InMemoryIdentityProvider
 		}
 
 		if (store.users.has(args.newEmailNormalized)) {
-			throw new StudentEmailUnavailableError();
+			throw new ProfileSecurityEmailUnavailableError();
 		}
 
 		store.users.delete(args.currentEmailNormalized);
@@ -399,7 +399,7 @@ export class InMemoryRegistrationRepository
 		RegistrationWorkflowRepository,
 		LoginProfileRepository,
 		PasswordResetProfileRepository,
-		StudentProfileRepository,
+		ProfileSecurityRepository,
 		AppSessionInvalidator
 {
 	async getPendingByEmail(emailNormalized: string) {
@@ -740,7 +740,7 @@ export class InMemoryEmailSender
 	implements
 		RegistrationEmailSender,
 		PasswordResetEmailSender,
-		StudentProfileEmailSender
+		ProfileSecurityEmailSender
 {
 	async sendRegistrationVerificationEmail(email: {
 		to: string;
@@ -803,7 +803,7 @@ export class InMemoryEmailSender
 		expiresInHours: number;
 	}) {
 		const record = {
-			type: "student_email_change_verification" as const,
+			type: "email_change_verification" as const,
 			...email,
 			sentAt: Date.now()
 		};
@@ -835,7 +835,7 @@ export class InMemoryEmailSender
 			.reverse()
 			.find(
 				(e) =>
-					e.type === "student_email_change_verification" &&
+					e.type === "email_change_verification" &&
 					e.to === emailNormalized
 			);
 

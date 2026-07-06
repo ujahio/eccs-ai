@@ -2,7 +2,7 @@ import {
 	submitTeacherPasswordChangeForm,
 	submitTeacherPersonalDetailsForm,
 } from "@/features/teacher/profile-security/actions";
-import { ProfileSecurityForms } from "@/features/student/profile-security/profile-security-forms";
+import { ProfileSecurityForms } from "@/features/profile-security/profile-security-forms";
 import { requireTeacherSession } from "@/lib/auth/session";
 
 type TeacherProfilePageProps = {

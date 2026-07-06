@@ -11,12 +11,12 @@ import {
 	type StatusTone,
 } from "@/features/auth/form-helpers";
 import type {
-	StudentPasswordChangeFormState,
-	StudentPersonalDetailsFormState,
+	ProfileSecurityPasswordChangeFormState,
+	ProfileSecurityPersonalDetailsFormState,
 } from "./state";
 import {
-	initialStudentPasswordChangeFormState,
-	initialStudentPersonalDetailsFormState,
+	initialProfileSecurityPasswordChangeFormState,
+	initialProfileSecurityPersonalDetailsFormState,
 } from "./state";
 
 type ProfileSecurityFormsProps = {
@@ -26,13 +26,13 @@ type ProfileSecurityFormsProps = {
 	pendingEmail?: string;
 	profileKind?: "student" | "teacher";
 	personalDetailsAction: (
-		previousState: StudentPersonalDetailsFormState,
+		previousState: ProfileSecurityPersonalDetailsFormState,
 		formData: FormData,
-	) => Promise<StudentPersonalDetailsFormState>;
+	) => Promise<ProfileSecurityPersonalDetailsFormState>;
 	passwordAction: (
-		previousState: StudentPasswordChangeFormState,
+		previousState: ProfileSecurityPasswordChangeFormState,
 		formData: FormData,
-	) => Promise<StudentPasswordChangeFormState>;
+	) => Promise<ProfileSecurityPasswordChangeFormState>;
 };
 
 type StatusState = {
@@ -41,11 +41,11 @@ type StatusState = {
 };
 
 type TabId = "personal" | "password";
-type DetailsValues = StudentPersonalDetailsFormState["values"];
-type PasswordValues = StudentPasswordChangeFormState["values"];
+type DetailsValues = ProfileSecurityPersonalDetailsFormState["values"];
+type PasswordValues = ProfileSecurityPasswordChangeFormState["values"];
 
 const tabButtonBase =
-	"flex min-h-11 min-w-0 flex-1 items-center justify-center border-b px-2 text-center text-[11px] font-semibold uppercase transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal sm:min-h-0 sm:flex-none sm:justify-start sm:px-0 sm:pb-3";
+	"flex min-h-11 min-w-0 flex-1 items-center justify-center border-b px-2 text-center text-xs font-semibold uppercase transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal sm:min-h-0 sm:flex-none sm:justify-start sm:px-0 sm:pb-3";
 
 function StatusMessage({
 	state,
@@ -138,7 +138,7 @@ export function ProfileSecurityForms({
 	const [activeTab, setActiveTab] = useState<TabId>("personal");
 	const [detailsState, submitDetails, isDetailsPending] = useActionState(
 		personalDetailsAction,
-		initialStudentPersonalDetailsFormState({
+		initialProfileSecurityPersonalDetailsFormState({
 			firstName,
 			lastName,
 			email: currentEmail,
@@ -151,7 +151,7 @@ export function ProfileSecurityForms({
 	}));
 	const [passwordState, submitPassword, isPasswordPending] = useActionState(
 		passwordAction,
-		initialStudentPasswordChangeFormState,
+		initialProfileSecurityPasswordChangeFormState,
 	);
 	const [passwordValues, setPasswordValues] = useState<PasswordValues>({
 		currentPassword: "",

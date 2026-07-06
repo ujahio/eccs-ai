@@ -7,8 +7,9 @@ Use this runbook to bootstrap the single v1 teacher account in the local SST sta
 - The script defaults to a dry run. Nothing is written to AWS until you add `--apply`.
 - Do not pass the temporary password as a CLI argument. Use a local-only environment variable so the secret is not written into shell history or echoed in logs.
 - The script refuses to continue if `UserProfileTable` already contains a conflicting profile record for the teacher email.
+- The script refuses to continue if Cognito or `UserProfileTable` already has a teacher identity for a different email. V1 supports exactly one teacher account/persona.
 - The bootstrap and cleanup scripts refuse to mutate an existing student account or a non-teacher app profile.
-- For an existing Cognito user, the password is left unchanged unless you explicitly add `--reset-temporary-password`.
+- Existing Cognito users are never promoted into teacher access. The script only creates a brand-new teacher account or reconciles an existing complete teacher identity.
 - Run this only through SST shell so `Resource.AuthUserPool.id` and `Resource.UserProfileTable.name` resolve correctly.
 
 ## Required Inputs
@@ -18,7 +19,7 @@ Use this runbook to bootstrap the single v1 teacher account in the local SST sta
 - Teacher last name
 - Temporary password in a local environment variable when you are:
   - creating a brand-new teacher user, or
-  - resetting the temporary password for an existing teacher user
+  - resetting the temporary password for an existing complete teacher identity
 
 Suggested local-only password entry:
 
@@ -48,7 +49,7 @@ bunx sst shell --stage localdev -- bun scripts/bootstrap-teacher.ts \
   --apply
 ```
 
-Apply and force a fresh temporary password for an existing teacher user:
+Apply and force a fresh temporary password for an existing complete teacher identity:
 
 ```bash
 bunx sst shell --stage localdev -- bun scripts/bootstrap-teacher.ts \
@@ -84,6 +85,8 @@ Dry run should:
 - list whether it would create or reconcile Cognito attributes
 - show whether it would add the `teacher` group
 - show whether it would create or update the DynamoDB teacher profile
+- refuse a different teacher email when a teacher identity already exists in Cognito or `UserProfileTable`
+- refuse to promote any existing Cognito user that is not already a complete teacher identity
 - remind you that `--apply` is required for writes
 
 Apply mode should:
@@ -95,7 +98,8 @@ Apply mode should:
   - `name`
 - add the user to the Cognito `teacher` group
 - create or update the `UserProfileTable` record with role `teacher`
-- leave an existing password alone unless `--reset-temporary-password` is supplied
+- leave a password unchanged only when reconciling the already-complete teacher identity or when Cognito is already in `FORCE_CHANGE_PASSWORD`
+- reset a temporary password for an existing complete teacher identity when `--reset-temporary-password` is supplied, causing the next sign-in to require `NEW_PASSWORD_REQUIRED`
 
 ## Expected First-Login Behavior
 
@@ -107,7 +111,7 @@ When a temporary password was set by the script:
 4. After setting the permanent password, sign in again if needed.
 5. Confirm the teacher can reach `/teacher`.
 
-When the script only reconciled an existing teacher user without resetting the password:
+When the script only reconciled the already-complete teacher identity without resetting the password:
 
 - Sign in with the existing permanent password.
 - Confirm `/teacher` is available and the teacher session works normally.
@@ -159,7 +163,29 @@ Expected:
 - The next sign-in requires a password change again.
 - The password value is not echoed by the script.
 
-### Check 5: Verify Cognito Attributes And Group
+### Check 5: Refuse A Second Teacher Email
+
+1. Bootstrap or identify an existing teacher identity for `teacher@example.com`.
+2. Run the dry-run or apply command with a different email, such as `second-teacher@example.com`.
+
+Expected:
+
+- The script refuses to continue.
+- The error states that v1 supports exactly one teacher account/persona.
+- No Cognito or DynamoDB writes are made.
+
+### Check 6: Refuse Existing User Promotion
+
+1. Identify an existing Cognito user that is not already the complete teacher identity.
+2. Run the dry-run or apply command for that email, with and without `--reset-temporary-password`.
+
+Expected:
+
+- The script refuses to continue.
+- The error explains that bootstrap only creates a brand-new teacher account or reconciles an existing teacher account.
+- `--reset-temporary-password` does not convert that existing user into a teacher.
+
+### Check 7: Verify Cognito Attributes And Group
 
 1. Sign in as the teacher after bootstrap.
 2. Open the teacher-facing area.
@@ -171,7 +197,7 @@ Expected:
 - The teacher reaches `/teacher`.
 - The teacher account behaves as a verified teacher account.
 
-### Check 6: Verify DynamoDB Profile
+### Check 8: Verify DynamoDB Profile
 
 Use the AWS console or a local read-only inspection script to confirm the `UserProfileTable` row for the Cognito `sub`.
 

@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
-	parseStudentEmailChangeInput,
-	parseStudentNameInput,
-	parseStudentPasswordChangeInput,
+	parseProfileSecurityEmailChangeInput,
+	parseProfileSecurityNameInput,
+	parseProfileSecurityPasswordChangeInput,
 } from "./schema";
 
-describe("student profile security schemas", () => {
+describe("profile security schemas", () => {
 	it("trims names and composes the display name", () => {
 		expect(
-			parseStudentNameInput({
+			parseProfileSecurityNameInput({
 				firstName: " Jordan ",
 				lastName: " Adebayo ",
 			}),
@@ -24,7 +24,7 @@ describe("student profile security schemas", () => {
 
 	it("validates required name fields", () => {
 		expect(
-			parseStudentNameInput({
+			parseProfileSecurityNameInput({
 				firstName: "",
 				lastName: "",
 			}),
@@ -39,7 +39,7 @@ describe("student profile security schemas", () => {
 
 	it("normalizes valid pending email addresses", () => {
 		expect(
-			parseStudentEmailChangeInput({
+			parseProfileSecurityEmailChangeInput({
 				email: " New.Student@Example.COM ",
 			}),
 		).toEqual({
@@ -52,7 +52,7 @@ describe("student profile security schemas", () => {
 	});
 
 	it("validates pending email format", () => {
-		expect(parseStudentEmailChangeInput({ email: "nope" })).toMatchObject({
+		expect(parseProfileSecurityEmailChangeInput({ email: "nope" })).toMatchObject({
 			success: false,
 			fieldErrors: {
 				email: "Enter a valid email address.",
@@ -62,7 +62,7 @@ describe("student profile security schemas", () => {
 
 	it("validates password changes", () => {
 		expect(
-			parseStudentPasswordChangeInput({
+			parseProfileSecurityPasswordChangeInput({
 				currentPassword: "",
 				password: "short",
 				confirmPassword: "different",
@@ -81,7 +81,7 @@ describe("student profile security schemas", () => {
 
 	it("rejects reusing the current password", () => {
 		expect(
-			parseStudentPasswordChangeInput({
+			parseProfileSecurityPasswordChangeInput({
 				currentPassword: "casework1",
 				password: "casework1",
 				confirmPassword: "casework1",

@@ -13,7 +13,7 @@ import {
 	PasswordResetDeliveryUnavailableError,
 	PasswordResetRateLimitedError
 } from "@/features/auth/password-reset/service";
-import { StudentEmailUnavailableError } from "@/features/student/profile-security/service";
+import { ProfileSecurityEmailUnavailableError } from "@/features/profile-security/service";
 import { CognitoAuthAdapter } from "./cognito";
 
 vi.mock("server-only", () => ({}));
@@ -274,7 +274,7 @@ describe("CognitoAuthAdapter password reset", () => {
 				currentEmailNormalized: "student@example.com",
 				newEmailNormalized: "taken@example.com"
 			})
-		).rejects.toBeInstanceOf(StudentEmailUnavailableError);
+		).rejects.toBeInstanceOf(ProfileSecurityEmailUnavailableError);
 	});
 
 	it("sets a permanent Cognito password for logged-in password changes", async () => {

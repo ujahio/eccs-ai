@@ -440,6 +440,19 @@ function toCompletePasswordResponse(
 		);
 	}
 
+	if (response.status === "validation_error") {
+		return {
+			status: "validation_error",
+			message: response.message,
+			values: {
+				email,
+				password: "",
+				confirmPassword: "",
+			},
+			errors: {},
+		};
+	}
+
 	return completePasswordFailure(response.status, response.message, email);
 }
 

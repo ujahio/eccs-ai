@@ -6,7 +6,7 @@ import type {
 	RegistrationEmailSender,
 	RegistrationVerificationEmail,
 } from "@/features/auth/registration/email";
-import type { StudentProfileEmailSender } from "@/features/student/profile-security/service";
+import type { ProfileSecurityEmailSender } from "@/features/profile-security/service";
 import { eccsLogoAttachment } from "@/lib/email-templates/logo-attachment";
 import {
 	forgotPasswordUrl,
@@ -20,7 +20,7 @@ export class ResendRegistrationEmailSender
 	implements
 		RegistrationEmailSender,
 		PasswordResetEmailSender,
-		StudentProfileEmailSender
+		ProfileSecurityEmailSender
 {
 	private readonly client: Resend;
 

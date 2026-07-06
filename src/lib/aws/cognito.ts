@@ -38,9 +38,9 @@ import {
 	type RegistrationIdentityProvider
 } from "@/features/auth/registration/identity";
 import {
-	StudentEmailUnavailableError,
-	type StudentProfileIdentityProvider
-} from "@/features/student/profile-security/service";
+	ProfileSecurityEmailUnavailableError,
+	type ProfileSecurityIdentityProvider
+} from "@/features/profile-security/service";
 import {
 	COGNITO_GROUPS,
 	hasCognitoGroupForRole
@@ -52,7 +52,7 @@ export class CognitoAuthAdapter
 		RegistrationIdentityProvider,
 		LoginIdentityProvider,
 		PasswordResetIdentityProvider,
-		StudentProfileIdentityProvider
+		ProfileSecurityIdentityProvider
 {
 	private readonly client: CognitoIdentityProviderClient;
 
@@ -467,7 +467,7 @@ export class CognitoAuthAdapter
 			const name = errorName(error);
 
 			if (name === "AliasExistsException" || name === "UsernameExistsException") {
-				throw new StudentEmailUnavailableError();
+				throw new ProfileSecurityEmailUnavailableError();
 			}
 
 			throw error;

@@ -15,7 +15,7 @@ import type {
 	AppSessionInvalidator,
 	PasswordResetProfileRepository
 } from "@/features/auth/password-reset/service";
-import type { StudentProfileRepository } from "@/features/student/profile-security/service";
+import type { ProfileSecurityRepository } from "@/features/profile-security/service";
 import type {
 	AppProfileRecord,
 	PendingRegistrationRecord,
@@ -33,7 +33,7 @@ export class DynamoAuthRepository
 		RegistrationWorkflowRepository,
 		LoginProfileRepository,
 		PasswordResetProfileRepository,
-		StudentProfileRepository,
+		ProfileSecurityRepository,
 		AppSessionInvalidator
 {
 	private readonly documentClient: DynamoDBDocumentClient;
@@ -355,23 +355,44 @@ export class DynamoAuthRepository
 		sessionsInvalidatedAt: number;
 		sessionInvalidationExemptToken?: string;
 	}) {
+		const setExpressions = [
+			"emailNormalized = :newEmail",
+			"emailVerifiedAt = :verifiedAt",
+			"sessionsInvalidatedAt = :sessionsInvalidatedAt",
+			"updatedAt = :verifiedAt"
+		];
+		const removeExpressions = [
+			"pendingEmail",
+			"pendingEmailVerificationTokenHash",
+			"pendingEmailVerificationExpiresAt",
+			"pendingEmailVerificationRequestedAt"
+		];
+		const expressionAttributeValues: Record<string, unknown> = {
+			":currentEmail": args.currentEmailNormalized,
+			":newEmail": args.newEmailNormalized,
+			":verifiedAt": args.verifiedAt,
+			":sessionsInvalidatedAt": args.sessionsInvalidatedAt
+		};
+
+		if (args.sessionInvalidationExemptToken) {
+			setExpressions.push("sessionInvalidationExemptToken = :exemptToken");
+			expressionAttributeValues[":exemptToken"] =
+				args.sessionInvalidationExemptToken;
+		} else {
+			removeExpressions.push("sessionInvalidationExemptToken");
+		}
+
 		await this.documentClient.send(
 			new UpdateCommand({
 				TableName: this.profileTableName,
 				Key: { profileId: args.profileId },
-				UpdateExpression:
-					[
-						"SET emailNormalized = :newEmail, emailVerifiedAt = :verifiedAt, sessionsInvalidatedAt = :sessionsInvalidatedAt, updatedAt = :verifiedAt",
-						"REMOVE pendingEmail, pendingEmailVerificationTokenHash, pendingEmailVerificationExpiresAt, pendingEmailVerificationRequestedAt, sessionInvalidationExemptToken"
-					].join(" "),
+				UpdateExpression: [
+					`SET ${setExpressions.join(", ")}`,
+					`REMOVE ${removeExpressions.join(", ")}`
+				].join(" "),
 				ConditionExpression:
 					"emailNormalized = :currentEmail AND pendingEmail = :newEmail",
-				ExpressionAttributeValues: {
-					":currentEmail": args.currentEmailNormalized,
-					":newEmail": args.newEmailNormalized,
-					":verifiedAt": args.verifiedAt,
-					":sessionsInvalidatedAt": args.sessionsInvalidatedAt
-				}
+				ExpressionAttributeValues: expressionAttributeValues
 			})
 		);
 	}

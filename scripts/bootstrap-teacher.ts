@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
 	AdminAddUserToGroupCommand,
 	AdminCreateUserCommand,
@@ -7,13 +9,16 @@ import {
 	AdminSetUserPasswordCommand,
 	AdminUpdateUserAttributesCommand,
 	CognitoIdentityProviderClient,
+	ListUsersInGroupCommand,
 	type AdminGetUserCommandOutput,
 	type AttributeType,
+	type UserType,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
 	DynamoDBDocumentClient,
 	GetCommand,
+	type NativeAttributeValue,
 	PutCommand,
 	QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
@@ -24,7 +29,7 @@ type BootstrapResources = {
 	UserProfileTable: { name: string };
 };
 
-type TeacherProfileRecord = {
+export type TeacherProfileRecord = {
 	profileId: string;
 	emailNormalized: string;
 	firstName: string;
@@ -52,7 +57,7 @@ type ParsedArgs = {
 	help: boolean;
 };
 
-type CognitoUserState = {
+export type CognitoUserState = {
 	username: string;
 	sub: string;
 	enabled: boolean;
@@ -61,192 +66,351 @@ type CognitoUserState = {
 	groups: string[];
 };
 
+type DesiredTeacherState = {
+	emailNormalized: string;
+	firstName: string;
+	lastName: string;
+	fullName: string;
+};
+
+type BootstrapContext = {
+	userPoolId: string;
+	userProfileTableName: string;
+	cognito: CognitoIdentityProviderClient;
+	dynamo: DynamoDBDocumentClient;
+};
+
 const TEACHER_GROUP = "teacher";
 const STUDENT_GROUP = "student";
 const DEFAULT_PASSWORD_ENV = "TEACHER_TEMP_PASSWORD";
+const FIRST_LOGIN_PASSWORD_CHANGE_STATUS = "FORCE_CHANGE_PASSWORD";
 
-const args = parseArgs(process.argv.slice(2));
+export async function main(argv = process.argv.slice(2)) {
+	const args = parseArgs(argv);
 
-if (args.help) {
-	printHelp();
-	process.exit(0);
-}
+	if (args.help) {
+		printHelp();
+		process.exit(0);
+	}
 
-const desired = {
-	emailNormalized: normalizeEmail(args.email),
-	firstName: args.firstName.trim(),
-	lastName: args.lastName.trim(),
-	fullName: `${args.firstName.trim()} ${args.lastName.trim()}`,
-};
+	const desired = {
+		emailNormalized: normalizeEmail(args.email),
+		firstName: args.firstName.trim(),
+		lastName: args.lastName.trim(),
+		fullName: `${args.firstName.trim()} ${args.lastName.trim()}`,
+	};
 
-validateRequired("email", desired.emailNormalized);
-validateRequired("first-name", desired.firstName);
-validateRequired("last-name", desired.lastName);
+	validateRequired("email", desired.emailNormalized);
+	validateRequired("first-name", desired.firstName);
+	validateRequired("last-name", desired.lastName);
 
-const region = process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION;
-const clientConfig = region ? { region } : {};
-const resources = Resource as unknown as BootstrapResources;
-const userPoolId = resources.AuthUserPool.id;
-const userProfileTableName = resources.UserProfileTable.name;
-const cognito = new CognitoIdentityProviderClient(clientConfig);
-const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient(clientConfig));
+	const context = createBootstrapContext();
 
-const existingUser = await getCognitoUser(desired.emailNormalized);
-const existingProfilesForEmail = await getProfilesByEmail(desired.emailNormalized);
-const duplicateProfilesForEmail = existingProfilesForEmail.filter(
-	(profile) => profile.emailNormalized === desired.emailNormalized,
-);
-
-if (!existingUser && duplicateProfilesForEmail.length > 0) {
-	fail(
-		`Refusing to create Cognito user because UserProfileTable already has ${duplicateProfilesForEmail.length} profile record(s) for ${desired.emailNormalized}. Resolve the profile conflict first.`,
+	const existingUser = await getCognitoUser(
+		context,
+		desired.emailNormalized,
 	);
-}
-
-const existingProfile =
-	existingUser?.sub ? await getProfileById(existingUser.sub) : null;
-const mismatchedEmailProfiles = existingUser
-	? duplicateProfilesForEmail.filter(
-			(profile) => profile.profileId !== existingUser.sub,
-		)
-	: [];
-
-if (existingUser?.groups.includes(STUDENT_GROUP)) {
-	fail(
-		`Refusing to bootstrap ${desired.emailNormalized} because the existing Cognito user is already in the ${STUDENT_GROUP} group. Remove or choose the correct account before creating a teacher identity.`,
+	const existingProfilesForEmail = await getProfilesByEmail(
+		context,
+		desired.emailNormalized,
 	);
-}
-
-if (existingProfile && existingProfile.role !== TEACHER_GROUP) {
-	fail(
-		`Refusing to bootstrap ${desired.emailNormalized} because the existing UserProfileTable record ${existingProfile.profileId} has role ${existingProfile.role}. Teacher bootstrap will not promote an existing non-teacher profile.`,
+	const duplicateProfilesForEmail = existingProfilesForEmail.filter(
+		(profile) => profile.emailNormalized === desired.emailNormalized,
 	);
-}
+	const existingProfile =
+		existingUser?.sub ? await getProfileById(context, existingUser.sub) : null;
+	const teacherProfiles = await getTeacherProfiles(context);
+	const teacherUsers = await listTeacherUsers(context);
+	const mismatchedEmailProfiles = existingUser
+		? duplicateProfilesForEmail.filter(
+				(profile) => profile.profileId !== existingUser.sub,
+			)
+		: [];
 
-if (mismatchedEmailProfiles.length > 0) {
-	fail(
+	const singleTeacherBlocker = getSingleTeacherIdentityBlocker({
+		desiredEmailNormalized: desired.emailNormalized,
+		existingUser,
+		teacherProfiles,
+		teacherUsers,
+	});
+
+	if (singleTeacherBlocker) {
+		fail(singleTeacherBlocker);
+	}
+
+	if (!existingUser && duplicateProfilesForEmail.length > 0) {
+		fail(
+			`Refusing to create Cognito user because UserProfileTable already has ${duplicateProfilesForEmail.length} profile record(s) for ${desired.emailNormalized}. Resolve the profile conflict first.`,
+		);
+	}
+
+	if (existingUser?.groups.includes(STUDENT_GROUP)) {
+		fail(
+			`Refusing to bootstrap ${desired.emailNormalized} because the existing Cognito user is already in the ${STUDENT_GROUP} group. Remove or choose the correct account before creating a teacher identity.`,
+		);
+	}
+
+	if (existingProfile && existingProfile.role !== TEACHER_GROUP) {
+		fail(
+			`Refusing to bootstrap ${desired.emailNormalized} because the existing UserProfileTable record ${existingProfile.profileId} has role ${existingProfile.role}. Teacher bootstrap will not promote an existing non-teacher profile.`,
+		);
+	}
+
+	if (mismatchedEmailProfiles.length > 0) {
+		fail(
+			[
+				`Refusing to continue because UserProfileTable has ${mismatchedEmailProfiles.length} profile record(s) for ${desired.emailNormalized} that do not match Cognito sub ${existingUser?.sub}.`,
+				"Mismatched profile IDs:",
+				...mismatchedEmailProfiles.map((profile) => `- ${profile.profileId}`),
+			].join("\n"),
+		);
+	}
+
+	const existingTeacherBlocker = getExistingTeacherReconciliationBlocker({
+		desiredEmailNormalized: desired.emailNormalized,
+		existingUser,
+		existingProfile,
+	});
+
+	if (existingTeacherBlocker) {
+		fail(existingTeacherBlocker);
+	}
+
+	const plan = buildPlan({
+		desired,
+		existingUser,
+		existingProfile,
+		resetTemporaryPassword: args.resetTemporaryPassword,
+		passwordEnv: args.passwordEnv,
+	});
+
+	printPlan(plan, args.apply);
+
+	if (!args.apply) {
+		console.log(
+			"\nDry run only. Re-run with --apply after reviewing the actions above.",
+		);
+		process.exit(0);
+	}
+
+	const needsTemporaryPassword = !existingUser || args.resetTemporaryPassword;
+	const existingFirstLoginChallenge = existingUser
+		? isFirstLoginPasswordChangeRequired(existingUser)
+		: false;
+	const temporaryPassword = needsTemporaryPassword
+		? readTemporaryPassword(args.passwordEnv)
+		: null;
+
+	let finalUser = existingUser;
+
+	if (!finalUser) {
+		await context.cognito.send(
+			new AdminCreateUserCommand({
+				UserPoolId: context.userPoolId,
+				Username: desired.emailNormalized,
+				TemporaryPassword: temporaryPassword!,
+				MessageAction: "SUPPRESS",
+				UserAttributes: desiredUserAttributes(desired),
+			}),
+		);
+
+		finalUser = await requireCognitoUser(context, desired.emailNormalized);
+		console.log(`Created Cognito teacher user ${desired.emailNormalized}.`);
+	}
+
+	if (!finalUser.enabled) {
+		await context.cognito.send(
+			new AdminEnableUserCommand({
+				UserPoolId: context.userPoolId,
+				Username: finalUser.username,
+			}),
+		);
+		console.log(`Enabled Cognito user ${finalUser.username}.`);
+	}
+
+	if (hasAttributeDrift(finalUser.attributes, desired)) {
+		await context.cognito.send(
+			new AdminUpdateUserAttributesCommand({
+				UserPoolId: context.userPoolId,
+				Username: finalUser.username,
+				UserAttributes: desiredUserAttributes(desired),
+			}),
+		);
+		console.log(`Reconciled Cognito attributes for ${finalUser.username}.`);
+	}
+
+	if (args.resetTemporaryPassword && temporaryPassword) {
+		await context.cognito.send(
+			new AdminSetUserPasswordCommand({
+				UserPoolId: context.userPoolId,
+				Username: finalUser.username,
+				Password: temporaryPassword,
+				Permanent: false,
+			}),
+		);
+		console.log(
+			`Reset the temporary password for ${finalUser.username}; first login will require a password change.`,
+		);
+	}
+
+	if (!finalUser.groups.includes(TEACHER_GROUP)) {
+		await context.cognito.send(
+			new AdminAddUserToGroupCommand({
+				UserPoolId: context.userPoolId,
+				Username: finalUser.username,
+				GroupName: TEACHER_GROUP,
+			}),
+		);
+		console.log(`Added ${finalUser.username} to the ${TEACHER_GROUP} group.`);
+	}
+
+	const refreshedUser = await requireCognitoUser(
+		context,
+		desired.emailNormalized,
+	);
+	const nextProfile = buildProfileRecord({
+		desired,
+		existingProfile,
+		cognitoSub: refreshedUser.sub,
+	});
+
+	await context.dynamo.send(
+		new PutCommand({
+			TableName: context.userProfileTableName,
+			Item: nextProfile,
+		}),
+	);
+
+	console.log(
 		[
-			`Refusing to continue because UserProfileTable has ${mismatchedEmailProfiles.length} profile record(s) for ${desired.emailNormalized} that do not match Cognito sub ${existingUser?.sub}.`,
-			"Mismatched profile IDs:",
-			...mismatchedEmailProfiles.map((profile) => `- ${profile.profileId}`),
+			"",
+			`Upserted teacher profile ${nextProfile.profileId} in ${context.userProfileTableName}.`,
+			`Cognito status: ${refreshedUser.status ?? "unknown"}; enabled: ${String(refreshedUser.enabled)}; groups: ${refreshedUser.groups.join(", ") || "(none)"}`,
+			needsTemporaryPassword
+				? `Temporary password was read from ${args.passwordEnv} and was not echoed. Clear that environment variable from your shell now.`
+				: existingFirstLoginChallenge
+					? "Existing Cognito first-login password-change challenge was left in place."
+					: "Existing password was left unchanged.",
+			"Teacher should sign in on /login and complete the Cognito first-login password change before accessing /teacher.",
 		].join("\n"),
 	);
 }
 
-const plan = buildPlan({
-	desired,
-	existingUser,
-	existingProfile,
-	resetTemporaryPassword: args.resetTemporaryPassword,
-	passwordEnv: args.passwordEnv,
-});
-
-printPlan(plan, args.apply);
-
-if (!args.apply) {
-	console.log(
-		"\nDry run only. Re-run with --apply after reviewing the actions above.",
+export function getSingleTeacherIdentityBlocker(args: {
+	desiredEmailNormalized: string;
+	existingUser: CognitoUserState | null;
+	teacherProfiles: TeacherProfileRecord[];
+	teacherUsers: CognitoUserState[];
+}) {
+	const desiredEmailNormalized = normalizeEmail(args.desiredEmailNormalized);
+	const conflictingProfiles = args.teacherProfiles.filter(
+		(profile) => normalizeEmail(profile.emailNormalized) !== desiredEmailNormalized,
 	);
-	process.exit(0);
+	const conflictingUsers = args.teacherUsers.filter(
+		(user) => getUserEmailNormalized(user) !== desiredEmailNormalized,
+	);
+
+	if (conflictingProfiles.length > 0 || conflictingUsers.length > 0) {
+		return [
+			`Refusing to bootstrap ${desiredEmailNormalized} because v1 supports exactly one teacher account/persona and another teacher identity already exists.`,
+			"Existing teacher identity evidence:",
+			...conflictingProfiles.map(formatTeacherProfileEvidence),
+			...conflictingUsers.map(formatTeacherUserEvidence),
+			"Use the cleanup script or manual remediation before bootstrapping a different teacher email.",
+		].join("\n");
+	}
+
+	if (args.teacherProfiles.length > 1) {
+		return [
+			`Refusing to bootstrap ${desiredEmailNormalized} because UserProfileTable has ${args.teacherProfiles.length} teacher profile records for the same teacher email.`,
+			"Teacher profile IDs:",
+			...args.teacherProfiles.map((profile) => `- ${profile.profileId}`),
+			"Resolve the duplicate teacher profiles before running bootstrap again.",
+		].join("\n");
+	}
+
+	if (args.teacherUsers.length > 1) {
+		return [
+			`Refusing to bootstrap ${desiredEmailNormalized} because Cognito has ${args.teacherUsers.length} users in the teacher group for the same teacher email.`,
+			"Cognito teacher users:",
+			...args.teacherUsers.map(formatTeacherUserEvidence),
+			"Resolve the duplicate teacher group membership before running bootstrap again.",
+		].join("\n");
+	}
+
+	if (!args.existingUser && args.teacherUsers.length > 0) {
+		return [
+			`Refusing to create Cognito user ${desiredEmailNormalized} because the ${TEACHER_GROUP} group already contains that teacher email, but direct user lookup by email did not resolve it.`,
+			...args.teacherUsers.map(formatTeacherUserEvidence),
+			"Resolve the Cognito identity mismatch before running bootstrap again.",
+		].join("\n");
+	}
+
+	if (args.existingUser) {
+		const mismatchedTeacherUsers = args.teacherUsers.filter(
+			(user) => user.sub !== args.existingUser?.sub,
+		);
+
+		if (mismatchedTeacherUsers.length > 0) {
+			return [
+				`Refusing to bootstrap ${desiredEmailNormalized} because the ${TEACHER_GROUP} group points at a different Cognito sub than direct lookup returned.`,
+				`Direct lookup sub: ${args.existingUser.sub}`,
+				"Teacher group users:",
+				...mismatchedTeacherUsers.map(formatTeacherUserEvidence),
+				"Resolve the Cognito identity mismatch before running bootstrap again.",
+			].join("\n");
+		}
+	}
+
+	return null;
 }
 
-const needsTemporaryPassword =
-	!existingUser || args.resetTemporaryPassword;
-const temporaryPassword = needsTemporaryPassword
-	? readTemporaryPassword(args.passwordEnv)
-	: null;
+export function getExistingTeacherReconciliationBlocker(args: {
+	desiredEmailNormalized: string;
+	existingUser: CognitoUserState | null;
+	existingProfile: TeacherProfileRecord | null;
+}) {
+	if (!args.existingUser) {
+		return null;
+	}
 
-let finalUser = existingUser;
+	const hasTeacherGroup = args.existingUser.groups.includes(TEACHER_GROUP);
+	const hasTeacherProfile = args.existingProfile?.role === TEACHER_GROUP;
 
-if (!finalUser) {
-	await cognito.send(
-		new AdminCreateUserCommand({
-			UserPoolId: userPoolId,
-			Username: desired.emailNormalized,
-			TemporaryPassword: temporaryPassword!,
-			MessageAction: "SUPPRESS",
-			UserAttributes: desiredUserAttributes(desired),
-		}),
-	);
+	if (hasTeacherGroup && hasTeacherProfile) {
+		return null;
+	}
 
-	finalUser = await requireCognitoUser(desired.emailNormalized);
-	console.log(`Created Cognito teacher user ${desired.emailNormalized}.`);
+	const missingEvidence: string[] = [];
+
+	if (!hasTeacherGroup) {
+		missingEvidence.push(`- Cognito user is not in the ${TEACHER_GROUP} group.`);
+	}
+
+	if (!args.existingProfile) {
+		missingEvidence.push(
+			`- UserProfileTable has no teacher profile for Cognito sub ${args.existingUser.sub}.`,
+		);
+	} else if (args.existingProfile.role !== TEACHER_GROUP) {
+		missingEvidence.push(
+			`- UserProfileTable profile ${args.existingProfile.profileId} has role ${args.existingProfile.role}.`,
+		);
+	}
+
+	return [
+		`Refusing to bootstrap ${args.desiredEmailNormalized} because it belongs to existing Cognito user ${args.existingUser.username}, but that user is not already a complete teacher identity.`,
+		"Teacher bootstrap only creates a brand-new teacher account or reconciles an existing teacher account.",
+		...missingEvidence,
+		"Use a new teacher email, or remediate the existing identity manually outside this script.",
+	].join("\n");
 }
 
-if (!finalUser.enabled) {
-	await cognito.send(
-		new AdminEnableUserCommand({
-			UserPoolId: userPoolId,
-			Username: finalUser.username,
-		}),
-	);
-	console.log(`Enabled Cognito user ${finalUser.username}.`);
+export function isFirstLoginPasswordChangeRequired(user: CognitoUserState) {
+	return user.status === FIRST_LOGIN_PASSWORD_CHANGE_STATUS;
 }
-
-if (hasAttributeDrift(finalUser.attributes, desired)) {
-	await cognito.send(
-		new AdminUpdateUserAttributesCommand({
-			UserPoolId: userPoolId,
-			Username: finalUser.username,
-			UserAttributes: desiredUserAttributes(desired),
-		}),
-	);
-	console.log(`Reconciled Cognito attributes for ${finalUser.username}.`);
-}
-
-if (args.resetTemporaryPassword && temporaryPassword) {
-	await cognito.send(
-		new AdminSetUserPasswordCommand({
-			UserPoolId: userPoolId,
-			Username: finalUser.username,
-			Password: temporaryPassword,
-			Permanent: false,
-		}),
-	);
-	console.log(
-		`Reset the temporary password for ${finalUser.username}; first login will require a password change.`,
-	);
-}
-
-if (!finalUser.groups.includes(TEACHER_GROUP)) {
-	await cognito.send(
-		new AdminAddUserToGroupCommand({
-			UserPoolId: userPoolId,
-			Username: finalUser.username,
-			GroupName: TEACHER_GROUP,
-		}),
-	);
-	console.log(`Added ${finalUser.username} to the ${TEACHER_GROUP} group.`);
-}
-
-const refreshedUser = await requireCognitoUser(desired.emailNormalized);
-const nextProfile = buildProfileRecord({
-	desired,
-	existingProfile,
-	cognitoSub: refreshedUser.sub,
-});
-
-await dynamo.send(
-	new PutCommand({
-		TableName: userProfileTableName,
-		Item: nextProfile,
-	}),
-);
-
-console.log(
-	[
-		"",
-		`Upserted teacher profile ${nextProfile.profileId} in ${userProfileTableName}.`,
-		`Cognito status: ${refreshedUser.status ?? "unknown"}; enabled: ${String(refreshedUser.enabled)}; groups: ${refreshedUser.groups.join(", ") || "(none)"}`,
-		needsTemporaryPassword
-			? `Temporary password was read from ${args.passwordEnv} and was not echoed. Clear that environment variable from your shell now.`
-			: "Existing password was left unchanged.",
-		"Teacher should sign in on /login and complete the Cognito first-login password change before accessing /teacher.",
-	].join("\n"),
-);
 
 function buildPlan(args: {
-	desired: typeof desired;
+	desired: DesiredTeacherState;
 	existingUser: CognitoUserState | null;
 	existingProfile: TeacherProfileRecord | null;
 	resetTemporaryPassword: boolean;
@@ -268,9 +432,13 @@ function buildPlan(args: {
 		);
 
 		if (hasAttributeDrift(existingUser.attributes, desired)) {
-			actions.push("Reconcile Cognito email/name attributes to the requested teacher values.");
+			actions.push(
+				"Reconcile Cognito email/name attributes to the requested teacher values.",
+			);
 		} else {
-			actions.push("Cognito email/name attributes already match the requested teacher values.");
+			actions.push(
+				"Cognito email/name attributes already match the requested teacher values.",
+			);
 		}
 
 		if (!existingUser.enabled) {
@@ -280,6 +448,10 @@ function buildPlan(args: {
 		if (args.resetTemporaryPassword) {
 			actions.push(
 				`Reset a temporary password from $${args.passwordEnv} and put the user back into Cognito's first-login password-change flow.`,
+			);
+		} else if (isFirstLoginPasswordChangeRequired(existingUser)) {
+			actions.push(
+				"Leave the existing temporary password challenge in place.",
 			);
 		} else {
 			actions.push("Leave the existing password unchanged.");
@@ -293,7 +465,9 @@ function buildPlan(args: {
 	}
 
 	if (!existingProfile) {
-		actions.push("Create the DynamoDB teacher profile record after resolving the Cognito sub.");
+		actions.push(
+			"Create the DynamoDB teacher profile record after resolving the Cognito sub.",
+		);
 	} else if (hasProfileDrift(existingProfile, desired)) {
 		actions.push(
 			`Update the DynamoDB teacher profile ${existingProfile.profileId} so role/email/name fields match Cognito.`,
@@ -316,7 +490,7 @@ function printPlan(actions: string[], apply: boolean) {
 }
 
 function buildProfileRecord(args: {
-	desired: typeof desired;
+	desired: DesiredTeacherState;
 	existingProfile: TeacherProfileRecord | null;
 	cognitoSub: string;
 }): TeacherProfileRecord {
@@ -336,7 +510,7 @@ function buildProfileRecord(args: {
 	};
 }
 
-function desiredUserAttributes(desiredState: typeof desired): AttributeType[] {
+function desiredUserAttributes(desiredState: DesiredTeacherState): AttributeType[] {
 	return [
 		{ Name: "email", Value: desiredState.emailNormalized },
 		{ Name: "email_verified", Value: "true" },
@@ -348,7 +522,7 @@ function desiredUserAttributes(desiredState: typeof desired): AttributeType[] {
 
 function hasAttributeDrift(
 	attributes: Record<string, string>,
-	desiredState: typeof desired,
+	desiredState: DesiredTeacherState,
 ) {
 	return (
 		attributes.email !== desiredState.emailNormalized ||
@@ -361,7 +535,7 @@ function hasAttributeDrift(
 
 function hasProfileDrift(
 	profile: TeacherProfileRecord,
-	desiredState: typeof desired,
+	desiredState: DesiredTeacherState,
 ) {
 	return (
 		profile.role !== "teacher" ||
@@ -372,18 +546,36 @@ function hasProfileDrift(
 	);
 }
 
+function createBootstrapContext(): BootstrapContext {
+	const region = process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION;
+	const clientConfig = region ? { region } : {};
+	const resources = Resource as unknown as BootstrapResources;
+
+	return {
+		userPoolId: resources.AuthUserPool.id,
+		userProfileTableName: resources.UserProfileTable.name,
+		cognito: new CognitoIdentityProviderClient(clientConfig),
+		dynamo: DynamoDBDocumentClient.from(new DynamoDBClient(clientConfig)),
+	};
+}
+
 async function getCognitoUser(
+	context: BootstrapContext,
 	emailNormalized: string,
 ): Promise<CognitoUserState | null> {
 	try {
-		const response = await cognito.send(
+		const response = await context.cognito.send(
 			new AdminGetUserCommand({
-				UserPoolId: userPoolId,
+				UserPoolId: context.userPoolId,
 				Username: emailNormalized,
 			}),
 		);
 		const groups = await listUserGroups(
-			response.Username ?? response.UserAttributes?.find((attribute) => attribute.Name === "email")?.Value ?? emailNormalized,
+			context,
+			response.Username ??
+				response.UserAttributes?.find((attribute) => attribute.Name === "email")
+					?.Value ??
+				emailNormalized,
 		);
 
 		return mapCognitoUser(response, groups);
@@ -396,8 +588,11 @@ async function getCognitoUser(
 	}
 }
 
-async function requireCognitoUser(emailNormalized: string) {
-	const user = await getCognitoUser(emailNormalized);
+async function requireCognitoUser(
+	context: BootstrapContext,
+	emailNormalized: string,
+) {
+	const user = await getCognitoUser(context, emailNormalized);
 
 	if (!user) {
 		throw new Error(`Expected Cognito user ${emailNormalized} to exist.`);
@@ -427,10 +622,31 @@ function mapCognitoUser(
 	};
 }
 
-async function getProfileById(profileId: string) {
-	const response = await dynamo.send(
+function mapCognitoGroupUser(user: UserType): CognitoUserState {
+	const attributes = listToRecord(user.Attributes ?? []);
+	const sub = attributes.sub;
+
+	if (!sub) {
+		throw new Error("Cognito teacher group user is missing the required sub attribute.");
+	}
+
+	return {
+		username: user.Username ?? attributes.email ?? "",
+		sub,
+		enabled: user.Enabled ?? true,
+		status: user.UserStatus,
+		attributes,
+		groups: [TEACHER_GROUP],
+	};
+}
+
+async function getProfileById(
+	context: BootstrapContext,
+	profileId: string,
+) {
+	const response = await context.dynamo.send(
 		new GetCommand({
-			TableName: userProfileTableName,
+			TableName: context.userProfileTableName,
 			Key: { profileId },
 			ConsistentRead: true,
 		}),
@@ -439,10 +655,13 @@ async function getProfileById(profileId: string) {
 	return (response.Item as TeacherProfileRecord | undefined) ?? null;
 }
 
-async function getProfilesByEmail(emailNormalized: string) {
-	const response = await dynamo.send(
+async function getProfilesByEmail(
+	context: BootstrapContext,
+	emailNormalized: string,
+) {
+	const response = await context.dynamo.send(
 		new QueryCommand({
-			TableName: userProfileTableName,
+			TableName: context.userProfileTableName,
 			IndexName: "EmailIndex",
 			KeyConditionExpression: "emailNormalized = :email",
 			ExpressionAttributeValues: {
@@ -454,15 +673,65 @@ async function getProfilesByEmail(emailNormalized: string) {
 	return (response.Items ?? []) as TeacherProfileRecord[];
 }
 
-async function listUserGroups(username: string) {
-	const response = await cognito.send(
+async function getTeacherProfiles(context: BootstrapContext) {
+	const profiles: TeacherProfileRecord[] = [];
+	let exclusiveStartKey: Record<string, NativeAttributeValue> | undefined;
+
+	do {
+		const response = await context.dynamo.send(
+			new QueryCommand({
+				TableName: context.userProfileTableName,
+				IndexName: "RoleIndex",
+				KeyConditionExpression: "#role = :role",
+				ExpressionAttributeNames: {
+					"#role": "role",
+				},
+				ExpressionAttributeValues: {
+					":role": TEACHER_GROUP,
+				},
+				ExclusiveStartKey: exclusiveStartKey,
+			}),
+		);
+
+		profiles.push(...((response.Items ?? []) as TeacherProfileRecord[]));
+		exclusiveStartKey = response.LastEvaluatedKey;
+	} while (exclusiveStartKey);
+
+	return profiles;
+}
+
+async function listUserGroups(
+	context: BootstrapContext,
+	username: string,
+) {
+	const response = await context.cognito.send(
 		new AdminListGroupsForUserCommand({
-			UserPoolId: userPoolId,
+			UserPoolId: context.userPoolId,
 			Username: username,
 		}),
 	);
 
 	return response.Groups?.map((group) => group.GroupName ?? "").filter(Boolean) ?? [];
+}
+
+async function listTeacherUsers(context: BootstrapContext) {
+	const users: CognitoUserState[] = [];
+	let nextToken: string | undefined;
+
+	do {
+		const response = await context.cognito.send(
+			new ListUsersInGroupCommand({
+				UserPoolId: context.userPoolId,
+				GroupName: TEACHER_GROUP,
+				NextToken: nextToken,
+			}),
+		);
+
+		users.push(...(response.Users ?? []).map(mapCognitoGroupUser));
+		nextToken = response.NextToken;
+	} while (nextToken);
+
+	return users;
 }
 
 function listToRecord(attributes: AttributeType[]) {
@@ -471,6 +740,18 @@ function listToRecord(attributes: AttributeType[]) {
 			.filter((attribute) => attribute.Name && attribute.Value)
 			.map((attribute) => [attribute.Name!, attribute.Value!]),
 	);
+}
+
+function getUserEmailNormalized(user: CognitoUserState) {
+	return normalizeEmail(user.attributes.email ?? user.username);
+}
+
+function formatTeacherProfileEvidence(profile: TeacherProfileRecord) {
+	return `- DynamoDB teacher profile ${profile.profileId}: ${profile.emailNormalized || "(missing email)"}`;
+}
+
+function formatTeacherUserEvidence(user: CognitoUserState) {
+	return `- Cognito teacher group user ${user.username}: ${getUserEmailNormalized(user) || "(missing email)"} (sub: ${user.sub})`;
 }
 
 function normalizeEmail(email: string) {
@@ -557,7 +838,7 @@ Usage:
 
 Options:
   --apply                     Execute Cognito and DynamoDB writes. Without this flag the script is a dry run.
-  --reset-temporary-password  For an existing Cognito user, set a fresh temporary password and require first-login password change again.
+  --reset-temporary-password  For an existing teacher user, set a fresh temporary password and require first-login password change again.
   --password-env NAME         Environment variable that holds the temporary password. Default: ${DEFAULT_PASSWORD_ENV}
   --help, -h                  Show this help text.
 `);
@@ -570,4 +851,14 @@ function fail(message: string): never {
 
 function errorName(error: unknown) {
 	return error instanceof Error ? error.name : undefined;
+}
+
+function isMainModule() {
+	return process.argv[1]
+		? fileURLToPath(import.meta.url) === resolve(process.argv[1])
+		: false;
+}
+
+if (isMainModule()) {
+	await main();
 }

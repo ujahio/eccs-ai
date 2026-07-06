@@ -5,45 +5,45 @@ import {
 	type PasswordRequirement,
 } from "@/features/auth/registration/schema";
 
-export type StudentNameInput = {
+export type ProfileSecurityNameInput = {
 	firstName: string;
 	lastName: string;
 };
 
-export type StudentEmailChangeInput = {
+export type ProfileSecurityEmailChangeInput = {
 	email: string;
 };
 
-export type StudentPasswordChangeInput = {
+export type ProfileSecurityPasswordChangeInput = {
 	currentPassword: string;
 	password: string;
 	confirmPassword: string;
 };
 
-export type StudentNameFieldErrors = Partial<Record<keyof StudentNameInput, string>>;
-export type StudentEmailChangeFieldErrors = Partial<
-	Record<keyof StudentEmailChangeInput, string>
+export type ProfileSecurityNameFieldErrors = Partial<Record<keyof ProfileSecurityNameInput, string>>;
+export type ProfileSecurityEmailChangeFieldErrors = Partial<
+	Record<keyof ProfileSecurityEmailChangeInput, string>
 >;
-export type StudentPasswordChangeFieldErrors = Partial<
-	Record<keyof StudentPasswordChangeInput, string>
+export type ProfileSecurityPasswordChangeFieldErrors = Partial<
+	Record<keyof ProfileSecurityPasswordChangeInput, string>
 >;
 
-export type ParsedStudentNameInput =
-	| { success: true; data: StudentNameInput & { fullName: string } }
-	| { success: false; fieldErrors: StudentNameFieldErrors };
+export type ParsedProfileSecurityNameInput =
+	| { success: true; data: ProfileSecurityNameInput & { fullName: string } }
+	| { success: false; fieldErrors: ProfileSecurityNameFieldErrors };
 
-export type ParsedStudentEmailChangeInput =
+export type ParsedProfileSecurityEmailChangeInput =
 	| {
 			success: true;
-			data: StudentEmailChangeInput & { emailNormalized: string };
+			data: ProfileSecurityEmailChangeInput & { emailNormalized: string };
 	  }
-	| { success: false; fieldErrors: StudentEmailChangeFieldErrors };
+	| { success: false; fieldErrors: ProfileSecurityEmailChangeFieldErrors };
 
-export type ParsedStudentPasswordChangeInput =
-	| { success: true; data: StudentPasswordChangeInput }
+export type ParsedProfileSecurityPasswordChangeInput =
+	| { success: true; data: ProfileSecurityPasswordChangeInput }
 	| {
 			success: false;
-			fieldErrors: StudentPasswordChangeFieldErrors;
+			fieldErrors: ProfileSecurityPasswordChangeFieldErrors;
 			failedPasswordRequirementIds: PasswordRequirement["id"][];
 	  };
 
@@ -116,9 +116,9 @@ const passwordChangeSchema = z
 		}
 	});
 
-export function parseStudentNameInput(
-	input: StudentNameInput,
-): ParsedStudentNameInput {
+export function parseProfileSecurityNameInput(
+	input: ProfileSecurityNameInput,
+): ParsedProfileSecurityNameInput {
 	const parsed = nameSchema.safeParse(input);
 
 	if (!parsed.success) {
@@ -141,9 +141,9 @@ export function parseStudentNameInput(
 	};
 }
 
-export function parseStudentEmailChangeInput(
-	input: StudentEmailChangeInput,
-): ParsedStudentEmailChangeInput {
+export function parseProfileSecurityEmailChangeInput(
+	input: ProfileSecurityEmailChangeInput,
+): ParsedProfileSecurityEmailChangeInput {
 	const parsed = emailChangeSchema.safeParse(input);
 
 	if (!parsed.success) {
@@ -162,9 +162,9 @@ export function parseStudentEmailChangeInput(
 	};
 }
 
-export function parseStudentPasswordChangeInput(
-	input: StudentPasswordChangeInput,
-): ParsedStudentPasswordChangeInput {
+export function parseProfileSecurityPasswordChangeInput(
+	input: ProfileSecurityPasswordChangeInput,
+): ParsedProfileSecurityPasswordChangeInput {
 	const parsed = passwordChangeSchema.safeParse(input);
 	const failedRequirementIds = failedPasswordRequirements(input.password).map(
 		(requirement) => requirement.id,
@@ -216,26 +216,26 @@ function passwordRequirementMessage(requirements: PasswordRequirement[]) {
 		.join(", ")}.`;
 }
 
-export function studentNameInputFromFormData(
+export function profileSecurityNameInputFromFormData(
 	formData: FormData,
-): StudentNameInput {
+): ProfileSecurityNameInput {
 	return {
 		firstName: String(formData.get("firstName") ?? ""),
 		lastName: String(formData.get("lastName") ?? ""),
 	};
 }
 
-export function studentEmailChangeInputFromFormData(
+export function profileSecurityEmailChangeInputFromFormData(
 	formData: FormData,
-): StudentEmailChangeInput {
+): ProfileSecurityEmailChangeInput {
 	return {
 		email: String(formData.get("email") ?? ""),
 	};
 }
 
-export function studentPasswordChangeInputFromFormData(
+export function profileSecurityPasswordChangeInputFromFormData(
 	formData: FormData,
-): StudentPasswordChangeInput {
+): ProfileSecurityPasswordChangeInput {
 	return {
 		currentPassword: String(formData.get("currentPassword") ?? ""),
 		password: String(formData.get("password") ?? ""),

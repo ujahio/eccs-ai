@@ -183,8 +183,8 @@ test.describe("Student profile security", () => {
 			newEmail,
 		);
 		await page.goto(emailChangeUrl);
-		await expect(page).toHaveURL(/\/login\?emailChange=verified$/);
-		await expect(page.getByTestId("login-success-message")).toHaveText(
+		await expect(page).toHaveURL(/\/student\/profile\?email=verified$/);
+		await expect(page.getByTestId("student-email-verified-message")).toHaveText(
 			"Your email address has been updated.",
 		);
 
@@ -197,8 +197,6 @@ test.describe("Student profile security", () => {
 			"We couldn’t sign you in with those details. Check your email and password and try again.",
 		);
 
-		await loginStudent(page, newEmail, validRegistration.password);
-		await expect(page).toHaveURL(/\/student$/);
 		await page.goto("/student/profile");
 		await expect(page.getByTestId("student-profile-new-email")).toHaveValue(
 			newEmail,
