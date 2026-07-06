@@ -86,6 +86,7 @@ function StatusMessage({ state }: { state: RegistrationFormState }) {
 		message: state.message,
 		testId,
 		dedupeKey: "registration-status",
+		trigger: state,
 	});
 
 	if (!state.message || isSuccess) {

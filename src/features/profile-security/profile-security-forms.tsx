@@ -205,6 +205,7 @@ export function ProfileSecurityForms({
 		message: detailsState.message,
 		testId: `${profileKind}-details-success-message`,
 		dedupeKey: `${profileKind}-details`,
+		trigger: detailsState,
 	});
 	useSuccessNotification({
 		enabled:
@@ -212,12 +213,14 @@ export function ProfileSecurityForms({
 		message: detailsState.message,
 		testId: `${profileKind}-email-verification-sent-message`,
 		dedupeKey: `${profileKind}-email-change`,
+		trigger: detailsState,
 	});
 	useSuccessNotification({
 		enabled: passwordState.status === "success",
 		message: passwordState.message,
 		testId: `${profileKind}-password-success-message`,
 		dedupeKey: `${profileKind}-password`,
+		trigger: passwordState,
 	});
 
 	function updateDetailsValue<Field extends keyof DetailsValues>(

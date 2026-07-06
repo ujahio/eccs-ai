@@ -78,6 +78,7 @@ function StatusMessage({ state }: { state: LoginFormState }) {
 		message: state.message,
 		testId,
 		dedupeKey: "login-status",
+		trigger: state,
 	});
 
 	if (!state.message || isSuccess) {

@@ -37,7 +37,8 @@ export function PasswordResetStatusMessage({
 		enabled: isSuccess,
 		message: state.message,
 		testId,
-		dedupeKey: `${testIdPrefix}-status`
+		dedupeKey: `${testIdPrefix}-status`,
+		trigger: state,
 	});
 
 	if (!state.message || isSuccess) {

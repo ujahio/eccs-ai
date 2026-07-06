@@ -147,11 +147,13 @@ export function useSuccessNotification({
 	enabled = true,
 	message,
 	testId,
+	trigger,
 }: {
 	dedupeKey: string;
 	enabled?: boolean;
 	message: string;
 	testId: string;
+	trigger?: unknown;
 }) {
 	const { notify } = useNotifications();
 
@@ -164,7 +166,7 @@ export function useSuccessNotification({
 				dedupeKey,
 			});
 		}
-	}, [dedupeKey, enabled, message, notify, testId]);
+	}, [dedupeKey, enabled, message, notify, testId, trigger]);
 }
 
 export function NotificationViewport() {
