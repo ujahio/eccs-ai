@@ -1,0 +1,210 @@
+import {
+	expect,
+	test,
+	type APIRequestContext,
+	type Page,
+} from "@playwright/test";
+
+function uniqueEmail(prefix: string) {
+	return `e2e-${prefix}-${Date.now()}-${Math.random()
+		.toString(36)
+		.slice(2, 8)}@example.com`;
+}
+
+const teacherPassword = "teacher1";
+const dayInMilliseconds = 24 * 60 * 60 * 1000;
+
+function formatDashboardDate(epochMilliseconds: number) {
+	return new Intl.DateTimeFormat("en-US", {
+		day: "numeric",
+		month: "short",
+		year: "numeric",
+		timeZone: "Asia/Dubai",
+	}).format(new Date(epochMilliseconds));
+}
+
+async function bootstrapVerifiedTeacher(
+	request: APIRequestContext,
+	email: string,
+) {
+	const response = await request.post("/api/e2e/auth/state", {
+		data: {
+			action: "bootstrap_teacher",
+			email,
+			firstName: "Taylor",
+			lastName: "Smith",
+			temporaryPassword: teacherPassword,
+			emailVerified: true,
+			forcePasswordChange: false,
+		},
+	});
+
+	expect(response.ok()).toBe(true);
+}
+
+async function login(page: Page, email: string) {
+	await page.goto("/login");
+	await expect(page.getByTestId("login-form")).toHaveAttribute(
+		"data-client-ready",
+		"true",
+	);
+	await page.getByTestId("login-email").fill(email);
+	await page.getByTestId("login-password").fill(teacherPassword);
+	await page.getByTestId("login-submit").click();
+	await expect(page).toHaveURL(/\/teacher$/);
+}
+
+async function seedTeacherDashboard(
+	request: APIRequestContext,
+	activeCase: {
+		title: string;
+		publishedAt: number;
+		deadlineAt: number;
+		completionCount: number;
+		feedbackCount: number;
+	} | null,
+	archivedCases: Array<{
+		title: string;
+		publishedAt: number;
+		deadlineAt: number;
+		archivedAt: number;
+		completionCount: number;
+		feedbackCount: number;
+	}> = [],
+) {
+	const response = await request.post("/api/e2e/teacher-dashboard/state", {
+		data: { activeCase, archivedCases },
+	});
+
+	expect(response.ok()).toBe(true);
+}
+
+test.describe("Teacher dashboard", () => {
+	test.beforeAll(async ({ request }) => {
+		const response = await request.get("/api/e2e/auth/state");
+
+		expect(response.ok()).toBe(true);
+	});
+
+	test.afterEach(async ({ request }) => {
+		const dashboardResponse = await request.delete(
+			"/api/e2e/teacher-dashboard/state",
+		);
+		expect(dashboardResponse.ok()).toBe(true);
+
+		const authResponse = await request.delete("/api/e2e/auth/state");
+		expect(authResponse.ok()).toBe(true);
+	});
+
+	test("shows active case details for a verified teacher when a case is seeded", async ({
+		page,
+		request,
+	}) => {
+		const email = uniqueEmail("teacher-dashboard-active");
+		const publishedAt = Date.now() - dayInMilliseconds;
+		const deadlineAt = Date.now() + 14 * dayInMilliseconds;
+
+		await bootstrapVerifiedTeacher(request, email);
+		await seedTeacherDashboard(
+			request,
+			{
+				title: "Acute endocrine case review",
+				publishedAt,
+				deadlineAt,
+				completionCount: 12,
+				feedbackCount: 5,
+			},
+			[
+				{
+					title: "Cardiac rehabilitation follow-up",
+					publishedAt: publishedAt - 28 * dayInMilliseconds,
+					deadlineAt: publishedAt - 14 * dayInMilliseconds,
+					archivedAt: publishedAt - 14 * dayInMilliseconds,
+					completionCount: 18,
+					feedbackCount: 9,
+				},
+				{
+					title: "Respiratory complications review",
+					publishedAt: publishedAt - 42 * dayInMilliseconds,
+					deadlineAt: publishedAt - 30 * dayInMilliseconds,
+					archivedAt: publishedAt - 30 * dayInMilliseconds,
+					completionCount: 21,
+					feedbackCount: 7,
+				},
+				{
+					title: "Metabolic emergency discussion",
+					publishedAt: publishedAt - 56 * dayInMilliseconds,
+					deadlineAt: publishedAt - 45 * dayInMilliseconds,
+					archivedAt: publishedAt - 45 * dayInMilliseconds,
+					completionCount: 16,
+					feedbackCount: 6,
+				},
+				{
+					title: "Older archived case hidden from dashboard",
+					publishedAt: publishedAt - 70 * dayInMilliseconds,
+					deadlineAt: publishedAt - 60 * dayInMilliseconds,
+					archivedAt: publishedAt - 60 * dayInMilliseconds,
+					completionCount: 10,
+					feedbackCount: 2,
+				},
+			],
+		);
+
+		await login(page, email);
+		await expect(page.getByTestId("teacher-dashboard-root")).toBeVisible();
+		await expect(page.getByTestId("teacher-start-case-button")).toHaveText(
+			"Start a draft case",
+		);
+		await expect(page.getByTestId("teacher-start-case-button")).toBeDisabled();
+		await expect(page.getByTestId("teacher-active-case-card")).toBeVisible();
+		await expect(page.getByTestId("teacher-active-case-title")).toHaveText(
+			"Acute endocrine case review",
+		);
+		await expect(
+			page.getByTestId("teacher-active-case-publish-date"),
+		).toHaveText(formatDashboardDate(publishedAt));
+		await expect(page.getByTestId("teacher-active-case-deadline")).toHaveText(
+			formatDashboardDate(deadlineAt),
+		);
+		await expect(
+			page.getByTestId("teacher-active-case-completions"),
+		).toHaveText("12");
+		await expect(page.getByTestId("teacher-active-case-feedback")).toHaveText(
+			"5",
+		);
+		await expect(page.getByTestId("teacher-archived-case-card")).toHaveCount(3);
+		await expect(page.getByTestId("teacher-archived-cases")).toContainText(
+			"Cardiac rehabilitation follow-up",
+		);
+		await expect(page.getByTestId("teacher-archived-cases")).not.toContainText(
+			"Older archived case hidden from dashboard",
+		);
+		await expect(
+			page.getByTestId("teacher-dashboard-no-active-case"),
+		).toBeHidden();
+	});
+
+	test("shows the no-active-case empty state for a verified teacher when no case is seeded", async ({
+		page,
+		request,
+	}) => {
+		const email = uniqueEmail("teacher-dashboard-empty");
+
+		await bootstrapVerifiedTeacher(request, email);
+		await seedTeacherDashboard(request, null);
+
+		await login(page, email);
+		await expect(page.getByTestId("teacher-dashboard-root")).toBeVisible();
+		await expect(page.getByTestId("teacher-start-case-button")).toHaveText(
+			"Start a New Case",
+		);
+		await expect(page.getByTestId("teacher-start-case-button")).toBeDisabled();
+		await expect(
+			page.getByTestId("teacher-dashboard-no-active-case"),
+		).toBeVisible();
+		await expect(
+			page.getByTestId("teacher-dashboard-no-active-case"),
+		).toContainText("No active case");
+		await expect(page.getByTestId("teacher-active-case-card")).toBeHidden();
+	});
+});

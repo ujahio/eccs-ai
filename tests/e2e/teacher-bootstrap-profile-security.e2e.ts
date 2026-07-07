@@ -123,9 +123,7 @@ test.describe("Teacher bootstrap and profile security", () => {
 			.fill(permanentPassword);
 		await page.getByTestId("teacher-first-login-password-submit").click();
 		await expect(page).toHaveURL(/\/teacher$/);
-		await expect(page.getByTestId("teacher-dashboard-heading")).toHaveText(
-			"Dashboard",
-		);
+		await expect(page.getByTestId("teacher-dashboard-root")).toBeVisible();
 
 		await page.getByTestId("teacher-account-menu-trigger").click();
 		await expect(page.getByTestId("teacher-account-menu-dashboard")).toBeVisible();

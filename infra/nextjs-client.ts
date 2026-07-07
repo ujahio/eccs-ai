@@ -20,6 +20,7 @@ export const client = new sst.aws.Nextjs("eccsfeweb", {
 		secrets.resendApiKey,
 		tables.registrationWorkflowTable,
 		tables.userProfileTable,
+		tables.teacherCaseTable,
 	],
 	dev: {
 		command: "bunx next dev -p 3001",
