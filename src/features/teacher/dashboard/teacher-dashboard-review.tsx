@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 
 type TeacherDashboardCase = {
 	caseId: string;
@@ -40,13 +40,13 @@ export function TeacherDashboardReview({
 			data-testid="teacher-dashboard-root"
 		>
 			<div className="mb-5 flex justify-end sm:mb-6">
-				<Button
-					disabled
+				<ButtonLink
 					data-testid="teacher-start-case-button"
+					href="/teacher/cases/new"
 					title={startCaseLabel}
 				>
 					{startCaseLabel}
-				</Button>
+				</ButtonLink>
 			</div>
 
 			<div className="grid gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.9fr)]">

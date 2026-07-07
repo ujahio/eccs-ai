@@ -369,14 +369,18 @@ export class InMemoryIdentityProvider
 		user.resetCodeConsumedAt = Date.now();
 	}
 
-	async invalidateCognitoSessions(_args: { emailNormalized: string }) {}
+	async invalidateCognitoSessions(args: { emailNormalized: string }) {
+		void args;
+	}
 
-	async updateProfileName(_args: {
+	async updateProfileName(args: {
 		emailNormalized: string;
 		firstName: string;
 		lastName: string;
 		fullName: string;
-	}) {}
+	}) {
+		void args;
+	}
 
 	async updateProfileEmail(args: {
 		currentEmailNormalized: string;

@@ -155,7 +155,10 @@ test.describe("Teacher dashboard", () => {
 		await expect(page.getByTestId("teacher-start-case-button")).toHaveText(
 			"Start a draft case",
 		);
-		await expect(page.getByTestId("teacher-start-case-button")).toBeDisabled();
+		await expect(page.getByTestId("teacher-start-case-button")).toHaveAttribute(
+			"href",
+			"/teacher/cases/new",
+		);
 		await expect(page.getByTestId("teacher-active-case-card")).toBeVisible();
 		await expect(page.getByTestId("teacher-active-case-title")).toHaveText(
 			"Acute endocrine case review",
@@ -198,7 +201,10 @@ test.describe("Teacher dashboard", () => {
 		await expect(page.getByTestId("teacher-start-case-button")).toHaveText(
 			"Start a New Case",
 		);
-		await expect(page.getByTestId("teacher-start-case-button")).toBeDisabled();
+		await expect(page.getByTestId("teacher-start-case-button")).toHaveAttribute(
+			"href",
+			"/teacher/cases/new",
+		);
 		await expect(
 			page.getByTestId("teacher-dashboard-no-active-case"),
 		).toBeVisible();
