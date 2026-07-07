@@ -83,6 +83,19 @@ export type E2EEmailRecord =
 type E2EAuthStoreShape = {
 	registrations: Map<string, PendingRegistrationRecord>;
 	profiles: Map<string, AppProfileRecord>;
+	teacherCases: Map<
+		string,
+		{
+			caseId: string;
+			title: string;
+			lifecycle: "published" | "archived" | "draft";
+			publishedAt: number;
+			deadlineAt: number;
+			archivedAt?: number;
+			completionCount: number;
+			feedbackCount: number;
+		}
+	>;
 	users: Map<
 		string,
 		{
@@ -114,6 +127,7 @@ function getStore(): E2EAuthStoreShape {
 		processStore[GLOBAL_KEY] = {
 			registrations: new Map(),
 			profiles: new Map(),
+			teacherCases: new Map(),
 			users: new Map(),
 			emails: []
 		};
@@ -131,6 +145,7 @@ export function resetE2EAuthStore() {
 
 	store.registrations.clear();
 	store.profiles.clear();
+	store.teacherCases.clear();
 	store.users.clear();
 	store.emails = [];
 
@@ -139,6 +154,31 @@ export function resetE2EAuthStore() {
 
 export function isE2EMode(): boolean {
 	return process.env.AUTH_E2E_MODE === "memory";
+}
+
+export function getE2ETeacherCaseStore() {
+	return Array.from(getStore().teacherCases.values());
+}
+
+export function seedE2ETeacherCases(
+	cases: Array<{
+		caseId: string;
+		title: string;
+		lifecycle: "published" | "archived" | "draft";
+		publishedAt: number;
+		deadlineAt: number;
+		archivedAt?: number;
+		completionCount: number;
+		feedbackCount: number;
+	}>,
+) {
+	const store = getStore();
+
+	store.teacherCases.clear();
+
+	for (const caseRecord of cases) {
+		store.teacherCases.set(caseRecord.caseId, caseRecord);
+	}
 }
 
 export class InMemoryIdentityProvider

@@ -27,6 +27,10 @@ declare module "sst" {
       "type": "sst.sst.Secret"
       "value": string
     }
+    "TeacherCaseTable": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
     "UserProfileTable": {
       "name": string
       "type": "sst.aws.Dynamo"

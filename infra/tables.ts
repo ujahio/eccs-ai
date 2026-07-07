@@ -50,3 +50,27 @@ export const userProfileTable = new sst.aws.Dynamo("UserProfileTable", {
 		}
 	}
 });
+
+export const teacherCaseTable = new sst.aws.Dynamo("TeacherCaseTable", {
+	fields: {
+		caseId: "string",
+		lifecycle: "string",
+		deadlineAt: "number",
+		archivedAt: "number"
+	},
+	primaryIndex: {
+		hashKey: "caseId"
+	},
+	globalIndexes: {
+		LifecycleDeadlineIndex: {
+			hashKey: "lifecycle",
+			rangeKey: "deadlineAt",
+			projection: "all"
+		},
+		LifecycleArchivedIndex: {
+			hashKey: "lifecycle",
+			rangeKey: "archivedAt",
+			projection: "all"
+		}
+	}
+});

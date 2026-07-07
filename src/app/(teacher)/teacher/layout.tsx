@@ -40,7 +40,7 @@ export default async function TeacherLayout({
 							data-testid="teacher-cases-link"
 							href="/teacher"
 						>
-							Cases
+							Case Studies
 						</Link>
 					</div>
 					<TeacherAccountMenu teacherName={profile.fullName} />

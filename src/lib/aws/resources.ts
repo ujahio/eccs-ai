@@ -7,6 +7,7 @@ export type LinkedResources = {
 	AuthUserPoolClient: { id: string };
 	RegistrationWorkflowTable: { name: string };
 	UserProfileTable: { name: string };
+	TeacherCaseTable: { name: string };
 	ResendApiKey: { value: string };
 	BetterAuthSecret: { value: string };
 };
@@ -68,6 +69,12 @@ export function getSessionAuthResources() {
 			: required(
 					linkedValue(() => linkedResources.UserProfileTable?.name),
 					"UserProfileTable.name",
+				),
+		teacherCaseTableName: e2eMode
+			? "e2e-teacher-case-table"
+			: required(
+					linkedValue(() => linkedResources.TeacherCaseTable?.name),
+					"TeacherCaseTable.name",
 				),
 		betterAuthSecret: required(
 			linkedValue(() => linkedResources.BetterAuthSecret?.value) ??
