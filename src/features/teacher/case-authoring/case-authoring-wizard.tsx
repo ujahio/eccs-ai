@@ -7,6 +7,8 @@ import {
 	caseAuthoringSections,
 	createDraftId,
 	createEmptyCmeQuestion,
+	draftForEditing,
+	draftForStorage,
 	emptyCaseDraft,
 	isPublishReady,
 	type CaseAuthoringSection,
@@ -41,7 +43,7 @@ export function CaseAuthoringWizard() {
 			}
 
 			try {
-				setDraft({ ...emptyCaseDraft, ...JSON.parse(storedDraft) });
+				setDraft(draftForEditing({ ...emptyCaseDraft, ...JSON.parse(storedDraft) }));
 			} catch {
 				setDraftStatus("error");
 			}
@@ -73,7 +75,10 @@ export function CaseAuthoringWizard() {
 
 	function saveDraft() {
 		try {
-			window.localStorage.setItem(draftStorageKey, JSON.stringify(draft));
+			window.localStorage.setItem(
+				draftStorageKey,
+				JSON.stringify(draftForStorage(draft)),
+			);
 			setIsDirty(false);
 			setDraftStatus("saved");
 		} catch {

@@ -100,7 +100,7 @@ test.describe("Teacher case authoring", () => {
 
 		await page.getByTestId("teacher-case-section-cme").click();
 		await expect(page.getByTestId("teacher-case-cme-counter")).toHaveText(
-			"Question 1 of 1",
+			"Question 1",
 		);
 		await expect(page.getByTestId("teacher-case-cme-validation")).toHaveText(
 			"Add 3 to 5 CME questions.",

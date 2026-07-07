@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
 	createEmptyCmeQuestion,
+	draftForEditing,
+	draftForStorage,
 	emptyCaseDraft,
+	hasCmeQuestionContent,
 	isPublishReady,
 	type CaseDraft,
 	validateCmeQuestions,
@@ -77,5 +80,35 @@ describe("case authoring validation", () => {
 
 		expect(validateCmeQuestions([question, validQuestion(2), validQuestion(3)]))
 			.toContain("Question 1 needs 2 to 5 options.");
+	});
+
+	it("uses authored content validation once three CME question tabs exist", () => {
+		const errors = validateCmeQuestions([
+			validQuestion(1),
+			createEmptyCmeQuestion(),
+			createEmptyCmeQuestion(),
+		]);
+
+		expect(errors).not.toContain("Add 3 to 5 CME questions.");
+		expect(errors).toContain("Add content to at least 3 CME questions.");
+	});
+
+	it("stores only CME questions with real authored content", () => {
+		const blankQuestion = createEmptyCmeQuestion();
+		const authoredQuestion = {
+			...createEmptyCmeQuestion(),
+			prompt: "Which clinical finding should be prioritized?",
+		};
+		const draft = {
+			...emptyCaseDraft,
+			cmeQuestions: [blankQuestion, authoredQuestion],
+		};
+
+		expect(hasCmeQuestionContent(blankQuestion)).toBe(false);
+		expect(hasCmeQuestionContent(authoredQuestion)).toBe(true);
+		expect(draftForStorage(draft).cmeQuestions).toEqual([authoredQuestion]);
+		expect(
+			draftForEditing({ ...draft, cmeQuestions: [] }).cmeQuestions,
+		).toHaveLength(1);
 	});
 });
