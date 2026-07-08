@@ -102,7 +102,7 @@ export function SectionNavigation({
 	return (
 		<nav
 			aria-label="Case authoring sections"
-			className="rounded border border-border-gray bg-white p-3"
+			className="self-start rounded border border-border-gray bg-white p-3"
 		>
 			{caseAuthoringSections.map((section, index) => (
 				<button

@@ -13,6 +13,7 @@ describe("case authoring wizard frame", () => {
 		);
 
 		expect(markup).toContain('aria-label="Case authoring sections"');
+		expect(markup).toContain("self-start");
 		expect(markup).toContain('data-testid="teacher-case-section-title"');
 		expect(markup).toContain("Title &amp; Description");
 		expect(markup).toContain("Final Review");
