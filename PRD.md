@@ -105,8 +105,9 @@ No super-admin UI is included in v1. Teacher setup is handled through bootstrap/
 - Deadline display uses UAE time as the source of truth, with a local browser-time equivalent where helpful.
 - Publishing is immediate from the teacher action. There is no scheduled publishing in v1.
 - Publishing creates exactly one "active" case. Disable publishing while another active case exists.
-- At deadline, the case auto-archives and all student operations on that case stop immediately. There is no mid-quiz exception in v1.
-- Case active/archive state is computed dynamically from `deadlineAt` for correctness, and a scheduled backend job also persists archive state for operational clarity.
+- At deadline, the case is treated as archived and all student operations on that case stop immediately. There is no mid-quiz exception in v1.
+- Case active/archive behavior is computed dynamically from the published case deadline for correctness.
+- A scheduled backend job also persists archived lifecycle state for operational clarity.
 - Students cannot access cases after the deadline unless they already earned a certificate. The only lasting student access is to their own certificates.
 - Payments are deferred until payment provider research is complete. While payments are deferred, verified students can access active cases through a `canAccessCases` policy boundary. When payments are introduced, case access must require both verification and paid access.
 
