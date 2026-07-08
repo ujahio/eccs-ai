@@ -12,6 +12,7 @@ function uniqueEmail(prefix: string) {
 }
 
 const teacherPassword = "teacher1";
+const dayInMilliseconds = 24 * 60 * 60 * 1000;
 
 async function bootstrapVerifiedTeacher(
 	request: APIRequestContext,
@@ -46,6 +47,11 @@ async function login(page: Page, email: string) {
 
 test.describe("Teacher case authoring", () => {
 	test.afterEach(async ({ request }) => {
+		const dashboardResponse = await request.delete(
+			"/api/e2e/teacher-dashboard/state",
+		);
+		expect(dashboardResponse.ok()).toBe(true);
+
 		const authResponse = await request.delete("/api/e2e/auth/state");
 		expect(authResponse.ok()).toBe(true);
 	});
@@ -110,6 +116,40 @@ test.describe("Teacher case authoring", () => {
 		await expect(page.getByTestId("teacher-case-publish-readiness")).toContainText(
 			"Draft can be saved",
 		);
+		await expect(page.getByTestId("teacher-case-publish")).toBeDisabled();
+	});
+
+	test("blocks publishing while another case is active", async ({
+		page,
+		request,
+	}) => {
+		const email = uniqueEmail("teacher-case-active-publish-blocker");
+		const now = Date.now();
+
+		await bootstrapVerifiedTeacher(request, email);
+		const dashboardResponse = await request.post(
+			"/api/e2e/teacher-dashboard/state",
+			{
+				data: {
+					activeCase: {
+						title: "Currently active endocrine case",
+						publishedAt: now - dayInMilliseconds,
+						deadlineAt: now + 14 * dayInMilliseconds,
+						completionCount: 0,
+						feedbackCount: 0,
+					},
+				},
+			},
+		);
+		expect(dashboardResponse.ok()).toBe(true);
+
+		await login(page, email);
+		await page.getByTestId("teacher-start-case-button").click();
+		await page.getByTestId("teacher-case-section-review").click();
+
+		await expect(
+			page.getByTestId("teacher-case-active-publish-blocker"),
+		).toContainText("Currently active endocrine case");
 		await expect(page.getByTestId("teacher-case-publish")).toBeDisabled();
 	});
 });

@@ -1,21 +1,30 @@
-import { Button } from "@/components/ui/button";
-import type { CaseDraft, CaseDraftValidation } from "../schema";
+import { Button, buttonVariants } from "@/components/ui/button";
+import type {
+	ActivePublishedCaseSummary,
+	CaseDraft,
+	CaseDraftValidation,
+	DraftAttachment,
+} from "../schema";
 import { Field, ReviewBlock, SectionHeading } from "../shared";
 
 type UpdateDraft = (update: Partial<CaseDraft>) => void;
 
 export function ReviewSection({
+	activePublishedCase,
 	draft,
 	readyToPublish,
 	updateDraft,
 	validation,
 }: {
+	activePublishedCase: ActivePublishedCaseSummary | null;
 	draft: CaseDraft;
 	readyToPublish: boolean;
 	updateDraft: UpdateDraft;
 	validation: CaseDraftValidation;
 }) {
 	const validationEntries = Object.entries(validation);
+	const hasActivePublishedCase = activePublishedCase !== null;
+	const publishDisabled = !readyToPublish || hasActivePublishedCase;
 
 	return (
 		<div data-testid="teacher-case-review-section">
@@ -43,39 +52,60 @@ export function ReviewSection({
 					</p>
 				) : null}
 			</Field>
-			<div className="mt-5 grid gap-4 lg:grid-cols-2">
+			<div className="mt-5 grid gap-4 lg:grid-cols-3">
 				<ReviewBlock label="Case Title" value={draft.title} />
 				<ReviewBlock label="Description" value={draft.description} />
-				<ReviewBlock label="Case Presentation" value={draft.presentation} />
-				<ReviewBlock label="Model Answer" value={draft.modelAnswer} />
-				<ReviewBlock label="Lecture Text" value={draft.lectureText} />
-				<ReviewBlock
-					label="PDF Attachments"
-					value={
-						draft.attachments.length > 0
-							? draft.attachments.map((attachment) => attachment.name).join(", ")
-							: "No PDFs attached"
-					}
-				/>
 				<ReviewBlock
 					label="CME Questions"
 					value={`${draft.cmeQuestions.length} question${draft.cmeQuestions.length === 1 ? "" : "s"} added`}
 				/>
 			</div>
+			<div className="mt-5 space-y-5">
+				<ReviewTextPanel
+					label="Case Presentation"
+					testId="teacher-case-review-presentation"
+					value={draft.presentation}
+				/>
+				<ReviewTextPanel
+					label="Model Answer"
+					testId="teacher-case-review-model-answer"
+					value={draft.modelAnswer}
+				/>
+				<ReviewTextPanel
+					label="Lecture Text"
+					testId="teacher-case-review-lecture-text"
+					value={draft.lectureText}
+				/>
+				<ReviewAttachmentPreviews attachments={draft.attachments} />
+			</div>
 			<div
 				className={[
 					"mt-5 border p-4",
-					readyToPublish
+					hasActivePublishedCase
+						? "border-warning-gold bg-white"
+						: readyToPublish
 						? "border-success-mint bg-success-soft"
 						: "border-border-gray bg-app-canvas",
 				].join(" ")}
 				data-testid="teacher-case-publish-readiness"
 			>
 				<p className="text-sm font-semibold">
-					{readyToPublish
+					{hasActivePublishedCase
+						? "Publishing is unavailable while another case is active."
+						: readyToPublish
 						? "Ready to publish"
 						: "Draft can be saved, but publish needs more content."}
 				</p>
+				{hasActivePublishedCase ? (
+					<p
+						className="mt-2 text-sm leading-6 text-muted-gray"
+						data-testid="teacher-case-active-publish-blocker"
+					>
+						{activePublishedCase.title} is active until{" "}
+						{formatDubaiDate(activePublishedCase.deadlineAt)}. Publish this
+						case after the active case closes.
+					</p>
+				) : null}
 				{validationEntries.length > 0 ? (
 					<ul className="mt-3 space-y-1 text-sm text-muted-gray">
 						{validationEntries.map(([key, value]) => (
@@ -87,10 +117,152 @@ export function ReviewSection({
 			<Button
 				className="mt-5"
 				data-testid="teacher-case-publish"
-				disabled={!readyToPublish}
+				disabled={publishDisabled}
 			>
 				Publish Case
 			</Button>
 		</div>
 	);
+}
+
+function ReviewTextPanel({
+	label,
+	testId,
+	value,
+}: {
+	label: string;
+	testId: string;
+	value: string;
+}) {
+	const trimmedValue = value.trim();
+	const wordCount = trimmedValue ? trimmedValue.split(/\s+/).length : 0;
+
+	return (
+		<section className="border border-border-gray bg-white" data-testid={testId}>
+			<div className="flex flex-col gap-2 border-b border-border-gray px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+				<h3 className="text-sm font-semibold text-primary-text">{label}</h3>
+				<p className="text-xs font-semibold uppercase text-muted-gray">
+					{wordCount} word{wordCount === 1 ? "" : "s"}
+				</p>
+			</div>
+			<div className="max-h-[32rem] overflow-auto bg-app-canvas p-4 text-sm leading-7 text-primary-text sm:p-5">
+				{trimmedValue ? (
+					<p className="whitespace-pre-wrap">{trimmedValue}</p>
+				) : (
+					<p className="text-muted-gray">Not added yet</p>
+				)}
+			</div>
+		</section>
+	);
+}
+
+function ReviewAttachmentPreviews({
+	attachments,
+}: {
+	attachments: DraftAttachment[];
+}) {
+	return (
+		<section
+			className="border border-border-gray bg-white"
+			data-testid="teacher-case-review-pdf-previews"
+		>
+			<div className="border-b border-border-gray px-4 py-3">
+				<h3 className="text-sm font-semibold text-primary-text">
+					Case Materials
+				</h3>
+			</div>
+			{attachments.length > 0 ? (
+				<div className="space-y-4 p-4 sm:p-5">
+					{attachments.map((attachment, index) => (
+						<ReviewAttachmentPreview
+							attachment={attachment}
+							index={index}
+							key={attachment.id}
+						/>
+					))}
+				</div>
+			) : (
+				<p className="p-4 text-sm text-muted-gray sm:p-5">
+					No Case Materials attached
+				</p>
+			)}
+		</section>
+	);
+}
+
+function ReviewAttachmentPreview({
+	attachment,
+	index,
+}: {
+	attachment: DraftAttachment;
+	index: number;
+}) {
+	return (
+		<article className="border border-border-gray bg-app-canvas">
+			<div className="flex flex-col gap-3 border-b border-border-gray bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+				<div>
+					<h4 className="text-sm font-semibold text-primary-text">
+						{attachment.name}
+					</h4>
+					<p className="mt-1 text-xs font-semibold uppercase text-muted-gray">
+						{formatFileSize(attachment.size)}
+					</p>
+				</div>
+				{attachment.previewUrl ? (
+					<a
+						className={buttonVariants({ variant: "secondary", size: "sm" })}
+						href={attachment.previewUrl}
+						rel="noreferrer"
+						target="_blank"
+					>
+						Open PDF
+					</a>
+				) : null}
+			</div>
+			{attachment.previewUrl ? (
+				<object
+					aria-label={`${attachment.name} preview`}
+					className="h-80 w-full bg-white sm:h-[28rem]"
+					data={attachment.previewUrl}
+					data-testid={`teacher-case-review-pdf-preview-${index}`}
+					type={attachment.type || "application/pdf"}
+				>
+					<div className="flex min-h-60 items-center justify-center p-6 text-center text-sm leading-6 text-muted-gray">
+						This browser cannot display the PDF preview. Use Open PDF to inspect
+						the material.
+					</div>
+				</object>
+			) : (
+				<div
+					className="flex min-h-52 items-center justify-center px-4 py-8 text-center text-sm leading-6 text-muted-gray"
+					data-testid={`teacher-case-review-pdf-preview-${index}`}
+				>
+					PDF metadata is saved. Re-upload this material before publishing if
+					you need to inspect the file contents again.
+				</div>
+			)}
+		</article>
+	);
+}
+
+function formatFileSize(bytes: number) {
+	if (bytes < 1024) {
+		return `${bytes} B`;
+	}
+
+	const kilobytes = bytes / 1024;
+	if (kilobytes < 1024) {
+		return `${kilobytes.toFixed(1)} KB`;
+	}
+
+	return `${(kilobytes / 1024).toFixed(1)} MB`;
+}
+
+function formatDubaiDate(epochMilliseconds: number) {
+	return new Intl.DateTimeFormat("en-US", {
+		day: "numeric",
+		month: "short",
+		timeZone: "Asia/Dubai",
+		year: "numeric",
+	}).format(new Date(epochMilliseconds));
 }

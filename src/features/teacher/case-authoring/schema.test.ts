@@ -101,12 +101,29 @@ describe("case authoring validation", () => {
 		};
 		const draft = {
 			...emptyCaseDraft,
+			attachments: [
+				{
+					id: "attachment-1",
+					name: "teaching-resource.pdf",
+					size: 512,
+					type: "application/pdf",
+					lastModified: 1,
+					previewUrl: "blob:http://localhost/preview",
+				},
+			],
 			cmeQuestions: [blankQuestion, authoredQuestion],
 		};
 
 		expect(hasCmeQuestionContent(blankQuestion)).toBe(false);
 		expect(hasCmeQuestionContent(authoredQuestion)).toBe(true);
 		expect(draftForStorage(draft).cmeQuestions).toEqual([authoredQuestion]);
+		expect(draftForStorage(draft).attachments[0]).toEqual({
+			id: "attachment-1",
+			name: "teaching-resource.pdf",
+			size: 512,
+			type: "application/pdf",
+			lastModified: 1,
+		});
 		expect(
 			draftForEditing({ ...draft, cmeQuestions: [] }).cmeQuestions,
 		).toHaveLength(1);

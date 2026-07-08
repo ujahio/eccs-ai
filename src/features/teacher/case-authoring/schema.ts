@@ -15,6 +15,12 @@ export type DraftAttachment = {
 	size: number;
 	type: string;
 	lastModified: number;
+	previewUrl?: string;
+};
+
+export type ActivePublishedCaseSummary = {
+	title: string;
+	deadlineAt: number;
 };
 
 export type CmeOptionDraft = {
@@ -94,7 +100,18 @@ export function savableCmeQuestions(questions: CmeQuestionDraft[]) {
 export function draftForStorage(draft: CaseDraft): CaseDraft {
 	return {
 		...draft,
+		attachments: draft.attachments.map(attachmentForStorage),
 		cmeQuestions: savableCmeQuestions(draft.cmeQuestions),
+	};
+}
+
+function attachmentForStorage(attachment: DraftAttachment): DraftAttachment {
+	return {
+		id: attachment.id,
+		name: attachment.name,
+		size: attachment.size,
+		type: attachment.type,
+		lastModified: attachment.lastModified,
 	};
 }
 

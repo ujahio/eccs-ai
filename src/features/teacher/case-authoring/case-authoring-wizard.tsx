@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActiveAuthoringSection } from "./active-section";
 import { draftStorageKey } from "./constants";
 import {
@@ -11,6 +11,7 @@ import {
 	draftForStorage,
 	emptyCaseDraft,
 	isPublishReady,
+	type ActivePublishedCaseSummary,
 	type CaseAuthoringSection,
 	type CaseDraft,
 	type CmeQuestionDraft,
@@ -24,7 +25,11 @@ import {
 	WizardStatusMessages,
 } from "./wizard-frame";
 
-export function CaseAuthoringWizard() {
+export function CaseAuthoringWizard({
+	activePublishedCase = null,
+}: {
+	activePublishedCase?: ActivePublishedCaseSummary | null;
+}) {
 	const [draft, setDraft] = useState<CaseDraft>(emptyCaseDraft);
 	const [activeSection, setActiveSection] =
 		useState<CaseAuthoringSection>("title");
@@ -32,6 +37,7 @@ export function CaseAuthoringWizard() {
 	const [isDirty, setIsDirty] = useState(false);
 	const [draftStatus, setDraftStatus] = useState<DraftStatus>("idle");
 	const [sectionWarning, setSectionWarning] = useState("");
+	const attachmentPreviewUrls = useRef(new Set<string>());
 	const validation = useMemo(() => validateDraftForPublish(draft), [draft]);
 	const readyToPublish = useMemo(() => isPublishReady(draft), [draft]);
 
@@ -50,6 +56,17 @@ export function CaseAuthoringWizard() {
 		});
 
 		return () => window.cancelAnimationFrame(animationFrame);
+	}, []);
+
+	useEffect(() => {
+		const previewUrls = attachmentPreviewUrls.current;
+
+		return () => {
+			for (const previewUrl of previewUrls) {
+				URL.revokeObjectURL(previewUrl);
+			}
+			previewUrls.clear();
+		};
 	}, []);
 
 	useEffect(() => {
@@ -158,18 +175,39 @@ export function CaseAuthoringWizard() {
 		const pdfFiles = Array.from(files).filter(
 			(file) => file.type === "application/pdf" || file.name.endsWith(".pdf"),
 		);
+		const attachments = pdfFiles.map((file) => {
+			const previewUrl = URL.createObjectURL(file);
+			attachmentPreviewUrls.current.add(previewUrl);
+
+			return {
+				id: createDraftId("attachment"),
+				name: file.name,
+				size: file.size,
+				type: file.type || "application/pdf",
+				lastModified: file.lastModified,
+				previewUrl,
+			};
+		});
 
 		updateDraft({
-			attachments: [
-				...draft.attachments,
-				...pdfFiles.map((file) => ({
-					id: createDraftId("attachment"),
-					name: file.name,
-					size: file.size,
-					type: file.type || "application/pdf",
-					lastModified: file.lastModified,
-				})),
-			],
+			attachments: [...draft.attachments, ...attachments],
+		});
+	}
+
+	function removeAttachment(attachmentId: string) {
+		const attachment = draft.attachments.find(
+			(currentAttachment) => currentAttachment.id === attachmentId,
+		);
+
+		if (attachment?.previewUrl) {
+			URL.revokeObjectURL(attachment.previewUrl);
+			attachmentPreviewUrls.current.delete(attachment.previewUrl);
+		}
+
+		updateDraft({
+			attachments: draft.attachments.filter(
+				(currentAttachment) => currentAttachment.id !== attachmentId,
+			),
 		});
 	}
 
@@ -201,13 +239,8 @@ export function CaseAuthoringWizard() {
 						addQuestion={addQuestion}
 						draft={draft}
 						readyToPublish={readyToPublish}
-						removeAttachment={(attachmentId) =>
-							updateDraft({
-								attachments: draft.attachments.filter(
-									(attachment) => attachment.id !== attachmentId,
-								),
-							})
-						}
+						activePublishedCase={activePublishedCase}
+						removeAttachment={removeAttachment}
 						removeQuestion={removeQuestion}
 						setActiveQuestionIndex={setActiveQuestionIndex}
 						updateDraft={updateDraft}

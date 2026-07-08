@@ -1,4 +1,5 @@
 import type {
+	ActivePublishedCaseSummary,
 	CaseAuthoringSection,
 	CaseDraft,
 	CaseDraftValidation,
@@ -13,6 +14,7 @@ import {
 } from "./sections";
 
 export function ActiveAuthoringSection({
+	activePublishedCase,
 	activeQuestionIndex,
 	activeSection,
 	addPdfAttachments,
@@ -26,6 +28,7 @@ export function ActiveAuthoringSection({
 	updateQuestion,
 	validation,
 }: {
+	activePublishedCase: ActivePublishedCaseSummary | null;
 	activeQuestionIndex: number;
 	activeSection: CaseAuthoringSection;
 	addPdfAttachments: (files: FileList | null) => void;
@@ -94,6 +97,7 @@ export function ActiveAuthoringSection({
 
 	return (
 		<ReviewSection
+			activePublishedCase={activePublishedCase}
 			draft={draft}
 			readyToPublish={readyToPublish}
 			updateDraft={updateDraft}
