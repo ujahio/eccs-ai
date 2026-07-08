@@ -98,6 +98,11 @@ describe("case authoring validation", () => {
 		const authoredQuestion = {
 			...createEmptyCmeQuestion(),
 			prompt: "Which clinical finding should be prioritized?",
+			options: [
+				{ id: "filled-option", text: "Prioritize serum potassium" },
+				{ id: "empty-option", text: "" },
+			],
+			correctOptionId: "empty-option",
 		};
 		const draft = {
 			...emptyCaseDraft,
@@ -109,23 +114,35 @@ describe("case authoring validation", () => {
 					type: "application/pdf",
 					lastModified: 1,
 					previewUrl: "blob:http://localhost/preview",
+					dataUrl: "data:application/pdf;base64,JVBERi0xLjQ=",
 				},
 			],
 			cmeQuestions: [blankQuestion, authoredQuestion],
 		};
+		const storedDraft = draftForStorage(draft);
 
 		expect(hasCmeQuestionContent(blankQuestion)).toBe(false);
 		expect(hasCmeQuestionContent(authoredQuestion)).toBe(true);
-		expect(draftForStorage(draft).cmeQuestions).toEqual([authoredQuestion]);
-		expect(draftForStorage(draft).attachments[0]).toEqual({
+		expect(storedDraft.cmeQuestions).toEqual([
+			{
+				...authoredQuestion,
+				options: [{ id: "filled-option", text: "Prioritize serum potassium" }],
+				correctOptionId: "filled-option",
+			},
+		]);
+		expect(storedDraft.attachments[0]).toEqual({
 			id: "attachment-1",
 			name: "teaching-resource.pdf",
 			size: 512,
 			type: "application/pdf",
 			lastModified: 1,
+			dataUrl: "data:application/pdf;base64,JVBERi0xLjQ=",
 		});
 		expect(
-			draftForEditing({ ...draft, cmeQuestions: [] }).cmeQuestions,
+			draftForEditing({ ...storedDraft, cmeQuestions: [] }).cmeQuestions,
 		).toHaveLength(1);
+		expect(draftForEditing(storedDraft).cmeQuestions[0].options).toHaveLength(
+			2,
+		);
 	});
 });

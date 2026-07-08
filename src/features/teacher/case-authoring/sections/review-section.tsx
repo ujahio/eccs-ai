@@ -197,6 +197,8 @@ function ReviewAttachmentPreview({
 	attachment: DraftAttachment;
 	index: number;
 }) {
+	const previewSource = attachment.previewUrl ?? attachment.dataUrl ?? "";
+
 	return (
 		<article className="border border-border-gray bg-app-canvas">
 			<div className="flex flex-col gap-3 border-b border-border-gray bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -208,10 +210,10 @@ function ReviewAttachmentPreview({
 						{formatFileSize(attachment.size)}
 					</p>
 				</div>
-				{attachment.previewUrl ? (
+				{previewSource ? (
 					<a
 						className={buttonVariants({ variant: "secondary", size: "sm" })}
-						href={attachment.previewUrl}
+						href={previewSource}
 						rel="noreferrer"
 						target="_blank"
 					>
@@ -219,11 +221,11 @@ function ReviewAttachmentPreview({
 					</a>
 				) : null}
 			</div>
-			{attachment.previewUrl ? (
+			{previewSource ? (
 				<object
 					aria-label={`${attachment.name} preview`}
 					className="h-80 w-full bg-white sm:h-[28rem]"
-					data={attachment.previewUrl}
+					data={previewSource}
 					data-testid={`teacher-case-review-pdf-preview-${index}`}
 					type={attachment.type || "application/pdf"}
 				>
@@ -237,8 +239,8 @@ function ReviewAttachmentPreview({
 					className="flex min-h-52 items-center justify-center px-4 py-8 text-center text-sm leading-6 text-muted-gray"
 					data-testid={`teacher-case-review-pdf-preview-${index}`}
 				>
-					PDF metadata is saved. Re-upload this material before publishing if
-					you need to inspect the file contents again.
+					This material is saved, but no browser preview is available. Re-upload
+					it if you need to inspect the file contents here.
 				</div>
 			)}
 		</article>

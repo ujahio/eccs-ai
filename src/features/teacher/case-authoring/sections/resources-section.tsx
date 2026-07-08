@@ -8,7 +8,7 @@ export function ResourcesSection({
 	updateDeadlineDate,
 	updateLectureText,
 }: {
-	addPdfAttachments: (files: FileList | null) => void;
+	addPdfAttachments: (files: FileList | null) => Promise<void>;
 	draft: CaseDraft;
 	removeAttachment: (attachmentId: string) => void;
 	updateDeadlineDate: (value: string) => void;
@@ -47,7 +47,9 @@ export function ResourcesSection({
 					data-testid="teacher-case-pdf-attachments"
 					id="teacher-case-pdf-attachments"
 					multiple
-					onChange={(event) => addPdfAttachments(event.target.files)}
+					onChange={(event) => {
+						void addPdfAttachments(event.target.files);
+					}}
 					type="file"
 				/>
 				<div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">

@@ -4,14 +4,14 @@ import { sectionLabels } from "./constants";
 import { caseAuthoringSections, type CaseAuthoringSection } from "./schema";
 import { StatusMessage } from "./shared";
 
-export type DraftStatus = "idle" | "saved" | "error";
+export type DraftStatus = "idle" | "saving" | "saved" | "error";
 
 export function WizardHeader({
 	isDirty,
 	onSaveDraft,
 }: {
 	isDirty: boolean;
-	onSaveDraft: () => void;
+	onSaveDraft: () => void | Promise<void>;
 }) {
 	return (
 		<div className="mb-6 flex flex-col gap-4 border-b border-border-gray pb-5 sm:flex-row sm:items-end sm:justify-between">
@@ -59,11 +59,18 @@ export function WizardStatusMessages({
 					value="Draft saved."
 				/>
 			) : null}
+			{draftStatus === "saving" ? (
+				<StatusMessage
+					testId="teacher-case-draft-saving"
+					tone="warning"
+					value="Saving draft..."
+				/>
+			) : null}
 			{draftStatus === "error" ? (
 				<StatusMessage
 					testId="teacher-case-draft-error"
 					tone="error"
-					value="The draft could not be saved in this browser."
+					value="The draft could not be saved. Try again."
 				/>
 			) : null}
 			{sectionWarning ? (

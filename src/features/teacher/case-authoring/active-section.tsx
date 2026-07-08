@@ -31,7 +31,7 @@ export function ActiveAuthoringSection({
 	activePublishedCase: ActivePublishedCaseSummary | null;
 	activeQuestionIndex: number;
 	activeSection: CaseAuthoringSection;
-	addPdfAttachments: (files: FileList | null) => void;
+	addPdfAttachments: (files: FileList | null) => Promise<void>;
 	addQuestion: () => void;
 	draft: CaseDraft;
 	readyToPublish: boolean;

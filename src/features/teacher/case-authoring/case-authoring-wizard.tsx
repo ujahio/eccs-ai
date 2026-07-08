@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActiveAuthoringSection } from "./active-section";
-import { draftStorageKey } from "./constants";
 import {
 	caseAuthoringSections,
 	createDraftId,
 	createEmptyCmeQuestion,
+	caseDraftFromUnknown,
 	draftForEditing,
 	draftForStorage,
 	emptyCaseDraft,
@@ -42,20 +42,33 @@ export function CaseAuthoringWizard({
 	const readyToPublish = useMemo(() => isPublishReady(draft), [draft]);
 
 	useEffect(() => {
+		let isMounted = true;
 		const animationFrame = window.requestAnimationFrame(() => {
-			const storedDraft = window.localStorage.getItem(draftStorageKey);
-			if (!storedDraft) {
-				return;
-			}
+			void (async () => {
+				try {
+					const response = await fetch("/api/teacher/case-draft");
 
-			try {
-				setDraft(draftForEditing({ ...emptyCaseDraft, ...JSON.parse(storedDraft) }));
-			} catch {
-				setDraftStatus("error");
-			}
+					if (!response.ok) {
+						throw new Error("Draft load failed.");
+					}
+
+					const body = (await response.json()) as { draft?: unknown };
+
+					if (body.draft && isMounted) {
+						setDraft(draftForEditing(caseDraftFromUnknown(body.draft)));
+					}
+				} catch {
+					if (isMounted) {
+						setDraftStatus("error");
+					}
+				}
+			})();
 		});
 
-		return () => window.cancelAnimationFrame(animationFrame);
+		return () => {
+			isMounted = false;
+			window.cancelAnimationFrame(animationFrame);
+		};
 	}, []);
 
 	useEffect(() => {
@@ -90,12 +103,27 @@ export function CaseAuthoringWizard({
 		setDraftStatus("idle");
 	}
 
-	function saveDraft() {
+	async function saveDraft() {
 		try {
-			window.localStorage.setItem(
-				draftStorageKey,
-				JSON.stringify(draftForStorage(draft)),
-			);
+			setDraftStatus("saving");
+			const response = await fetch("/api/teacher/case-draft", {
+				body: JSON.stringify({ draft: draftForStorage(draft) }),
+				headers: {
+					"content-type": "application/json",
+				},
+				method: "PUT",
+			});
+
+			if (!response.ok) {
+				throw new Error("Draft save failed.");
+			}
+
+			const body = (await response.json()) as { draft?: unknown };
+			const savedDraft = body.draft
+				? draftForEditing(caseDraftFromUnknown(body.draft))
+				: draftForEditing(draftForStorage(draft));
+
+			setDraft(savedDraft);
 			setIsDirty(false);
 			setDraftStatus("saved");
 		} catch {
@@ -105,17 +133,13 @@ export function CaseAuthoringWizard({
 
 	function selectSection(section: CaseAuthoringSection) {
 		if (isDirty) {
-			const shouldContinue = window.confirm(
-				"You have unsaved changes. Continue without saving this draft?",
+			setSectionWarning(
+				"Unsaved changes stay on this page. Use Save Draft to persist them.",
 			);
-
-			if (!shouldContinue) {
-				setSectionWarning("Save your draft before changing sections.");
-				return;
-			}
+		} else {
+			setSectionWarning("");
 		}
 
-		setSectionWarning("");
 		setActiveSection(section);
 	}
 
@@ -167,7 +191,7 @@ export function CaseAuthoringWizard({
 		setActiveQuestionIndex(Math.max(0, activeQuestionIndex - 1));
 	}
 
-	function addPdfAttachments(files: FileList | null) {
+	async function addPdfAttachments(files: FileList | null) {
 		if (!files) {
 			return;
 		}
@@ -175,11 +199,12 @@ export function CaseAuthoringWizard({
 		const pdfFiles = Array.from(files).filter(
 			(file) => file.type === "application/pdf" || file.name.endsWith(".pdf"),
 		);
-		const attachments = pdfFiles.map((file) => {
+		const attachments = await Promise.all(pdfFiles.map(async (file) => {
 			const previewUrl = URL.createObjectURL(file);
 			attachmentPreviewUrls.current.add(previewUrl);
 
 			return {
+				dataUrl: await readFileAsDataUrl(file),
 				id: createDraftId("attachment"),
 				name: file.name,
 				size: file.size,
@@ -187,7 +212,7 @@ export function CaseAuthoringWizard({
 				lastModified: file.lastModified,
 				previewUrl,
 			};
-		});
+		}));
 
 		updateDraft({
 			attachments: [...draft.attachments, ...attachments],
@@ -251,4 +276,16 @@ export function CaseAuthoringWizard({
 			</div>
 		</section>
 	);
+}
+
+function readFileAsDataUrl(file: File) {
+	return new Promise<string>((resolve, reject) => {
+		const reader = new FileReader();
+
+		reader.addEventListener("load", () => {
+			resolve(typeof reader.result === "string" ? reader.result : "");
+		});
+		reader.addEventListener("error", () => reject(reader.error));
+		reader.readAsDataURL(file);
+	});
 }

@@ -1,18 +1,11 @@
+import { expect, test, type APIRequestContext } from "@playwright/test";
 import {
-	expect,
-	test,
-	type APIRequestContext,
-	type Page,
-} from "@playwright/test";
-
-function uniqueEmail(prefix: string) {
-	return `e2e-${prefix}-${Date.now()}-${Math.random()
-		.toString(36)
-		.slice(2, 8)}@example.com`;
-}
-
-const teacherPassword = "teacher1";
-const dayInMilliseconds = 24 * 60 * 60 * 1000;
+	bootstrapVerifiedTeacher,
+	dayInMilliseconds,
+	loginTeacher,
+	resetTeacherE2EState,
+	uniqueEmail,
+} from "./teacher-helpers";
 
 function formatDashboardDate(epochMilliseconds: number) {
 	return new Intl.DateTimeFormat("en-US", {
@@ -21,37 +14,6 @@ function formatDashboardDate(epochMilliseconds: number) {
 		year: "numeric",
 		timeZone: "Asia/Dubai",
 	}).format(new Date(epochMilliseconds));
-}
-
-async function bootstrapVerifiedTeacher(
-	request: APIRequestContext,
-	email: string,
-) {
-	const response = await request.post("/api/e2e/auth/state", {
-		data: {
-			action: "bootstrap_teacher",
-			email,
-			firstName: "Taylor",
-			lastName: "Smith",
-			temporaryPassword: teacherPassword,
-			emailVerified: true,
-			forcePasswordChange: false,
-		},
-	});
-
-	expect(response.ok()).toBe(true);
-}
-
-async function login(page: Page, email: string) {
-	await page.goto("/login");
-	await expect(page.getByTestId("login-form")).toHaveAttribute(
-		"data-client-ready",
-		"true",
-	);
-	await page.getByTestId("login-email").fill(email);
-	await page.getByTestId("login-password").fill(teacherPassword);
-	await page.getByTestId("login-submit").click();
-	await expect(page).toHaveURL(/\/teacher$/);
 }
 
 async function seedTeacherDashboard(
@@ -87,13 +49,7 @@ test.describe("Teacher dashboard", () => {
 	});
 
 	test.afterEach(async ({ request }) => {
-		const dashboardResponse = await request.delete(
-			"/api/e2e/teacher-dashboard/state",
-		);
-		expect(dashboardResponse.ok()).toBe(true);
-
-		const authResponse = await request.delete("/api/e2e/auth/state");
-		expect(authResponse.ok()).toBe(true);
+		await resetTeacherE2EState(request);
 	});
 
 	test("shows active case details for a verified teacher when a case is seeded", async ({
@@ -150,7 +106,7 @@ test.describe("Teacher dashboard", () => {
 			],
 		);
 
-		await login(page, email);
+		await loginTeacher(page, email);
 		await expect(page.getByTestId("teacher-dashboard-root")).toBeVisible();
 		await expect(page.getByTestId("teacher-start-case-button")).toHaveText(
 			"Start a draft case",
@@ -196,7 +152,7 @@ test.describe("Teacher dashboard", () => {
 		await bootstrapVerifiedTeacher(request, email);
 		await seedTeacherDashboard(request, null);
 
-		await login(page, email);
+		await loginTeacher(page, email);
 		await expect(page.getByTestId("teacher-dashboard-root")).toBeVisible();
 		await expect(page.getByTestId("teacher-start-case-button")).toHaveText(
 			"Start a New Case",

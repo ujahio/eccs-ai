@@ -1,69 +1,25 @@
+import { expect, test } from "@playwright/test";
 import {
-	expect,
-	test,
-	type APIRequestContext,
-	type Page,
-} from "@playwright/test";
-
-function uniqueEmail(prefix: string) {
-	return `e2e-${prefix}-${Date.now()}-${Math.random()
-		.toString(36)
-		.slice(2, 8)}@example.com`;
-}
-
-const teacherPassword = "teacher1";
-const dayInMilliseconds = 24 * 60 * 60 * 1000;
-
-async function bootstrapVerifiedTeacher(
-	request: APIRequestContext,
-	email: string,
-) {
-	const response = await request.post("/api/e2e/auth/state", {
-		data: {
-			action: "bootstrap_teacher",
-			email,
-			firstName: "Taylor",
-			lastName: "Smith",
-			temporaryPassword: teacherPassword,
-			emailVerified: true,
-			forcePasswordChange: false,
-		},
-	});
-
-	expect(response.ok()).toBe(true);
-}
-
-async function login(page: Page, email: string) {
-	await page.goto("/login");
-	await expect(page.getByTestId("login-form")).toHaveAttribute(
-		"data-client-ready",
-		"true",
-	);
-	await page.getByTestId("login-email").fill(email);
-	await page.getByTestId("login-password").fill(teacherPassword);
-	await page.getByTestId("login-submit").click();
-	await expect(page).toHaveURL(/\/teacher$/);
-}
+	bootstrapVerifiedTeacher,
+	dayInMilliseconds,
+	loginTeacher,
+	resetTeacherE2EState,
+	uniqueEmail,
+} from "./teacher-helpers";
 
 test.describe("Teacher case authoring", () => {
 	test.afterEach(async ({ request }) => {
-		const dashboardResponse = await request.delete(
-			"/api/e2e/teacher-dashboard/state",
-		);
-		expect(dashboardResponse.ok()).toBe(true);
-
-		const authResponse = await request.delete("/api/e2e/auth/state");
-		expect(authResponse.ok()).toBe(true);
+		await resetTeacherE2EState(request);
 	});
 
-	test("saves an incomplete draft, retains PDF metadata, and validates review readiness", async ({
+	test("saves an incomplete draft, retains PDF attachments, and validates review readiness", async ({
 		page,
 		request,
 	}) => {
 		const email = uniqueEmail("teacher-case-authoring");
 
 		await bootstrapVerifiedTeacher(request, email);
-		await login(page, email);
+		await loginTeacher(page, email);
 		await page.getByTestId("teacher-start-case-button").click();
 		await expect(page).toHaveURL(/\/teacher\/cases\/new$/);
 		await expect(page.getByTestId("teacher-case-authoring-root")).toBeVisible();
@@ -94,6 +50,9 @@ test.describe("Teacher case authoring", () => {
 			"teaching-resource.pdf",
 		);
 		await page.getByTestId("teacher-case-save-draft").click();
+		await expect(page.getByTestId("teacher-case-draft-saved")).toHaveText(
+			"Draft saved.",
+		);
 
 		await page.reload();
 		await expect(page.getByTestId("teacher-case-title")).toHaveValue(
@@ -143,7 +102,7 @@ test.describe("Teacher case authoring", () => {
 		);
 		expect(dashboardResponse.ok()).toBe(true);
 
-		await login(page, email);
+		await loginTeacher(page, email);
 		await page.getByTestId("teacher-start-case-button").click();
 		await page.getByTestId("teacher-case-section-review").click();
 
