@@ -19,6 +19,26 @@ type TeacherCaseCardRecord =
 			kind: "archived";
 	  });
 
+const CASE_MODE_DETAILS = {
+	draft: {
+		emptyStateTestId: "teacher-case-library-no-drafts",
+		emptyStateTitle: "No draft cases.",
+		listTestId: "teacher-draft-cases",
+	},
+	archived: {
+		emptyStateTestId: "teacher-case-library-no-archived-cases",
+		emptyStateTitle: "No archived cases.",
+		listTestId: "teacher-library-archived-cases",
+	},
+} satisfies Record<
+	TeacherCaseMode,
+	{
+		emptyStateTestId: string;
+		emptyStateTitle: string;
+		listTestId: string;
+	}
+>;
+
 export function TeacherCaseLibrary({
 	archivedCases,
 	draftCases,
@@ -31,13 +51,8 @@ export function TeacherCaseLibrary({
 		useState<TeacherDraftCase | null>(null);
 	const [deleteStatus, setDeleteStatus] = useState<"idle" | "deleting">("idle");
 	const [deleteError, setDeleteError] = useState("");
-	const cards: TeacherCaseCardRecord[] =
-		activeMode === "draft"
-			? drafts.map((draft) => ({ ...draft, kind: "draft" as const }))
-			: archivedCases.map((caseRecord) => ({
-					...caseRecord,
-					kind: "archived" as const,
-				}));
+	const activeModeDetails = CASE_MODE_DETAILS[activeMode];
+	const cards = caseRecordsForMode(activeMode, drafts, archivedCases);
 
 	async function confirmDeleteDraft() {
 		if (!draftPendingDelete) {
@@ -86,11 +101,7 @@ export function TeacherCaseLibrary({
 			{cards.length > 0 ? (
 				<div
 					className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
-					data-testid={
-						activeMode === "draft"
-							? "teacher-draft-cases"
-							: "teacher-library-archived-cases"
-					}
+					data-testid={activeModeDetails.listTestId}
 				>
 					{cards.map((caseRecord) => (
 						<TeacherCaseCard
@@ -109,12 +120,8 @@ export function TeacherCaseLibrary({
 				</div>
 			) : (
 				<EmptyState
-					testId={
-						activeMode === "draft"
-							? "teacher-case-library-no-drafts"
-							: "teacher-case-library-no-archived-cases"
-					}
-					title={`No ${activeMode === "draft" ? "draft" : "archived"} cases.`}
+					testId={activeModeDetails.emptyStateTestId}
+					title={activeModeDetails.emptyStateTitle}
 				/>
 			)}
 
@@ -132,6 +139,19 @@ export function TeacherCaseLibrary({
 			) : null}
 		</section>
 	);
+}
+
+function caseRecordsForMode(
+	activeMode: TeacherCaseMode,
+	drafts: TeacherDraftCase[],
+	archivedCases: TeacherCaseLibraryArchivedCase[],
+): TeacherCaseCardRecord[] {
+	return activeMode === "draft"
+		? drafts.map((draft) => ({ ...draft, kind: "draft" as const }))
+		: archivedCases.map((caseRecord) => ({
+				...caseRecord,
+				kind: "archived" as const,
+			}));
 }
 
 function CaseModeSwitch({
@@ -424,7 +444,8 @@ function DeleteDraftDialog({
 					Delete draft case?
 				</h2>
 				<p className="mt-3 text-sm leading-6 text-muted-gray">
-					This permanently deletes {draft.title} and its saved PDF attachments.
+					This permanently deletes <em>{draft.title}</em> and its saved case
+					materials.
 				</p>
 				{deleteError ? (
 					<p
@@ -489,10 +510,31 @@ function caseDate(caseRecord: TeacherCaseCardRecord) {
 
 function caseDeadline(caseRecord: TeacherCaseCardRecord) {
 	if (caseRecord.kind === "draft") {
-		return caseRecord.deadlineDate || "Not set";
+		return formatDraftDeadlineDate(caseRecord.deadlineDate);
 	}
 
 	return formatDate(caseRecord.deadlineAt);
+}
+
+function formatDraftDeadlineDate(deadlineDate: string) {
+	if (!deadlineDate) {
+		return "Not set";
+	}
+
+	const [yearText = "", monthText = "", dayText = ""] = deadlineDate.split("-");
+	const year = Number(yearText);
+	const month = Number(monthText);
+	const day = Number(dayText);
+
+	if (
+		!Number.isInteger(year) ||
+		!Number.isInteger(month) ||
+		!Number.isInteger(day)
+	) {
+		return deadlineDate;
+	}
+
+	return formatDate(Date.UTC(year, month - 1, day));
 }
 
 function formatDate(epochMilliseconds: number) {

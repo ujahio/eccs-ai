@@ -7,9 +7,8 @@ import {
 	DeleteCommand,
 	GetCommand,
 	PutCommand,
-	QueryCommand,
-	type QueryCommandInput,
 } from "@aws-sdk/lib-dynamodb";
+import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import {
 	deleteE2ETeacherCaseDraftRecord,
@@ -284,39 +283,25 @@ export class DynamoTeacherCaseDraftRepository
 	}
 
 	private async listDraftRecords(teacherProfileId: string) {
-		const records: TeacherCaseDraftRecord[] = [];
-		let exclusiveStartKey: QueryCommandInput["ExclusiveStartKey"];
+		const records = await queryAllDynamoItems<TeacherCaseDraftRecord>(
+			this.documentClient,
+			{
+				TableName: this.tableName,
+				IndexName: "LifecycleDeadlineIndex",
+				KeyConditionExpression: "#lifecycle = :draft",
+				FilterExpression: "#teacherProfileId = :teacherProfileId",
+				ExpressionAttributeNames: {
+					"#lifecycle": "lifecycle",
+					"#teacherProfileId": "teacherProfileId",
+				},
+				ExpressionAttributeValues: {
+					":draft": "draft",
+					":teacherProfileId": teacherProfileId,
+				},
+			},
+		);
 
-		do {
-			const response = await this.documentClient.send(
-				new QueryCommand({
-					TableName: this.tableName,
-					IndexName: "LifecycleDeadlineIndex",
-					KeyConditionExpression: "#lifecycle = :draft",
-					FilterExpression: "#teacherProfileId = :teacherProfileId",
-					ExpressionAttributeNames: {
-						"#lifecycle": "lifecycle",
-						"#teacherProfileId": "teacherProfileId",
-					},
-					ExpressionAttributeValues: {
-						":draft": "draft",
-						":teacherProfileId": teacherProfileId,
-					},
-					...(exclusiveStartKey
-						? { ExclusiveStartKey: exclusiveStartKey }
-						: {}),
-				}),
-			);
-
-			records.push(
-				...((response.Items ?? []) as TeacherCaseDraftRecord[]).filter(
-					(record) => record.teacherProfileId === teacherProfileId,
-				),
-			);
-			exclusiveStartKey = response.LastEvaluatedKey;
-		} while (exclusiveStartKey);
-
-		return records;
+		return records.filter((record) => record.teacherProfileId === teacherProfileId);
 	}
 }
 

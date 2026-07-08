@@ -1,11 +1,7 @@
 import "server-only";
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import {
-	DynamoDBDocumentClient,
-	QueryCommand,
-	type QueryCommandInput,
-} from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import {
 	getTeacherCaseDraftRepository,
 	type TeacherCaseDraftListItem,
@@ -14,6 +10,7 @@ import {
 	sortArchivedTeacherCases,
 	type TeacherCaseLifecycle,
 } from "@/features/teacher/cases/case-lifecycle";
+import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import { requireTeacherSession } from "@/lib/auth/session";
 import { getE2ETeacherCaseStore, isE2EMode } from "@/lib/e2e/in-memory-auth";
@@ -73,58 +70,43 @@ export class DynamoTeacherCaseLibraryRepository {
 
 	async listArchivedCases(now: number) {
 		const [archivedCases, expiredPublishedCases] = await Promise.all([
-			this.queryAll({
-				TableName: this.tableName,
-				IndexName: "LifecycleArchivedIndex",
-				KeyConditionExpression: "#lifecycle = :archived",
-				ExpressionAttributeNames: {
-					"#lifecycle": "lifecycle",
+			queryAllDynamoItems<StoredTeacherCaseRecord>(
+				this.documentClient,
+				{
+					TableName: this.tableName,
+					IndexName: "LifecycleArchivedIndex",
+					KeyConditionExpression: "#lifecycle = :archived",
+					ExpressionAttributeNames: {
+						"#lifecycle": "lifecycle",
+					},
+					ExpressionAttributeValues: {
+						":archived": "archived",
+					},
+					ScanIndexForward: false,
 				},
-				ExpressionAttributeValues: {
-					":archived": "archived",
+			),
+			queryAllDynamoItems<StoredTeacherCaseRecord>(
+				this.documentClient,
+				{
+					TableName: this.tableName,
+					IndexName: "LifecycleDeadlineIndex",
+					KeyConditionExpression: "#lifecycle = :published AND deadlineAt < :now",
+					ExpressionAttributeNames: {
+						"#lifecycle": "lifecycle",
+					},
+					ExpressionAttributeValues: {
+						":published": "published",
+						":now": now,
+					},
+					ScanIndexForward: false,
 				},
-				ScanIndexForward: false,
-			}),
-			this.queryAll({
-				TableName: this.tableName,
-				IndexName: "LifecycleDeadlineIndex",
-				KeyConditionExpression: "#lifecycle = :published AND deadlineAt < :now",
-				ExpressionAttributeNames: {
-					"#lifecycle": "lifecycle",
-				},
-				ExpressionAttributeValues: {
-					":published": "published",
-					":now": now,
-				},
-				ScanIndexForward: false,
-			}),
+			),
 		]);
 
 		return sortArchivedCases(
 			[...archivedCases, ...expiredPublishedCases],
 			now,
 		);
-	}
-
-	private async queryAll(input: QueryCommandInput) {
-		const records: StoredTeacherCaseRecord[] = [];
-		let exclusiveStartKey: QueryCommandInput["ExclusiveStartKey"];
-
-		do {
-			const response = await this.documentClient.send(
-				new QueryCommand({
-					...input,
-					...(exclusiveStartKey
-						? { ExclusiveStartKey: exclusiveStartKey }
-						: {}),
-				}),
-			);
-
-			records.push(...((response.Items ?? []) as StoredTeacherCaseRecord[]));
-			exclusiveStartKey = response.LastEvaluatedKey;
-		} while (exclusiveStartKey);
-
-		return records;
 	}
 }
 
