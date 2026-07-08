@@ -50,6 +50,7 @@ import {
 	type ProfileSecurityIdentityProvider,
 	type ProfileSecurityRepository
 } from "@/features/profile-security/service";
+import type { CaseDraft } from "@/features/teacher/case-authoring/schema";
 
 export type E2EEmailRecord =
 	| {
@@ -96,6 +97,7 @@ type E2EAuthStoreShape = {
 			feedbackCount: number;
 		}
 	>;
+	teacherCaseDrafts: Map<string, CaseDraft>;
 	users: Map<
 		string,
 		{
@@ -128,6 +130,7 @@ function getStore(): E2EAuthStoreShape {
 			registrations: new Map(),
 			profiles: new Map(),
 			teacherCases: new Map(),
+			teacherCaseDrafts: new Map(),
 			users: new Map(),
 			emails: []
 		};
@@ -146,6 +149,7 @@ export function resetE2EAuthStore() {
 	store.registrations.clear();
 	store.profiles.clear();
 	store.teacherCases.clear();
+	store.teacherCaseDrafts.clear();
 	store.users.clear();
 	store.emails = [];
 
@@ -179,6 +183,17 @@ export function seedE2ETeacherCases(
 	for (const caseRecord of cases) {
 		store.teacherCases.set(caseRecord.caseId, caseRecord);
 	}
+}
+
+export function getE2ETeacherCaseDraft(teacherProfileId: string) {
+	return getStore().teacherCaseDrafts.get(teacherProfileId) ?? null;
+}
+
+export function saveE2ETeacherCaseDraft(
+	teacherProfileId: string,
+	draft: CaseDraft,
+) {
+	getStore().teacherCaseDrafts.set(teacherProfileId, draft);
 }
 
 export class InMemoryIdentityProvider
@@ -369,14 +384,18 @@ export class InMemoryIdentityProvider
 		user.resetCodeConsumedAt = Date.now();
 	}
 
-	async invalidateCognitoSessions(_args: { emailNormalized: string }) {}
+	async invalidateCognitoSessions(args: { emailNormalized: string }) {
+		void args;
+	}
 
-	async updateProfileName(_args: {
+	async updateProfileName(args: {
 		emailNormalized: string;
 		firstName: string;
 		lastName: string;
 		fullName: string;
-	}) {}
+	}) {
+		void args;
+	}
 
 	async updateProfileEmail(args: {
 		currentEmailNormalized: string;
