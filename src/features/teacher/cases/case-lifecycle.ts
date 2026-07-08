@@ -1,3 +1,7 @@
+export const teacherCaseRecordType = "case";
+
+export type TeacherCaseRecordType = typeof teacherCaseRecordType;
+
 export type TeacherCaseLifecycle = "published" | "archived" | "draft";
 
 export type TeacherCaseLifecycleRecord = {

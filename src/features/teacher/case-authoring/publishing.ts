@@ -8,7 +8,10 @@ import {
 	QueryCommand,
 	TransactWriteCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { isActiveTeacherCase } from "@/features/teacher/cases/case-lifecycle";
+import {
+	isActiveTeacherCase,
+	teacherCaseRecordType,
+} from "@/features/teacher/cases/case-lifecycle";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import {
 	deleteE2ETeacherCaseDraftRecord,
@@ -33,6 +36,7 @@ export type PublishedTeacherCaseRecord = {
 	feedbackCount: number;
 	lifecycle: "published";
 	publishedAt: number;
+	recordType: typeof teacherCaseRecordType;
 	teacherProfileId: string;
 	title: string;
 };
@@ -45,7 +49,7 @@ export type PublishTeacherCaseDraftArgs = {
 };
 
 const activeCaseLockCaseId = "teacher-case-active-lock";
-const activeCaseLockLifecycle = "activeCaseLock";
+const activeCaseLockRecordType = "activeCaseLock";
 
 type StoredTeacherCaseRecord = Omit<PublishedTeacherCaseRecord, "lifecycle"> & {
 	archivedAt?: number;
@@ -55,12 +59,10 @@ type StoredTeacherCaseRecord = Omit<PublishedTeacherCaseRecord, "lifecycle"> & {
 type ActiveCaseLockRecord = {
 	caseId: typeof activeCaseLockCaseId;
 	deadlineAt: number;
-	lifecycle: typeof activeCaseLockLifecycle;
 	publishedCaseId: string;
+	recordType: typeof activeCaseLockRecordType;
 	updatedAt: number;
 };
-
-type TeacherCaseTableRecord = StoredTeacherCaseRecord | ActiveCaseLockRecord;
 
 type PreparedTeacherCaseDraft = PublishTeacherCaseDraftArgs & {
 	deadlineAt: number;
@@ -188,12 +190,14 @@ export class DynamoTeacherCasePublisher implements TeacherCasePublisher {
 										TableName: this.tableName,
 										Item: record,
 										ConditionExpression:
-											"#lifecycle = :draft AND #teacherProfileId = :teacherProfileId",
+											"#recordType = :caseRecordType AND #lifecycle = :draft AND #teacherProfileId = :teacherProfileId",
 										ExpressionAttributeNames: {
 											"#lifecycle": "lifecycle",
+											"#recordType": "recordType",
 											"#teacherProfileId": "teacherProfileId",
 										},
 										ExpressionAttributeValues: {
+											":caseRecordType": teacherCaseRecordType,
 											":draft": "draft",
 											":teacherProfileId": preparedDraft.teacherProfileId,
 										},
@@ -239,11 +243,11 @@ export class DynamoTeacherCasePublisher implements TeacherCasePublisher {
 			}),
 		);
 
-		const record = (response.Items ?? [])[0] as
-			| TeacherCaseTableRecord
-			| undefined;
+		const record = (response.Items ?? [])[0];
 
-		return record?.lifecycle === "published" ? record : null;
+		return isStoredTeacherCaseRecord(record) && record.lifecycle === "published"
+			? record
+			: null;
 	}
 
 	private async getDraftRecordByCaseId(
@@ -256,10 +260,10 @@ export class DynamoTeacherCasePublisher implements TeacherCasePublisher {
 				Key: { caseId },
 			}),
 		);
-		const record = response.Item as TeacherCaseTableRecord | undefined;
+		const record = response.Item;
 
 		if (
-			!record ||
+			!isStoredTeacherCaseRecord(record) ||
 			record.lifecycle !== "draft" ||
 			record.teacherProfileId !== teacherProfileId
 		) {
@@ -330,6 +334,7 @@ function publishedCaseRecord({
 		feedbackCount: 0,
 		lifecycle: "published",
 		publishedAt: now,
+		recordType: teacherCaseRecordType,
 		teacherProfileId,
 		title: storedDraft.title.trim(),
 	};
@@ -360,10 +365,27 @@ function activeCaseLockRecord(
 	return {
 		caseId: activeCaseLockCaseId,
 		deadlineAt: record.deadlineAt,
-		lifecycle: activeCaseLockLifecycle,
 		publishedCaseId: record.caseId,
+		recordType: activeCaseLockRecordType,
 		updatedAt: now,
 	};
+}
+
+function isStoredTeacherCaseRecord(
+	record: unknown,
+): record is StoredTeacherCaseRecord {
+	if (typeof record !== "object" || record === null) {
+		return false;
+	}
+
+	const candidate = record as Partial<StoredTeacherCaseRecord>;
+
+	return (
+		candidate.recordType === teacherCaseRecordType &&
+		(candidate.lifecycle === "published" ||
+			candidate.lifecycle === "archived" ||
+			candidate.lifecycle === "draft")
+	);
 }
 
 function isConditionalCheckFailed(error: unknown) {

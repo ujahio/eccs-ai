@@ -221,7 +221,7 @@ describe("DynamoTeacherCasePublisher", () => {
 					Put: {
 						Item: {
 							caseId: "teacher-case-active-lock",
-							lifecycle: "activeCaseLock",
+							recordType: "activeCaseLock",
 						},
 						ConditionExpression:
 							"attribute_not_exists(caseId) OR deadlineAt < :now",
@@ -231,6 +231,7 @@ describe("DynamoTeacherCasePublisher", () => {
 					Put: {
 						Item: expect.objectContaining({
 							lifecycle: "published",
+							recordType: "case",
 							title: "Acute endocrine case review",
 						}),
 						ConditionExpression: "attribute_not_exists(caseId)",
@@ -250,6 +251,7 @@ describe("DynamoTeacherCasePublisher", () => {
 			deadlineAt: now + 86_400_000,
 			completionCount: 0,
 			feedbackCount: 0,
+			recordType: "case",
 		};
 		let activeQueryCount = 0;
 		const documentClient = {

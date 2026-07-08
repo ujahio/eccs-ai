@@ -63,6 +63,7 @@ describe("DynamoTeacherCaseDraftRepository", () => {
 			expect.objectContaining({
 				caseId,
 				lifecycle: "draft",
+				recordType: "case",
 				title: "Updated endocrine review",
 				updatedAt: 1_800_000_100,
 			}),
@@ -180,6 +181,7 @@ function recordForDraft({
 		feedbackCount: 0,
 		lifecycle: "draft",
 		publishedAt: 0,
+		recordType: "case",
 		teacherProfileId,
 		title: draft.title,
 		updatedAt,
