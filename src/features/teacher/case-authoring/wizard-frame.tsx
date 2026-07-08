@@ -18,8 +18,7 @@ export function WizardHeader({
 			<div>
 				<h1 className="mt-2 text-xl font-semibold sm:text-2xl">Case Studies</h1>
 				<p className="mt-2 max-w-2xl text-sm leading-6 text-muted-gray">
-					Move through sections in any order. Drafts save only when you choose
-					Save Draft.
+					Move through sections in any order.
 				</p>
 			</div>
 			<div className="flex flex-wrap items-center gap-3">
