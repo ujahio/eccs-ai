@@ -4,7 +4,7 @@ import { emptyCaseDraft } from "../schema";
 import { ReviewSection } from "./review-section";
 
 describe("ReviewSection", () => {
-	it("renders readable long-text panels and persisted PDF previews", () => {
+	it("renders expandable long-text panels and persisted PDF previews", () => {
 		const markup = renderToStaticMarkup(
 			<ReviewSection
 				activePublishedCase={null}
@@ -33,7 +33,10 @@ describe("ReviewSection", () => {
 		);
 
 		expect(markup).toContain('data-testid="teacher-case-review-presentation"');
+		expect(markup).toContain("<details");
+		expect(markup).toContain("<summary");
 		expect(markup).toContain("Line one");
+		expect(markup).not.toContain("word");
 		expect(markup).toContain("Case Materials");
 		expect(markup).toContain("case-material.pdf");
 		expect(markup).toContain("data:application/pdf;base64,JVBERi0xLjQ=");

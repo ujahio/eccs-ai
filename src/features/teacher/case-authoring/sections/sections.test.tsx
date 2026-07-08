@@ -9,7 +9,13 @@ import { TitleSection } from "./title-section";
 describe("case authoring sections", () => {
 	it("renders title and long-text section labels", () => {
 		const titleMarkup = renderToStaticMarkup(
-			<TitleSection draft={emptyCaseDraft} updateDraft={() => {}} />,
+			<TitleSection
+				draft={emptyCaseDraft}
+				updateDraft={() => {}}
+				validation={{
+					title: "Enter a Case Title before saving this draft.",
+				}}
+			/>,
 		);
 		const longTextMarkup = renderToStaticMarkup(
 			<LongTextSection
@@ -22,6 +28,7 @@ describe("case authoring sections", () => {
 		);
 
 		expect(titleMarkup).toContain("Case Title");
+		expect(titleMarkup).toContain("Enter a Case Title before saving this draft.");
 		expect(titleMarkup).toContain('data-testid="teacher-case-description"');
 		expect(longTextMarkup).toContain("Case Presentation");
 		expect(longTextMarkup).toContain('data-testid="teacher-case-presentation"');

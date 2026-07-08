@@ -23,6 +23,7 @@ export function ActiveAuthoringSection({
 	readyToPublish,
 	removeAttachment,
 	removeQuestion,
+	saveValidation,
 	setActiveQuestionIndex,
 	updateDraft,
 	updateQuestion,
@@ -37,13 +38,20 @@ export function ActiveAuthoringSection({
 	readyToPublish: boolean;
 	removeAttachment: (attachmentId: string) => void;
 	removeQuestion: () => void;
+	saveValidation: CaseDraftValidation;
 	setActiveQuestionIndex: (index: number) => void;
 	updateDraft: (update: Partial<CaseDraft>) => void;
 	updateQuestion: (question: CmeQuestionDraft) => void;
 	validation: CaseDraftValidation;
 }) {
 	if (activeSection === "title") {
-		return <TitleSection draft={draft} updateDraft={updateDraft} />;
+		return (
+			<TitleSection
+				draft={draft}
+				updateDraft={updateDraft}
+				validation={saveValidation}
+			/>
+		);
 	}
 
 	if (activeSection === "presentation") {

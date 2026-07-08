@@ -135,24 +135,20 @@ function ReviewTextPanel({
 	value: string;
 }) {
 	const trimmedValue = value.trim();
-	const wordCount = trimmedValue ? trimmedValue.split(/\s+/).length : 0;
 
 	return (
-		<section className="border border-border-gray bg-white" data-testid={testId}>
-			<div className="flex flex-col gap-2 border-b border-border-gray px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-				<h3 className="text-sm font-semibold text-primary-text">{label}</h3>
-				<p className="text-xs font-semibold uppercase text-muted-gray">
-					{wordCount} word{wordCount === 1 ? "" : "s"}
-				</p>
-			</div>
-			<div className="max-h-[32rem] overflow-auto bg-app-canvas p-4 text-sm leading-7 text-primary-text sm:p-5">
+		<details className="border border-border-gray bg-white" data-testid={testId}>
+			<summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-primary-text marker:text-muted-gray">
+				{label}
+			</summary>
+			<div className="max-h-[32rem] overflow-auto border-t border-border-gray bg-app-canvas p-4 text-sm leading-7 text-primary-text sm:p-5">
 				{trimmedValue ? (
 					<p className="whitespace-pre-wrap">{trimmedValue}</p>
 				) : (
 					<p className="text-muted-gray">Not added yet</p>
 				)}
 			</div>
-		</section>
+		</details>
 	);
 }
 
@@ -162,17 +158,15 @@ function ReviewAttachmentPreviews({
 	attachments: DraftAttachment[];
 }) {
 	return (
-		<section
+		<details
 			className="border border-border-gray bg-white"
 			data-testid="teacher-case-review-pdf-previews"
 		>
-			<div className="border-b border-border-gray px-4 py-3">
-				<h3 className="text-sm font-semibold text-primary-text">
-					Case Materials
-				</h3>
-			</div>
+			<summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-primary-text marker:text-muted-gray">
+				Case Materials
+			</summary>
 			{attachments.length > 0 ? (
-				<div className="space-y-4 p-4 sm:p-5">
+				<div className="space-y-4 border-t border-border-gray p-4 sm:p-5">
 					{attachments.map((attachment, index) => (
 						<ReviewAttachmentPreview
 							attachment={attachment}
@@ -182,11 +176,11 @@ function ReviewAttachmentPreviews({
 					))}
 				</div>
 			) : (
-				<p className="p-4 text-sm text-muted-gray sm:p-5">
+				<p className="border-t border-border-gray p-4 text-sm text-muted-gray sm:p-5">
 					No Case Materials attached
 				</p>
 			)}
-		</section>
+		</details>
 	);
 }
 

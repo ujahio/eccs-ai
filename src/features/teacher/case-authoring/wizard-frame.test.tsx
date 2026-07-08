@@ -21,13 +21,16 @@ describe("case authoring wizard frame", () => {
 	it("renders draft status and non-blocking navigation warnings", () => {
 		const markup = renderToStaticMarkup(
 			<WizardStatusMessages
+				draftValidationMessage="Enter a Case Title before saving this draft."
 				draftStatus="saving"
 				sectionWarning="Unsaved changes stay on this page."
 			/>,
 		);
 
+		expect(markup).toContain('data-testid="teacher-case-draft-validation"');
 		expect(markup).toContain('data-testid="teacher-case-draft-saving"');
 		expect(markup).toContain('data-testid="teacher-case-navigation-warning"');
+		expect(markup).toContain("Enter a Case Title before saving this draft.");
 		expect(markup).toContain("Unsaved changes stay on this page.");
 	});
 

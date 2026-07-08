@@ -43,14 +43,23 @@ export function WizardHeader({
 }
 
 export function WizardStatusMessages({
+	draftValidationMessage = "",
 	draftStatus,
 	sectionWarning,
 }: {
+	draftValidationMessage?: string;
 	draftStatus: DraftStatus;
 	sectionWarning: string;
 }) {
 	return (
 		<>
+			{draftValidationMessage ? (
+				<StatusMessage
+					testId="teacher-case-draft-validation"
+					tone="error"
+					value={draftValidationMessage}
+				/>
+			) : null}
 			{draftStatus === "saved" ? (
 				<StatusMessage
 					testId="teacher-case-draft-saved"

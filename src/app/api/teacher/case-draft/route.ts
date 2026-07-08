@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getTeacherCaseDraftRepository } from "@/features/teacher/case-authoring/drafts";
-import { caseDraftFromUnknown } from "@/features/teacher/case-authoring/schema";
+import {
+	caseDraftFromUnknown,
+	validateDraftForSave,
+} from "@/features/teacher/case-authoring/schema";
 import { requireTeacherSession } from "@/lib/auth/session";
 
 export async function GET() {
@@ -18,6 +21,12 @@ export async function PUT(request: Request) {
 			? (body as Record<string, unknown>).draft
 			: null,
 	);
+	const validation = validateDraftForSave(draft);
+
+	if (Object.keys(validation).length > 0) {
+		return NextResponse.json({ validation }, { status: 400 });
+	}
+
 	const savedDraft = await getTeacherCaseDraftRepository().saveDraft({
 		draft,
 		now: Date.now(),

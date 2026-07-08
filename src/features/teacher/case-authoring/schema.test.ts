@@ -9,6 +9,7 @@ import {
 	type CaseDraft,
 	validateCmeQuestions,
 	validateDraftForPublish,
+	validateDraftForSave,
 } from "./schema";
 
 function validQuestion(index: number) {
@@ -44,6 +45,18 @@ function validDraft(): CaseDraft {
 }
 
 describe("case authoring validation", () => {
+	it("requires a Case Title before saving a draft record", () => {
+		expect(validateDraftForSave(emptyCaseDraft)).toEqual({
+			title: "Enter a Case Title before saving this draft.",
+		});
+		expect(
+			validateDraftForSave({
+				...emptyCaseDraft,
+				title: "Acute endocrine review",
+			}),
+		).toEqual({});
+	});
+
 	it("requires publish-ready drafts to include all authoring sections", () => {
 		const validation = validateDraftForPublish(emptyCaseDraft);
 

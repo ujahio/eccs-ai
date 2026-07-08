@@ -73,7 +73,7 @@ For v1, ECCS is a single-tenant platform with one teacher account/persona. The p
 59. As a teacher, I want to upload Case Study resources in a fixed order: lecture text, optional PDF attachments, and the student deadline date, so that content and schedule are consistently structured for students.
 60. As a teacher, I want to add 3–5 CME questions with 2–5 options each and mark the correct answer, so that I can assess student comprehension.
 61. As a teacher, I want the CME question creation to add one question at a time with a visible counter, so that I know how many I've added.
-62. As a teacher, I want to save my case as a draft at any point in the case creation process, so that I can control when my work is persisted.
+62. As a teacher, I want to save my case as a draft after adding a Case Title, so that I can control when my work is persisted while every persisted draft has an identifiable record.
 63. As a teacher, I want to see a draft save confirmation after each save, so that I know my work is stored.
 64. As a teacher, I want to review all case content on a final step before publishing including confirming the deadline, so that I can confirm everything is correct and choose how long students have.
 65. As a teacher, I want the deadline set as a calendar date (not a time) from the Case Study resources step and still editable in final review, so that I decide the student access window while authoring and confirm it before publish.
@@ -94,10 +94,10 @@ No super-admin UI is included in v1. Teacher setup is handled through bootstrap/
 
 ### Case Lifecycle
 
-- Teacher creates draft at any time. All fields saveable to server-side draft storage via explicit "Save Draft" button. No auto-save.
+- Teacher creates a draft record after entering a Case Title. After the title exists, all fields are saveable to server-side draft storage via explicit "Save Draft" button. No auto-save.
 - Teacher case creation is section-based with free navigation (not strictly linear). Sections: title/description → case presentation → model answer → Case Study resources (lecture text → optional PDFs → deadline date) → CME questions → review & publish.
 - Teacher authoring uses explicit "Save Draft" only. The UI must show dirty-state messaging and warn before navigation when unsaved changes exist.
-- Drafts can be incomplete and saved. Draft PDF attachments are retained with the draft content. Use partial section-level validation for author feedback, with full validation as the hard gate at publish.
+- Drafts can be incomplete and saved after the Case Title minimum is met. Draft PDF attachments are retained with the draft content. Use partial section-level validation for author feedback, with full validation as the hard gate at publish.
 - Draft deletion requires a confirmation dialog and then permanently deletes the draft. Deleting a draft also deletes its draft PDF attachments from storage.
 - Published case content is immutable in v1. Teachers can edit drafts only. Once published, the case presentation, model answer, teaching resources, quiz, CE credit hours, and deadline are frozen.
 - If a serious typo or clinical correction is discovered after publishing, handle it manually outside the product. Minor typos remain unchanged.

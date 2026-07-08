@@ -14,7 +14,9 @@ import {
 	type ActivePublishedCaseSummary,
 	type CaseAuthoringSection,
 	type CaseDraft,
+	type CaseDraftValidation,
 	type CmeQuestionDraft,
+	validateDraftForSave,
 	validateDraftForPublish,
 } from "./schema";
 import {
@@ -36,6 +38,7 @@ export function CaseAuthoringWizard({
 	const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
 	const [isDirty, setIsDirty] = useState(false);
 	const [draftStatus, setDraftStatus] = useState<DraftStatus>("idle");
+	const [saveValidation, setSaveValidation] = useState<CaseDraftValidation>({});
 	const [sectionWarning, setSectionWarning] = useState("");
 	const attachmentPreviewUrls = useRef(new Set<string>());
 	const validation = useMemo(() => validateDraftForPublish(draft), [draft]);
@@ -101,10 +104,23 @@ export function CaseAuthoringWizard({
 		setDraft((current) => ({ ...current, ...update }));
 		setIsDirty(true);
 		setDraftStatus("idle");
+		setSaveValidation({});
 	}
 
 	async function saveDraft() {
+		const draftSaveValidation = validateDraftForSave(draft);
+
+		if (Object.keys(draftSaveValidation).length > 0) {
+			setDraftStatus("idle");
+			setSaveValidation(draftSaveValidation);
+			setSectionWarning("");
+			setActiveSection("title");
+			return;
+		}
+
 		try {
+			setSaveValidation({});
+			setSectionWarning("");
 			setDraftStatus("saving");
 			const response = await fetch("/api/teacher/case-draft", {
 				body: JSON.stringify({ draft: draftForStorage(draft) }),
@@ -243,6 +259,7 @@ export function CaseAuthoringWizard({
 		>
 			<WizardHeader isDirty={isDirty} onSaveDraft={saveDraft} />
 			<WizardStatusMessages
+				draftValidationMessage={saveValidation.title}
 				draftStatus={draftStatus}
 				sectionWarning={sectionWarning}
 			/>
@@ -267,6 +284,7 @@ export function CaseAuthoringWizard({
 						activePublishedCase={activePublishedCase}
 						removeAttachment={removeAttachment}
 						removeQuestion={removeQuestion}
+						saveValidation={saveValidation}
 						setActiveQuestionIndex={setActiveQuestionIndex}
 						updateDraft={updateDraft}
 						updateQuestion={updateQuestion}

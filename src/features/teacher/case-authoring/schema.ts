@@ -58,6 +58,9 @@ export type CaseDraftValidation = {
 	deadlineDate?: string;
 };
 
+export const draftSaveTitleValidationMessage =
+	"Enter a Case Title before saving this draft.";
+
 export const emptyCaseDraft: CaseDraft = {
 	title: "",
 	description: "",
@@ -291,6 +294,16 @@ export function validateDraftForPublish(
 
 	if (!draft.deadlineDate) {
 		validation.deadlineDate = "Select the student deadline date.";
+	}
+
+	return validation;
+}
+
+export function validateDraftForSave(draft: CaseDraft): CaseDraftValidation {
+	const validation: CaseDraftValidation = {};
+
+	if (draft.title.trim().length === 0) {
+		validation.title = draftSaveTitleValidationMessage;
 	}
 
 	return validation;
