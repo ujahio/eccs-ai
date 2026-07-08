@@ -172,4 +172,72 @@ test.describe("Teacher case authoring", () => {
 		).toContainText("Currently active endocrine case");
 		await expect(page.getByTestId("teacher-case-publish")).toBeDisabled();
 	});
+
+	test("publishes a complete case immediately as the active case", async ({
+		page,
+		request,
+	}) => {
+		const email = uniqueEmail("teacher-case-publish");
+
+		await bootstrapVerifiedTeacher(request, email);
+		await loginTeacher(page, email);
+		await page.getByTestId("teacher-start-case-button").click();
+
+		await page.getByTestId("teacher-case-title").fill("Acute endocrine review");
+		await page
+			.getByTestId("teacher-case-description")
+			.fill("A focused review for learners preparing for endocrine cases.");
+		await page.getByTestId("teacher-case-section-presentation").click();
+		await page
+			.getByTestId("teacher-case-presentation")
+			.fill(
+				"Patient history, presenting symptoms, laboratory findings, and the clinical decision context are described with enough detail for learners to reason carefully.",
+			);
+		await page.getByTestId("teacher-case-section-modelAnswer").click();
+		await page
+			.getByTestId("teacher-case-model-answer")
+			.fill(
+				"The model answer explains the diagnostic path, key discriminating findings, management priorities, and teaching points for comparison.",
+			);
+		await page.getByTestId("teacher-case-section-resources").click();
+		await page
+			.getByTestId("teacher-case-lecture-text")
+			.fill(
+				"Case Study resources summarize the core physiology, common diagnostic pitfalls, and next-step management considerations for review.",
+			);
+		await page
+			.getByTestId("teacher-case-resource-deadline-date")
+			.fill("2026-08-12");
+		await page.getByTestId("teacher-case-section-cme").click();
+
+		for (let questionIndex = 0; questionIndex < 3; questionIndex += 1) {
+			await page
+				.getByTestId("teacher-case-cme-prompt")
+				.fill(`Which finding best supports diagnosis ${questionIndex + 1}?`);
+			await page
+				.getByTestId("teacher-case-cme-option-0")
+				.fill(`Correct option ${questionIndex + 1}`);
+			await page
+				.getByTestId("teacher-case-cme-option-1")
+				.fill(`Distractor option ${questionIndex + 1}`);
+
+			if (questionIndex < 2) {
+				await page.getByTestId("teacher-case-add-cme-question").click();
+			}
+		}
+
+		await page.getByTestId("teacher-case-section-review").click();
+		await expect(page.getByTestId("teacher-case-publish-readiness")).toContainText(
+			"Ready to publish",
+		);
+		await expect(page.getByTestId("teacher-case-deadline-summary")).toContainText(
+			"UAE time",
+		);
+		await page.getByTestId("teacher-case-publish").click();
+
+		await expect(page).toHaveURL(/\/teacher$/);
+		await expect(page.getByTestId("teacher-active-case-card")).toContainText(
+			"Acute endocrine review",
+		);
+	});
 });

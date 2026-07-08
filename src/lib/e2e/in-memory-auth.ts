@@ -93,6 +93,8 @@ type E2EAuthStoreShape = {
 			publishedAt: number;
 			deadlineAt: number;
 			archivedAt?: number;
+			draft?: CaseDraft;
+			teacherProfileId?: string;
 			completionCount: number;
 			feedbackCount: number;
 		}
@@ -180,6 +182,8 @@ export function seedE2ETeacherCases(
 		publishedAt: number;
 		deadlineAt: number;
 		archivedAt?: number;
+		draft?: CaseDraft;
+		teacherProfileId?: string;
 		completionCount: number;
 		feedbackCount: number;
 	}>,
@@ -191,6 +195,21 @@ export function seedE2ETeacherCases(
 	for (const caseRecord of cases) {
 		store.teacherCases.set(caseRecord.caseId, caseRecord);
 	}
+}
+
+export function saveE2ETeacherCaseRecord(record: {
+	caseId: string;
+	title: string;
+	lifecycle: "published" | "archived" | "draft";
+	publishedAt: number;
+	deadlineAt: number;
+	archivedAt?: number;
+	draft?: CaseDraft;
+	teacherProfileId?: string;
+	completionCount: number;
+	feedbackCount: number;
+}) {
+	getStore().teacherCases.set(record.caseId, record);
 }
 
 export function deleteE2ETeacherCaseDraftRecord(

@@ -1,9 +1,11 @@
 import { PublishCaseButton } from "../wizard-frame";
 import {
+	deadlineAtFromDubaiDate,
 	hasCmeQuestionContent,
 	type ActivePublishedCaseSummary,
 	type CaseDraft,
 	type CaseDraftValidation,
+	type CmeQuestionDraft,
 	type DraftAttachment,
 } from "../schema";
 import { Field, ReviewBlock, SectionHeading } from "../shared";
@@ -13,19 +15,22 @@ type UpdateDraft = (update: Partial<CaseDraft>) => void;
 export function ReviewSection({
 	activePublishedCase,
 	draft,
+	onPublish,
+	publishDisabled,
 	readyToPublish,
 	updateDraft,
 	validation,
 }: {
 	activePublishedCase: ActivePublishedCaseSummary | null;
 	draft: CaseDraft;
+	onPublish: () => void | Promise<void>;
+	publishDisabled: boolean;
 	readyToPublish: boolean;
 	updateDraft: UpdateDraft;
 	validation: CaseDraftValidation;
 }) {
 	const validationEntries = Object.entries(validation);
 	const hasActivePublishedCase = activePublishedCase !== null;
-	const publishDisabled = !readyToPublish || hasActivePublishedCase;
 	const authoredQuestionCount = draft.cmeQuestions.filter(
 		hasCmeQuestionContent,
 	).length;
@@ -55,6 +60,7 @@ export function ReviewSection({
 						{validation.deadlineDate}
 					</p>
 				) : null}
+				<DeadlineSummary deadlineDate={draft.deadlineDate} />
 			</Field>
 			<div className="mt-5 grid gap-4 lg:grid-cols-3">
 				<ReviewBlock label="Case Title" value={draft.title} />
@@ -80,6 +86,7 @@ export function ReviewSection({
 					testId="teacher-case-review-lecture-text"
 					value={draft.lectureText}
 				/>
+				<ReviewCmeQuestions questions={draft.cmeQuestions} />
 				<ReviewAttachmentPreviews attachments={draft.attachments} />
 			</div>
 			<div
@@ -106,8 +113,8 @@ export function ReviewSection({
 						data-testid="teacher-case-active-publish-blocker"
 					>
 						{activePublishedCase.title} is active until{" "}
-						{formatDubaiDate(activePublishedCase.deadlineAt)}. Publish this
-						case after the active case closes.
+						{formatDubaiDateTime(activePublishedCase.deadlineAt)} UAE time.
+						Publish this case after the active case closes.
 					</p>
 				) : null}
 				{validationEntries.length > 0 ? (
@@ -122,8 +129,26 @@ export function ReviewSection({
 				className="mt-5"
 				data-testid="teacher-case-publish"
 				disabled={publishDisabled}
+				onClick={onPublish}
 			/>
 		</div>
+	);
+}
+
+function DeadlineSummary({ deadlineDate }: { deadlineDate: string }) {
+	const deadlineAt = deadlineAtFromDubaiDate(deadlineDate);
+
+	if (deadlineAt === null) {
+		return null;
+	}
+
+	return (
+		<p
+			className="mt-2 text-sm leading-6 text-muted-gray"
+			data-testid="teacher-case-deadline-summary"
+		>
+			Expires at {formatDubaiDateTime(deadlineAt)} UAE time.
+		</p>
 	);
 }
 
@@ -150,6 +175,61 @@ function ReviewTextPanel({
 					<p className="text-muted-gray">Not added yet</p>
 				)}
 			</div>
+		</details>
+	);
+}
+
+function ReviewCmeQuestions({
+	questions,
+}: {
+	questions: CmeQuestionDraft[];
+}) {
+	const authoredQuestions = questions.filter(hasCmeQuestionContent);
+
+	return (
+		<details
+			className="border border-border-gray bg-white"
+			data-testid="teacher-case-review-cme-questions"
+		>
+			<summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-primary-text marker:text-muted-gray">
+				CME Questions
+			</summary>
+			{authoredQuestions.length > 0 ? (
+				<div className="space-y-4 border-t border-border-gray bg-app-canvas p-4 sm:p-5">
+					{authoredQuestions.map((question, questionIndex) => (
+						<article
+							className="border border-border-gray bg-white p-4"
+							key={question.id}
+						>
+							<p className="text-xs font-semibold uppercase text-muted-gray">
+								Question {questionIndex + 1}
+							</p>
+							<p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6 text-primary-text">
+								{question.prompt.trim() || "No prompt added"}
+							</p>
+							<ol className="mt-3 space-y-2 text-sm text-muted-gray">
+								{question.options.map((option, optionIndex) => (
+									<li key={option.id}>
+										<span className="font-semibold">
+											{String.fromCharCode(65 + optionIndex)}.
+										</span>{" "}
+										{option.text.trim() || "No option text added"}
+										{question.correctOptionId === option.id ? (
+											<span className="ml-2 font-semibold text-brand-teal">
+												Correct answer
+											</span>
+										) : null}
+									</li>
+								))}
+							</ol>
+						</article>
+					))}
+				</div>
+			) : (
+				<p className="border-t border-border-gray p-4 text-sm text-muted-gray sm:p-5">
+					No CME questions added
+				</p>
+			)}
 		</details>
 	);
 }
@@ -236,9 +316,11 @@ function formatFileSize(bytes: number) {
 	return `${(kilobytes / 1024).toFixed(1)} MB`;
 }
 
-function formatDubaiDate(epochMilliseconds: number) {
+function formatDubaiDateTime(epochMilliseconds: number) {
 	return new Intl.DateTimeFormat("en-US", {
 		day: "numeric",
+		hour: "numeric",
+		minute: "2-digit",
 		month: "short",
 		timeZone: "Asia/Dubai",
 		year: "numeric",

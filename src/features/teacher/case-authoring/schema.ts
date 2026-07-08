@@ -258,6 +258,37 @@ function numberFromUnknown(value: unknown) {
 	return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
+export function deadlineAtFromDubaiDate(deadlineDate: string) {
+	const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(deadlineDate);
+
+	if (!match) {
+		return null;
+	}
+
+	const [, yearText = "", monthText = "", dayText = ""] = match;
+	const year = Number(yearText);
+	const month = Number(monthText);
+	const day = Number(dayText);
+
+	if (!year || month < 1 || month > 12 || day < 1 || day > 31) {
+		return null;
+	}
+
+	// UAE does not observe daylight saving time; 23:59:59.999 in Dubai is UTC+4.
+	const deadlineAt = Date.UTC(year, month - 1, day, 19, 59, 59, 999);
+	const parsed = new Date(deadlineAt);
+
+	if (
+		parsed.getUTCFullYear() !== year ||
+		parsed.getUTCMonth() !== month - 1 ||
+		parsed.getUTCDate() !== day
+	) {
+		return null;
+	}
+
+	return deadlineAt;
+}
+
 export function validateDraftForPublish(
 	draft: CaseDraft,
 ): CaseDraftValidation {
@@ -294,6 +325,8 @@ export function validateDraftForPublish(
 
 	if (!draft.deadlineDate) {
 		validation.deadlineDate = "Select the student deadline date.";
+	} else if (deadlineAtFromDubaiDate(draft.deadlineDate) === null) {
+		validation.deadlineDate = "Select a valid student deadline date.";
 	}
 
 	return validation;

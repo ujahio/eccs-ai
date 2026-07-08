@@ -21,6 +21,7 @@ import {
 } from "./schema";
 import {
 	type DraftStatus,
+	type PublishStatus,
 	SectionNavigation,
 	WizardContentFrame,
 	WizardHeader,
@@ -43,12 +44,24 @@ export function CaseAuthoringWizard({
 	const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
 	const [isDirty, setIsDirty] = useState(false);
 	const [draftStatus, setDraftStatus] = useState<DraftStatus>("idle");
+	const [publishStatus, setPublishStatus] = useState<PublishStatus>("idle");
 	const [saveValidation, setSaveValidation] = useState<CaseDraftValidation>({});
+	const [publishValidation, setPublishValidation] = useState<CaseDraftValidation>(
+		{},
+	);
 	const [sectionWarning, setSectionWarning] = useState("");
 	const attachmentPreviewUrls = useRef(new Set<string>());
-	const validation = useMemo(() => validateDraftForPublish(draft), [draft]);
+	const validation = useMemo(
+		() => ({ ...validateDraftForPublish(draft), ...publishValidation }),
+		[draft, publishValidation],
+	);
 	const readyToPublish = useMemo(() => isPublishReady(draft), [draft]);
-	const publishDisabled = !readyToPublish || activePublishedCase !== null;
+	const hasPublishValidation = Object.keys(publishValidation).length > 0;
+	const publishDisabled =
+		!readyToPublish ||
+		activePublishedCase !== null ||
+		hasPublishValidation ||
+		publishStatus === "publishing";
 
 	useEffect(() => {
 		if (!draftCaseId) {
@@ -122,7 +135,9 @@ export function CaseAuthoringWizard({
 		setDraft((current) => ({ ...current, ...update }));
 		setIsDirty(true);
 		setDraftStatus("idle");
+		setPublishStatus("idle");
 		setSaveValidation({});
+		setPublishValidation({});
 	}
 
 	async function saveDraft() {
@@ -180,6 +195,47 @@ export function CaseAuthoringWizard({
 			setDraftStatus("saved");
 		} catch {
 			setDraftStatus("error");
+		}
+	}
+
+	async function publishCase() {
+		if (publishDisabled) {
+			return;
+		}
+
+		try {
+			setSaveValidation({});
+			setPublishValidation({});
+			setSectionWarning("");
+			setPublishStatus("publishing");
+			const response = await fetch("/api/teacher/case-publish", {
+				body: JSON.stringify({
+					...(currentDraftCaseId ? { caseId: currentDraftCaseId } : {}),
+					draft: draftForStorage(draft),
+				}),
+				headers: {
+					"content-type": "application/json",
+				},
+				method: "POST",
+			});
+
+			if (!response.ok) {
+				const body = (await response.json().catch(() => null)) as {
+					validation?: CaseDraftValidation;
+				} | null;
+
+				if (body?.validation) {
+					setPublishValidation(body.validation);
+				}
+
+				throw new Error("Case publish failed.");
+			}
+
+			setIsDirty(false);
+			window.location.assign("/teacher");
+		} catch {
+			setPublishStatus("error");
+			setActiveSection("review");
 		}
 	}
 
@@ -296,11 +352,13 @@ export function CaseAuthoringWizard({
 			<WizardHeader
 				isDirty={isDirty}
 				onSaveDraft={saveDraft}
+				onPublish={publishCase}
 				publishDisabled={publishDisabled}
 			/>
 			<WizardStatusMessages
 				draftValidationMessage={saveValidation.title}
 				draftStatus={draftStatus}
+				publishStatus={publishStatus}
 				sectionWarning={sectionWarning}
 			/>
 
@@ -322,6 +380,8 @@ export function CaseAuthoringWizard({
 						draft={draft}
 						readyToPublish={readyToPublish}
 						activePublishedCase={activePublishedCase}
+						onPublish={publishCase}
+						publishDisabled={publishDisabled}
 						removeAttachment={removeAttachment}
 						removeQuestion={removeQuestion}
 						saveValidation={saveValidation}

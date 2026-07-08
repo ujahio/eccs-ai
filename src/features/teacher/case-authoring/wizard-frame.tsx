@@ -5,14 +5,17 @@ import { caseAuthoringSections, type CaseAuthoringSection } from "./schema";
 import { StatusMessage } from "./shared";
 
 export type DraftStatus = "idle" | "saving" | "saved" | "error" | "load-error";
+export type PublishStatus = "idle" | "publishing" | "error";
 
 export function WizardHeader({
 	isDirty,
 	onSaveDraft,
+	onPublish,
 	publishDisabled,
 }: {
 	isDirty: boolean;
 	onSaveDraft: () => void | Promise<void>;
+	onPublish: () => void | Promise<void>;
 	publishDisabled: boolean;
 }) {
 	return (
@@ -42,6 +45,7 @@ export function WizardHeader({
 				<PublishCaseButton
 					data-testid="teacher-case-header-publish"
 					disabled={publishDisabled}
+					onClick={onPublish}
 				/>
 			</div>
 		</div>
@@ -58,10 +62,12 @@ export function PublishCaseButton({
 export function WizardStatusMessages({
 	draftValidationMessage = "",
 	draftStatus,
+	publishStatus,
 	sectionWarning,
 }: {
 	draftValidationMessage?: string;
 	draftStatus: DraftStatus;
+	publishStatus: PublishStatus;
 	sectionWarning: string;
 }) {
 	return (
@@ -99,6 +105,20 @@ export function WizardStatusMessages({
 					testId="teacher-case-draft-load-error"
 					tone="error"
 					value="The draft could not be loaded. Return to Case Studies and try again."
+				/>
+			) : null}
+			{publishStatus === "publishing" ? (
+				<StatusMessage
+					testId="teacher-case-publishing"
+					tone="warning"
+					value="Publishing case..."
+				/>
+			) : null}
+			{publishStatus === "error" ? (
+				<StatusMessage
+					testId="teacher-case-publish-error"
+					tone="error"
+					value="The case could not be published. Review the deadline and active case status, then try again."
 				/>
 			) : null}
 			{sectionWarning ? (

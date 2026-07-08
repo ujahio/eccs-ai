@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	createEmptyCmeQuestion,
+	deadlineAtFromDubaiDate,
 	draftForEditing,
 	draftForStorage,
 	emptyCaseDraft,
@@ -45,6 +46,14 @@ function validDraft(): CaseDraft {
 }
 
 describe("case authoring validation", () => {
+	it("converts a selected deadline date to the UAE end-of-day cutoff", () => {
+		expect(deadlineAtFromDubaiDate("2026-08-12")).toBe(
+			Date.UTC(2026, 7, 12, 19, 59, 59, 999),
+		);
+		expect(deadlineAtFromDubaiDate("2026-02-31")).toBeNull();
+		expect(deadlineAtFromDubaiDate("not-a-date")).toBeNull();
+	});
+
 	it("requires a Case Title before saving a draft record", () => {
 		expect(validateDraftForSave(emptyCaseDraft)).toEqual({
 			title: "Enter a Case Title before saving this draft.",
@@ -71,6 +80,15 @@ describe("case authoring validation", () => {
 			deadlineDate: "Select the student deadline date.",
 		});
 		expect(validation.cmeQuestions).toBe("Add 3 to 5 CME questions.");
+	});
+
+	it("requires a valid student deadline date before publishing", () => {
+		expect(
+			validateDraftForPublish({
+				...validDraft(),
+				deadlineDate: "2026-02-31",
+			}).deadlineDate,
+		).toBe("Select a valid student deadline date.");
 	});
 
 	it("accepts a complete draft for publish readiness", () => {
