@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { sectionLabels } from "./constants";
 import { caseAuthoringSections, type CaseAuthoringSection } from "./schema";
@@ -9,9 +9,11 @@ export type DraftStatus = "idle" | "saving" | "saved" | "error";
 export function WizardHeader({
 	isDirty,
 	onSaveDraft,
+	publishDisabled,
 }: {
 	isDirty: boolean;
 	onSaveDraft: () => void | Promise<void>;
+	publishDisabled: boolean;
 }) {
 	return (
 		<div className="mb-6 flex flex-col gap-4 border-b border-border-gray pb-5 sm:flex-row sm:items-end sm:justify-between">
@@ -37,9 +39,20 @@ export function WizardHeader({
 				>
 					Save Draft
 				</Button>
+				<PublishCaseButton
+					data-testid="teacher-case-header-publish"
+					disabled={publishDisabled}
+				/>
 			</div>
 		</div>
 	);
+}
+
+export function PublishCaseButton({
+	children = "Publish Case",
+	...props
+}: ComponentPropsWithoutRef<typeof Button>) {
+	return <Button {...props}>{children}</Button>;
 }
 
 export function WizardStatusMessages({

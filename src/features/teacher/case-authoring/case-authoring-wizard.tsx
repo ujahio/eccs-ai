@@ -43,6 +43,7 @@ export function CaseAuthoringWizard({
 	const attachmentPreviewUrls = useRef(new Set<string>());
 	const validation = useMemo(() => validateDraftForPublish(draft), [draft]);
 	const readyToPublish = useMemo(() => isPublishReady(draft), [draft]);
+	const publishDisabled = !readyToPublish || activePublishedCase !== null;
 
 	useEffect(() => {
 		let isMounted = true;
@@ -257,7 +258,11 @@ export function CaseAuthoringWizard({
 			className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10"
 			data-testid="teacher-case-authoring-root"
 		>
-			<WizardHeader isDirty={isDirty} onSaveDraft={saveDraft} />
+			<WizardHeader
+				isDirty={isDirty}
+				onSaveDraft={saveDraft}
+				publishDisabled={publishDisabled}
+			/>
 			<WizardStatusMessages
 				draftValidationMessage={saveValidation.title}
 				draftStatus={draftStatus}

@@ -37,6 +37,8 @@ describe("ReviewSection", () => {
 		expect(markup).toContain("<summary");
 		expect(markup).toContain("Line one");
 		expect(markup).not.toContain("word");
+		expect(markup).toContain("0 questions added");
+		expect(markup).not.toContain("1 question added");
 		expect(markup).toContain("Case Materials");
 		expect(markup).toContain("case-material.pdf");
 		expect(markup).toContain("data:application/pdf;base64,JVBERi0xLjQ=");

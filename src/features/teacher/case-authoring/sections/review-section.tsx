@@ -1,9 +1,11 @@
-import { Button, buttonVariants } from "@/components/ui/button";
-import type {
-	ActivePublishedCaseSummary,
-	CaseDraft,
-	CaseDraftValidation,
-	DraftAttachment,
+import { buttonVariants } from "@/components/ui/button";
+import { PublishCaseButton } from "../wizard-frame";
+import {
+	hasCmeQuestionContent,
+	type ActivePublishedCaseSummary,
+	type CaseDraft,
+	type CaseDraftValidation,
+	type DraftAttachment,
 } from "../schema";
 import { Field, ReviewBlock, SectionHeading } from "../shared";
 
@@ -25,6 +27,9 @@ export function ReviewSection({
 	const validationEntries = Object.entries(validation);
 	const hasActivePublishedCase = activePublishedCase !== null;
 	const publishDisabled = !readyToPublish || hasActivePublishedCase;
+	const authoredQuestionCount = draft.cmeQuestions.filter(
+		hasCmeQuestionContent,
+	).length;
 
 	return (
 		<div data-testid="teacher-case-review-section">
@@ -57,7 +62,7 @@ export function ReviewSection({
 				<ReviewBlock label="Description" value={draft.description} />
 				<ReviewBlock
 					label="CME Questions"
-					value={`${draft.cmeQuestions.length} question${draft.cmeQuestions.length === 1 ? "" : "s"} added`}
+					value={`${authoredQuestionCount} question${authoredQuestionCount === 1 ? "" : "s"} added`}
 				/>
 			</div>
 			<div className="mt-5 space-y-5">
@@ -114,13 +119,11 @@ export function ReviewSection({
 					</ul>
 				) : null}
 			</div>
-			<Button
+			<PublishCaseButton
 				className="mt-5"
 				data-testid="teacher-case-publish"
 				disabled={publishDisabled}
-			>
-				Publish Case
-			</Button>
+			/>
 		</div>
 	);
 }

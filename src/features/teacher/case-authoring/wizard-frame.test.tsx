@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	SectionNavigation,
 	WizardContentFrame,
+	WizardHeader,
 	WizardStatusMessages,
 } from "./wizard-frame";
 
@@ -17,6 +18,22 @@ describe("case authoring wizard frame", () => {
 		expect(markup).toContain('data-testid="teacher-case-section-title"');
 		expect(markup).toContain("Title &amp; Description");
 		expect(markup).toContain("Final Review");
+	});
+
+	it("renders Save Draft and header Publish Case actions", () => {
+		const markup = renderToStaticMarkup(
+			<WizardHeader
+				isDirty
+				onSaveDraft={() => {}}
+				publishDisabled
+			/>,
+		);
+
+		expect(markup).toContain('data-testid="teacher-case-save-draft"');
+		expect(markup).toContain('data-testid="teacher-case-header-publish"');
+		expect(markup).toContain("Unsaved changes");
+		expect(markup).toContain("Publish Case");
+		expect(markup).toContain("disabled");
 	});
 
 	it("renders draft status and non-blocking navigation warnings", () => {
