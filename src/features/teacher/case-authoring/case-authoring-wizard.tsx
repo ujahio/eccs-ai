@@ -151,7 +151,7 @@ export function CaseAuthoringWizard({
 	function selectSection(section: CaseAuthoringSection) {
 		if (isDirty) {
 			setSectionWarning(
-				"Unsaved changes stay on this page. Use Save Draft to persist them.",
+				"You have unsaved changes. Select Save Draft to store them.",
 			);
 		} else {
 			setSectionWarning("");

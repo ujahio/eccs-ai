@@ -41,7 +41,7 @@ describe("case authoring wizard frame", () => {
 			<WizardStatusMessages
 				draftValidationMessage="Enter a Case Title before saving this draft."
 				draftStatus="saving"
-				sectionWarning="Unsaved changes stay on this page."
+				sectionWarning="You have unsaved changes. Select Save Draft to store them."
 			/>,
 		);
 
@@ -49,7 +49,9 @@ describe("case authoring wizard frame", () => {
 		expect(markup).toContain('data-testid="teacher-case-draft-saving"');
 		expect(markup).toContain('data-testid="teacher-case-navigation-warning"');
 		expect(markup).toContain("Enter a Case Title before saving this draft.");
-		expect(markup).toContain("Unsaved changes stay on this page.");
+		expect(markup).toContain(
+			"You have unsaved changes. Select Save Draft to store them.",
+		);
 	});
 
 	it("removes the next button from final review", () => {
