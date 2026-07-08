@@ -37,10 +37,38 @@ export type PublishedTeacherCaseRecord = {
 	title: string;
 };
 
+export type PublishTeacherCaseDraftArgs = {
+	caseId?: string;
+	draft: CaseDraft;
+	now: number;
+	teacherProfileId: string;
+};
+
+const activeCaseLockCaseId = "teacher-case-active-lock";
+const activeCaseLockLifecycle = "activeCaseLock";
+
 type StoredTeacherCaseRecord = Omit<PublishedTeacherCaseRecord, "lifecycle"> & {
 	archivedAt?: number;
 	lifecycle: "published" | "archived" | "draft";
 };
+
+type ActiveCaseLockRecord = {
+	caseId: typeof activeCaseLockCaseId;
+	deadlineAt: number;
+	lifecycle: typeof activeCaseLockLifecycle;
+	publishedCaseId: string;
+	updatedAt: number;
+};
+
+type TeacherCaseTableRecord = StoredTeacherCaseRecord | ActiveCaseLockRecord;
+
+type PreparedTeacherCaseDraft = PublishTeacherCaseDraftArgs & {
+	deadlineAt: number;
+};
+
+type ExistingTeacherCaseDraft = {
+	caseId: string;
+} | null;
 
 export class PublishValidationError extends Error {
 	constructor(readonly validation: CaseDraftValidation) {
@@ -61,12 +89,9 @@ export class PublishDraftNotFoundError extends Error {
 }
 
 export interface TeacherCasePublisher {
-	publishDraft(args: {
-		caseId?: string;
-		draft: CaseDraft;
-		now: number;
-		teacherProfileId: string;
-	}): Promise<PublishedTeacherCaseRecord>;
+	publishDraft(
+		args: PublishTeacherCaseDraftArgs,
+	): Promise<PublishedTeacherCaseRecord>;
 }
 
 export function getTeacherCasePublisher(): TeacherCasePublisher {
@@ -78,48 +103,32 @@ export function getTeacherCasePublisher(): TeacherCasePublisher {
 }
 
 export class InMemoryTeacherCasePublisher implements TeacherCasePublisher {
-	async publishDraft({
-		caseId,
-		draft,
-		now,
-		teacherProfileId,
-	}: {
-		caseId?: string;
-		draft: CaseDraft;
-		now: number;
-		teacherProfileId: string;
-	}) {
-		const validation = validateDraftForPublishAt(draft, now);
-		const deadlineAt = deadlineAtFromDubaiDate(draft.deadlineDate);
+	async publishDraft(args: PublishTeacherCaseDraftArgs) {
+		const preparedDraft = prepareTeacherCaseDraftForPublish(args);
 
-		if (Object.keys(validation).length > 0 || deadlineAt === null) {
-			throw new PublishValidationError(validation);
-		}
-
-		if (hasActivePublishedCase(getE2ETeacherCaseStore(), now)) {
+		if (hasActivePublishedCase(getE2ETeacherCaseStore(), preparedDraft.now)) {
 			throw new ActivePublishedCaseError();
 		}
 
-		const existingDraft = caseId
-			? getE2ETeacherCaseDraftRecord(teacherProfileId, caseId)
+		const existingDraft = preparedDraft.caseId
+			? getE2ETeacherCaseDraftRecord(
+					preparedDraft.teacherProfileId,
+					preparedDraft.caseId,
+				)
 			: null;
 
-		if (caseId && !existingDraft) {
-			throw new PublishDraftNotFoundError();
-		}
-
-		const record = publishedCaseRecord({
-			caseId: existingDraft?.caseId ?? caseId ?? createTeacherCaseId(),
-			draft,
-			now,
-			deadlineAt,
-			teacherProfileId,
-		});
+		const record = publishedCaseRecordFromPreparedDraft(
+			preparedDraft,
+			existingDraft,
+		);
 
 		saveE2ETeacherCaseRecord(record);
 
 		if (existingDraft) {
-			deleteE2ETeacherCaseDraftRecord(teacherProfileId, existingDraft.caseId);
+			deleteE2ETeacherCaseDraftRecord(
+				preparedDraft.teacherProfileId,
+				existingDraft.caseId,
+			);
 		}
 
 		return record;
@@ -136,28 +145,16 @@ export class DynamoTeacherCasePublisher implements TeacherCasePublisher {
 		this.documentClient = documentClient;
 	}
 
-	async publishDraft({
-		caseId,
-		draft,
-		now,
-		teacherProfileId,
-	}: {
-		caseId?: string;
-		draft: CaseDraft;
-		now: number;
-		teacherProfileId: string;
-	}) {
-		const validation = validateDraftForPublishAt(draft, now);
-		const deadlineAt = deadlineAtFromDubaiDate(draft.deadlineDate);
-
-		if (Object.keys(validation).length > 0 || deadlineAt === null) {
-			throw new PublishValidationError(validation);
-		}
+	async publishDraft(args: PublishTeacherCaseDraftArgs) {
+		const preparedDraft = prepareTeacherCaseDraftForPublish(args);
 
 		const [activeCase, existingDraft] = await Promise.all([
-			this.getActivePublishedCase(now),
-			caseId
-				? this.getDraftRecordByCaseId(teacherProfileId, caseId)
+			this.getActivePublishedCase(preparedDraft.now),
+			preparedDraft.caseId
+				? this.getDraftRecordByCaseId(
+						preparedDraft.teacherProfileId,
+						preparedDraft.caseId,
+					)
 				: Promise.resolve(null),
 		]);
 
@@ -165,17 +162,10 @@ export class DynamoTeacherCasePublisher implements TeacherCasePublisher {
 			throw new ActivePublishedCaseError();
 		}
 
-		if (caseId && !existingDraft) {
-			throw new PublishDraftNotFoundError();
-		}
-
-		const record = publishedCaseRecord({
-			caseId: existingDraft?.caseId ?? caseId ?? createTeacherCaseId(),
-			draft,
-			now,
-			deadlineAt,
-			teacherProfileId,
-		});
+		const record = publishedCaseRecordFromPreparedDraft(
+			preparedDraft,
+			existingDraft,
+		);
 
 		try {
 			await this.documentClient.send(
@@ -184,11 +174,11 @@ export class DynamoTeacherCasePublisher implements TeacherCasePublisher {
 						{
 							Put: {
 								TableName: this.tableName,
-								Item: activeCaseLockRecord(record, now),
+								Item: activeCaseLockRecord(record, preparedDraft.now),
 								ConditionExpression:
 									"attribute_not_exists(caseId) OR deadlineAt < :now",
 								ExpressionAttributeValues: {
-									":now": now,
+									":now": preparedDraft.now,
 								},
 							},
 						},
@@ -205,7 +195,7 @@ export class DynamoTeacherCasePublisher implements TeacherCasePublisher {
 										},
 										ExpressionAttributeValues: {
 											":draft": "draft",
-											":teacherProfileId": teacherProfileId,
+											":teacherProfileId": preparedDraft.teacherProfileId,
 										},
 									}
 								: {
@@ -219,7 +209,7 @@ export class DynamoTeacherCasePublisher implements TeacherCasePublisher {
 			);
 		} catch (error) {
 			if (isConditionalCheckFailed(error)) {
-				if (await this.getActivePublishedCase(now)) {
+				if (await this.getActivePublishedCase(preparedDraft.now)) {
 					throw new ActivePublishedCaseError();
 				}
 
@@ -249,8 +239,11 @@ export class DynamoTeacherCasePublisher implements TeacherCasePublisher {
 			}),
 		);
 
-		return ((response.Items ?? [])[0] as StoredTeacherCaseRecord | undefined) ??
-			null;
+		const record = (response.Items ?? [])[0] as
+			| TeacherCaseTableRecord
+			| undefined;
+
+		return record?.lifecycle === "published" ? record : null;
 	}
 
 	private async getDraftRecordByCaseId(
@@ -263,7 +256,7 @@ export class DynamoTeacherCasePublisher implements TeacherCasePublisher {
 				Key: { caseId },
 			}),
 		);
-		const record = response.Item as StoredTeacherCaseRecord | undefined;
+		const record = response.Item as TeacherCaseTableRecord | undefined;
 
 		if (
 			!record ||
@@ -282,6 +275,36 @@ function hasActivePublishedCase(
 	now: number,
 ) {
 	return cases.some((caseRecord) => isActiveTeacherCase(caseRecord, now));
+}
+
+function prepareTeacherCaseDraftForPublish(
+	args: PublishTeacherCaseDraftArgs,
+): PreparedTeacherCaseDraft {
+	const deadlineAt = deadlineAtFromDubaiDate(args.draft.deadlineDate);
+	const validation = validateDraftForPublishAt(args.draft, args.now, deadlineAt);
+
+	if (Object.keys(validation).length > 0 || deadlineAt === null) {
+		throw new PublishValidationError(validation);
+	}
+
+	return { ...args, deadlineAt };
+}
+
+function publishedCaseRecordFromPreparedDraft(
+	{ caseId, deadlineAt, draft, now, teacherProfileId }: PreparedTeacherCaseDraft,
+	existingDraft: ExistingTeacherCaseDraft,
+) {
+	if (caseId && !existingDraft) {
+		throw new PublishDraftNotFoundError();
+	}
+
+	return publishedCaseRecord({
+		caseId: existingDraft?.caseId ?? caseId ?? createTeacherCaseId(),
+		deadlineAt,
+		draft,
+		now,
+		teacherProfileId,
+	});
 }
 
 function publishedCaseRecord({
@@ -312,9 +335,12 @@ function publishedCaseRecord({
 	};
 }
 
-function validateDraftForPublishAt(draft: CaseDraft, now: number) {
+function validateDraftForPublishAt(
+	draft: CaseDraft,
+	now: number,
+	deadlineAt: number | null,
+) {
 	const validation = validateDraftForPublish(draft);
-	const deadlineAt = deadlineAtFromDubaiDate(draft.deadlineDate);
 
 	if (deadlineAt !== null && deadlineAt < now) {
 		validation.deadlineDate = "Select a deadline date that has not passed.";
@@ -330,11 +356,11 @@ function createTeacherCaseId() {
 function activeCaseLockRecord(
 	record: PublishedTeacherCaseRecord,
 	now: number,
-) {
+): ActiveCaseLockRecord {
 	return {
-		caseId: "teacher-case-active-lock",
+		caseId: activeCaseLockCaseId,
 		deadlineAt: record.deadlineAt,
-		lifecycle: "activeCaseLock",
+		lifecycle: activeCaseLockLifecycle,
 		publishedCaseId: record.caseId,
 		updatedAt: now,
 	};

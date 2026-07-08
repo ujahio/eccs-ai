@@ -7,6 +7,12 @@ import {
 	uniqueEmail,
 } from "./teacher-helpers";
 
+function futureDeadlineDate() {
+	return new Date(Date.now() + 30 * dayInMilliseconds)
+		.toISOString()
+		.slice(0, 10);
+}
+
 test.describe("Teacher case authoring", () => {
 	test.afterEach(async ({ request }) => {
 		await resetTeacherE2EState(request);
@@ -60,7 +66,7 @@ test.describe("Teacher case authoring", () => {
 			.fill("Short resource notes saved before the full publish validation passes.");
 		await page
 			.getByTestId("teacher-case-resource-deadline-date")
-			.fill("2026-08-12");
+			.fill(futureDeadlineDate());
 		await page.getByTestId("teacher-case-pdf-attachments").setInputFiles({
 			name: "teaching-resource.pdf",
 			mimeType: "application/pdf",
@@ -207,7 +213,7 @@ test.describe("Teacher case authoring", () => {
 			);
 		await page
 			.getByTestId("teacher-case-resource-deadline-date")
-			.fill("2026-08-12");
+			.fill(futureDeadlineDate());
 		await page.getByTestId("teacher-case-section-cme").click();
 
 		for (let questionIndex = 0; questionIndex < 3; questionIndex += 1) {
