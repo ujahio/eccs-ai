@@ -21,8 +21,9 @@ export function TeacherDashboardReview({
 }: TeacherDashboardReviewProps) {
 	const startCaseLabel = activeCase ? "Start a draft case" : "Start a New Case";
 	const hasActiveCase = activeCase !== null;
+	const summarySurfaceHeight = "min-h-60";
 	const activeCasePanelClasses = [
-		"relative overflow-hidden rounded border border-border-gray p-5 sm:p-6",
+		`relative flex ${summarySurfaceHeight} overflow-hidden rounded border border-border-gray p-5 sm:p-6`,
 		hasActiveCase
 			? "bg-primary-action bg-[length:auto_100%] bg-[position:70%_center] bg-no-repeat text-white sm:bg-cover sm:bg-center"
 			: "bg-white text-primary-text",
@@ -61,7 +62,7 @@ export function TeacherDashboardReview({
 						Ongoing case study
 					</p>
 					<div className={activeCasePanelClasses} style={activeCasePanelStyle}>
-						<div className="relative z-10">
+						<div className="relative z-10 flex w-full flex-1 flex-col">
 							{activeCase ? (
 								<div data-testid="teacher-active-case-card">
 									<div
@@ -91,7 +92,9 @@ export function TeacherDashboardReview({
 					</div>
 				</div>
 
-				<div className="rounded border border-border-gray bg-white p-5 sm:p-6 lg:mt-7">
+				<div
+					className={`flex ${summarySurfaceHeight} flex-col rounded border border-border-gray bg-white p-5 sm:p-6 lg:mt-7`}
+				>
 					<div className="mb-1 border-b border-border-gray pb-4">
 						<p className="text-xs font-semibold uppercase text-muted-gray">
 							Recent archived cases
@@ -99,7 +102,7 @@ export function TeacherDashboardReview({
 					</div>
 
 					{archivedCases.length > 0 ? (
-						<div data-testid="teacher-archived-cases">
+						<div className="flex-1" data-testid="teacher-archived-cases">
 							{archivedCases.map((caseRecord) => (
 								<ArchivedCaseRow
 									caseRecord={caseRecord}
@@ -246,7 +249,7 @@ function EmptyState({
 	return (
 		<div
 			className={[
-				"flex min-h-48 flex-col justify-center p-5",
+				"flex flex-1 flex-col justify-center p-5",
 				isDark ? "bg-white/10" : "bg-app-canvas",
 			].join(" ")}
 			data-testid={testId}

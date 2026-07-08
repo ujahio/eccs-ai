@@ -15,6 +15,17 @@ describe("ReviewSection", () => {
 					presentation: "Line one\nLine two",
 					modelAnswer: "Model answer text",
 					lectureText: "Lecture text for learners",
+					cmeQuestions: [
+						{
+							id: "question-1",
+							prompt: "Which result supports the diagnosis?",
+							options: [
+								{ id: "option-a", text: "Elevated marker" },
+								{ id: "option-b", text: "Normal marker" },
+							],
+							correctOptionId: "option-a",
+						},
+					],
 					attachments: [
 						{
 							dataUrl: "data:application/pdf;base64,JVBERi0xLjQ=",
@@ -25,7 +36,10 @@ describe("ReviewSection", () => {
 							lastModified: 1,
 						},
 					],
+					deadlineDate: "2026-08-12",
 				}}
+				onPublish={() => {}}
+				publishDisabled
 				readyToPublish={false}
 				updateDraft={() => {}}
 				validation={{ cmeQuestions: "Add 3 to 5 CME questions." }}
@@ -37,11 +51,18 @@ describe("ReviewSection", () => {
 		expect(markup).toContain("<summary");
 		expect(markup).toContain("Line one");
 		expect(markup).not.toContain("word");
-		expect(markup).toContain("0 questions added");
-		expect(markup).not.toContain("1 question added");
+		expect(markup).toContain("1 question added");
+		expect(markup).not.toContain("0 questions added");
+		expect(markup).toContain('data-testid="teacher-case-review-cme-questions"');
+		expect(markup).toContain("Which result supports the diagnosis?");
+		expect(markup).toContain("Elevated marker");
+		expect(markup).toContain("Correct answer");
 		expect(markup).toContain("Case Materials");
 		expect(markup).toContain("case-material.pdf");
 		expect(markup).toContain("data:application/pdf;base64,JVBERi0xLjQ=");
+		expect(markup).toContain("Expires at");
+		expect(markup).toContain("Aug 12, 2026");
+		expect(markup).toContain("11:59 PM UAE time");
 		expect(markup).not.toContain("<object");
 	});
 
@@ -50,9 +71,11 @@ describe("ReviewSection", () => {
 			<ReviewSection
 				activePublishedCase={{
 					title: "Published endocrine case",
-					deadlineAt: Date.UTC(2026, 7, 12),
+					deadlineAt: Date.UTC(2026, 7, 12, 19, 59, 59, 999),
 				}}
 				draft={emptyCaseDraft}
+				onPublish={() => {}}
+				publishDisabled
 				readyToPublish
 				updateDraft={() => {}}
 				validation={{}}

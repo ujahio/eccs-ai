@@ -99,14 +99,15 @@ No super-admin UI is included in v1. Teacher setup is handled through bootstrap/
 - Teacher authoring uses explicit "Save Draft" only. The UI must show dirty-state messaging and warn before navigation when unsaved changes exist.
 - Drafts can be incomplete and saved after the Case Title minimum is met. Draft PDF attachments are retained with the draft content. Use partial section-level validation for author feedback, with full validation as the hard gate at publish.
 - Draft deletion requires a confirmation dialog and then permanently deletes the draft. Deleting a draft also deletes its draft PDF attachments from storage.
-- Published case content is immutable in v1. Teachers can edit drafts only. Once published, the case presentation, model answer, teaching resources, quiz, CE credit hours, and deadline are frozen.
+- Published case content is immutable in v1. Teachers can edit drafts only. Once published, the case presentation, model answer, teaching resources, quiz, and deadline are frozen.
 - If a serious typo or clinical correction is discovered after publishing, handle it manually outside the product. Minor typos remain unchanged.
 - Deadline is initially set in the Case Study resources step and confirmed or edited at review/publish as a calendar date. The case expires at 11:59 PM UAE time (`Asia/Dubai`) on that date.
-- Deadline display uses UAE time as the source of truth, with a local browser-time equivalent where helpful.
+- Deadline display uses UAE time as the source of truth and follows the product date format from the design system.
 - Publishing is immediate from the teacher action. There is no scheduled publishing in v1.
 - Publishing creates exactly one "active" case. Disable publishing while another active case exists.
-- At deadline, the case auto-archives and all student operations on that case stop immediately. There is no mid-quiz exception in v1.
-- Case active/archive state is computed dynamically from `deadlineAt` for correctness, and a scheduled backend job also persists archive state for operational clarity.
+- At deadline, the case is treated as archived and all student operations on that case stop immediately. There is no mid-quiz exception in v1.
+- Case active/archive behavior is computed dynamically from the published case deadline for correctness.
+- A scheduled backend job also persists archived lifecycle state for operational clarity.
 - Students cannot access cases after the deadline unless they already earned a certificate. The only lasting student access is to their own certificates.
 - Payments are deferred until payment provider research is complete. While payments are deferred, verified students can access active cases through a `canAccessCases` policy boundary. When payments are introduced, case access must require both verification and paid access.
 
@@ -211,7 +212,8 @@ Feedback is shown to the teacher with the student's name in v1.
 ### Certificates
 
 - Certificate records are created at quiz pass time.
-- Certificate records include certificate-facing immutable facts only: student display name, case title, completion date, CE credit hours, ECCS branding fields, partner/issuing authority fields, and unique certificate ID.
+- Certificate records include certificate-facing immutable facts only: student display name, case title, completion date, ECCS branding fields, partner/issuing authority fields, and unique certificate ID.
+- Certificate previews and PDFs display the shared v1 CE credit hour value. Do not store CE credit hours per case study or per student completion record.
 - Personal analysis remains in the case progress/completion record, not the certificate record.
 - Certificate PDFs are generated on demand only when the student clicks download.
 - PDF generation uses the current certificate template with immutable certificate facts.

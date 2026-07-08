@@ -51,6 +51,7 @@ import {
 	type ProfileSecurityRepository
 } from "@/features/profile-security/service";
 import type { CaseDraft } from "@/features/teacher/case-authoring/schema";
+import { teacherCaseRecordType } from "@/features/teacher/cases/case-lifecycle";
 
 export type E2EEmailRecord =
 	| {
@@ -84,19 +85,7 @@ export type E2EEmailRecord =
 type E2EAuthStoreShape = {
 	registrations: Map<string, PendingRegistrationRecord>;
 	profiles: Map<string, AppProfileRecord>;
-	teacherCases: Map<
-		string,
-		{
-			caseId: string;
-			title: string;
-			lifecycle: "published" | "archived" | "draft";
-			publishedAt: number;
-			deadlineAt: number;
-			archivedAt?: number;
-			completionCount: number;
-			feedbackCount: number;
-		}
-	>;
+	teacherCases: Map<string, E2ETeacherCaseRecord>;
 	teacherCaseDrafts: Map<string, E2ETeacherCaseDraftRecord>;
 	users: Map<
 		string,
@@ -123,6 +112,20 @@ export type E2ETeacherCaseDraftRecord = {
 	teacherProfileId: string;
 	title: string;
 	updatedAt: number;
+};
+
+type E2ETeacherCaseRecord = {
+	caseId: string;
+	title: string;
+	lifecycle: "published" | "archived" | "draft";
+	publishedAt: number;
+	deadlineAt: number;
+	archivedAt?: number;
+	draft?: CaseDraft;
+	teacherProfileId?: string;
+	completionCount: number;
+	feedbackCount: number;
+	recordType: typeof teacherCaseRecordType;
 };
 
 const GLOBAL_KEY = "__E2E_AUTH_STORE__";
@@ -180,8 +183,11 @@ export function seedE2ETeacherCases(
 		publishedAt: number;
 		deadlineAt: number;
 		archivedAt?: number;
+		draft?: CaseDraft;
+		teacherProfileId?: string;
 		completionCount: number;
 		feedbackCount: number;
+		recordType?: typeof teacherCaseRecordType;
 	}>,
 ) {
 	const store = getStore();
@@ -189,8 +195,35 @@ export function seedE2ETeacherCases(
 	store.teacherCases.clear();
 
 	for (const caseRecord of cases) {
-		store.teacherCases.set(caseRecord.caseId, caseRecord);
+		store.teacherCases.set(caseRecord.caseId, normalizeE2ETeacherCase(caseRecord));
 	}
+}
+
+export function saveE2ETeacherCaseRecord(record: {
+	caseId: string;
+	title: string;
+	lifecycle: "published" | "archived" | "draft";
+	publishedAt: number;
+	deadlineAt: number;
+	archivedAt?: number;
+	draft?: CaseDraft;
+	teacherProfileId?: string;
+	completionCount: number;
+	feedbackCount: number;
+	recordType?: typeof teacherCaseRecordType;
+}) {
+	getStore().teacherCases.set(record.caseId, normalizeE2ETeacherCase(record));
+}
+
+function normalizeE2ETeacherCase(
+	record: Omit<E2ETeacherCaseRecord, "recordType"> & {
+		recordType?: typeof teacherCaseRecordType;
+	},
+): E2ETeacherCaseRecord {
+	return {
+		...record,
+		recordType: record.recordType ?? teacherCaseRecordType,
+	};
 }
 
 export function deleteE2ETeacherCaseDraftRecord(

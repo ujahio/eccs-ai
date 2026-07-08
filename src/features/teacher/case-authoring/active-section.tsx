@@ -21,6 +21,8 @@ export function ActiveAuthoringSection({
 	addQuestion,
 	draft,
 	readyToPublish,
+	onPublish,
+	publishDisabled,
 	removeAttachment,
 	removeQuestion,
 	saveValidation,
@@ -36,6 +38,8 @@ export function ActiveAuthoringSection({
 	addQuestion: () => void;
 	draft: CaseDraft;
 	readyToPublish: boolean;
+	onPublish: () => void | Promise<void>;
+	publishDisabled: boolean;
 	removeAttachment: (attachmentId: string) => void;
 	removeQuestion: () => void;
 	saveValidation: CaseDraftValidation;
@@ -107,6 +111,8 @@ export function ActiveAuthoringSection({
 		<ReviewSection
 			activePublishedCase={activePublishedCase}
 			draft={draft}
+			onPublish={onPublish}
+			publishDisabled={publishDisabled}
 			readyToPublish={readyToPublish}
 			updateDraft={updateDraft}
 			validation={validation}

@@ -25,6 +25,7 @@ describe("case authoring wizard frame", () => {
 			<WizardHeader
 				isDirty
 				onSaveDraft={() => {}}
+				onPublish={() => {}}
 				publishDisabled
 			/>,
 		);
@@ -41,12 +42,14 @@ describe("case authoring wizard frame", () => {
 			<WizardStatusMessages
 				draftValidationMessage="Enter a Case Title before saving this draft."
 				draftStatus="saving"
+				publishStatus="publishing"
 				sectionWarning="You have unsaved changes. Select Save Draft to store them."
 			/>,
 		);
 
 		expect(markup).toContain('data-testid="teacher-case-draft-validation"');
 		expect(markup).toContain('data-testid="teacher-case-draft-saving"');
+		expect(markup).toContain('data-testid="teacher-case-publishing"');
 		expect(markup).toContain('data-testid="teacher-case-navigation-warning"');
 		expect(markup).toContain("Enter a Case Title before saving this draft.");
 		expect(markup).toContain(

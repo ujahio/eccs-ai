@@ -8,6 +8,7 @@ import {
 	GetCommand,
 	PutCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { teacherCaseRecordType } from "@/features/teacher/cases/case-lifecycle";
 import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import {
@@ -30,6 +31,7 @@ export type TeacherCaseDraftRecord = {
 	feedbackCount: number;
 	lifecycle: "draft";
 	publishedAt: number;
+	recordType: typeof teacherCaseRecordType;
 	teacherProfileId: string;
 	title: string;
 	updatedAt: number;
@@ -235,6 +237,7 @@ export class DynamoTeacherCaseDraftRepository
 			feedbackCount: 0,
 			lifecycle: "draft",
 			publishedAt: 0,
+			recordType: teacherCaseRecordType,
 			teacherProfileId,
 			title: storedDraft.title.trim() || "Untitled draft",
 			updatedAt: now,
@@ -260,13 +263,9 @@ export class DynamoTeacherCaseDraftRepository
 				Key: { caseId },
 			}),
 		);
-		const record = response.Item as TeacherCaseDraftRecord | undefined;
+		const record = response.Item as unknown;
 
-		if (
-			!record ||
-			record.lifecycle !== "draft" ||
-			record.teacherProfileId !== teacherProfileId
-		) {
+		if (!isTeacherCaseDraftRecord(record, teacherProfileId)) {
 			return null;
 		}
 
@@ -307,6 +306,23 @@ export class DynamoTeacherCaseDraftRepository
 
 function createTeacherCaseId() {
 	return randomUUID();
+}
+
+function isTeacherCaseDraftRecord(
+	record: unknown,
+	teacherProfileId: string,
+): record is TeacherCaseDraftRecord {
+	if (typeof record !== "object" || record === null) {
+		return false;
+	}
+
+	const candidate = record as Partial<TeacherCaseDraftRecord>;
+
+	return (
+		candidate.recordType === teacherCaseRecordType &&
+		candidate.lifecycle === "draft" &&
+		candidate.teacherProfileId === teacherProfileId
+	);
 }
 
 function draftRecordForEditing(

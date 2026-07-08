@@ -4,6 +4,7 @@ import {
 	isE2EMode,
 	seedE2ETeacherCases,
 } from "@/lib/e2e/in-memory-auth";
+import { isActiveTeacherCase } from "@/features/teacher/cases/case-lifecycle";
 
 type E2ETeacherDashboardActiveCase = {
 	title: string;
@@ -101,7 +102,7 @@ export async function GET() {
 
 	const activeCase =
 		getE2ETeacherCaseStore().find(
-			(caseRecord) => caseRecord.lifecycle === "published",
+			(caseRecord) => isActiveTeacherCase(caseRecord, Date.now()),
 		) ?? null;
 
 	return NextResponse.json({ activeCase });
