@@ -42,6 +42,7 @@ describe("case authoring sections", () => {
 					...emptyCaseDraft,
 					attachments: [
 						{
+							dataUrl: "data:application/pdf;base64,JVBERi0xLjQ=",
 							id: "attachment-1",
 							name: "resource.pdf",
 							size: 100,
@@ -60,6 +61,7 @@ describe("case authoring sections", () => {
 		expect(markup).toContain("Deadline Date");
 		expect(markup).toContain("1 Case Material Selected");
 		expect(markup).toContain("resource.pdf");
+		expect(markup).toContain("data:application/pdf;base64,JVBERi0xLjQ=");
 	});
 
 	it("renders CME question bubbles and started count", () => {

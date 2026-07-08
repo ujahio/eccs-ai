@@ -4,7 +4,7 @@ import { emptyCaseDraft } from "../schema";
 import { ReviewSection } from "./review-section";
 
 describe("ReviewSection", () => {
-	it("renders expandable long-text panels and persisted PDF previews", () => {
+	it("renders expandable long-text panels and persisted PDF links", () => {
 		const markup = renderToStaticMarkup(
 			<ReviewSection
 				activePublishedCase={null}
@@ -42,6 +42,7 @@ describe("ReviewSection", () => {
 		expect(markup).toContain("Case Materials");
 		expect(markup).toContain("case-material.pdf");
 		expect(markup).toContain("data:application/pdf;base64,JVBERi0xLjQ=");
+		expect(markup).not.toContain("<object");
 	});
 
 	it("disables publish when another case is active", () => {

@@ -1,4 +1,4 @@
-import type { CaseDraft } from "../schema";
+import type { CaseDraft, DraftAttachment } from "../schema";
 import { Field, SectionHeading } from "../shared";
 
 export function ResourcesSection({
@@ -75,7 +75,7 @@ export function ResourcesSection({
 								className="flex items-center justify-between gap-3 border-t border-border-gray pt-2 text-sm"
 								key={attachment.id}
 							>
-								<span>{attachment.name}</span>
+								<CaseMaterialLink attachment={attachment} />
 								<button
 									className="text-xs font-bold uppercase text-error-red"
 									onClick={() => removeAttachment(attachment.id)}
@@ -89,5 +89,24 @@ export function ResourcesSection({
 				) : null}
 			</div>
 		</div>
+	);
+}
+
+function CaseMaterialLink({ attachment }: { attachment: DraftAttachment }) {
+	const materialSource = attachment.previewUrl ?? attachment.dataUrl ?? "";
+
+	if (!materialSource) {
+		return <span>{attachment.name}</span>;
+	}
+
+	return (
+		<a
+			className="font-semibold text-brand-teal underline-offset-4 hover:underline"
+			href={materialSource}
+			rel="noreferrer"
+			target="_blank"
+		>
+			{attachment.name}
+		</a>
 	);
 }

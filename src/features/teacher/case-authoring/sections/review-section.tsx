@@ -1,4 +1,3 @@
-import { buttonVariants } from "@/components/ui/button";
 import { PublishCaseButton } from "../wizard-frame";
 import {
 	hasCmeQuestionContent,
@@ -170,10 +169,9 @@ function ReviewAttachmentPreviews({
 			</summary>
 			{attachments.length > 0 ? (
 				<div className="space-y-4 border-t border-border-gray p-4 sm:p-5">
-					{attachments.map((attachment, index) => (
+					{attachments.map((attachment) => (
 						<ReviewAttachmentPreview
 							attachment={attachment}
-							index={index}
 							key={attachment.id}
 						/>
 					))}
@@ -189,57 +187,38 @@ function ReviewAttachmentPreviews({
 
 function ReviewAttachmentPreview({
 	attachment,
-	index,
 }: {
 	attachment: DraftAttachment;
-	index: number;
 }) {
 	const previewSource = attachment.previewUrl ?? attachment.dataUrl ?? "";
 
 	return (
-		<article className="border border-border-gray bg-app-canvas">
-			<div className="flex flex-col gap-3 border-b border-border-gray bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-				<div>
-					<h4 className="text-sm font-semibold text-primary-text">
-						{attachment.name}
-					</h4>
-					<p className="mt-1 text-xs font-semibold uppercase text-muted-gray">
-						{formatFileSize(attachment.size)}
-					</p>
-				</div>
+		<article className="border border-border-gray bg-app-canvas px-4 py-3">
+			<div className="flex flex-col gap-2">
 				{previewSource ? (
 					<a
-						className={buttonVariants({ variant: "secondary", size: "sm" })}
+						className="text-sm font-semibold text-brand-teal underline-offset-4 hover:underline"
 						href={previewSource}
 						rel="noreferrer"
 						target="_blank"
 					>
-						Open PDF
+						{attachment.name}
 					</a>
-				) : null}
+				) : (
+					<h4 className="text-sm font-semibold text-primary-text">
+						{attachment.name}
+					</h4>
+				)}
+				<p className="text-xs font-semibold uppercase text-muted-gray">
+					{formatFileSize(attachment.size)}
+				</p>
+				{previewSource ? null : (
+					<p className="text-sm leading-6 text-muted-gray">
+						This material is saved, but no browser link is available. Re-upload
+						it if you need to inspect the file contents here.
+					</p>
+				)}
 			</div>
-			{previewSource ? (
-				<object
-					aria-label={`${attachment.name} preview`}
-					className="h-80 w-full bg-white sm:h-[28rem]"
-					data={previewSource}
-					data-testid={`teacher-case-review-pdf-preview-${index}`}
-					type={attachment.type || "application/pdf"}
-				>
-					<div className="flex min-h-60 items-center justify-center p-6 text-center text-sm leading-6 text-muted-gray">
-						This browser cannot display the PDF preview. Use Open PDF to inspect
-						the material.
-					</div>
-				</object>
-			) : (
-				<div
-					className="flex min-h-52 items-center justify-center px-4 py-8 text-center text-sm leading-6 text-muted-gray"
-					data-testid={`teacher-case-review-pdf-preview-${index}`}
-				>
-					This material is saved, but no browser preview is available. Re-upload
-					it if you need to inspect the file contents here.
-				</div>
-			)}
 		</article>
 	);
 }
