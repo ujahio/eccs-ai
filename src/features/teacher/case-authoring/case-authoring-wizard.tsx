@@ -29,10 +29,15 @@ import {
 
 export function CaseAuthoringWizard({
 	activePublishedCase = null,
+	draftCaseId = null,
 }: {
 	activePublishedCase?: ActivePublishedCaseSummary | null;
+	draftCaseId?: string | null;
 }) {
 	const [draft, setDraft] = useState<CaseDraft>(emptyCaseDraft);
+	const [currentDraftCaseId, setCurrentDraftCaseId] = useState<string | null>(
+		draftCaseId,
+	);
 	const [activeSection, setActiveSection] =
 		useState<CaseAuthoringSection>("title");
 	const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
@@ -46,24 +51,36 @@ export function CaseAuthoringWizard({
 	const publishDisabled = !readyToPublish || activePublishedCase !== null;
 
 	useEffect(() => {
+		if (!draftCaseId) {
+			return;
+		}
+
 		let isMounted = true;
 		const animationFrame = window.requestAnimationFrame(() => {
 			void (async () => {
 				try {
-					const response = await fetch("/api/teacher/case-draft");
+					const response = await fetch(
+						`/api/teacher/case-draft?caseId=${encodeURIComponent(
+							draftCaseId,
+						)}`,
+					);
 
 					if (!response.ok) {
 						throw new Error("Draft load failed.");
 					}
 
-					const body = (await response.json()) as { draft?: unknown };
+					const body = (await response.json()) as {
+						caseId?: unknown;
+						draft?: unknown;
+					};
 
 					if (body.draft && isMounted) {
 						setDraft(draftForEditing(caseDraftFromUnknown(body.draft)));
+						setCurrentDraftCaseId(caseIdFromResponse(body) ?? draftCaseId);
 					}
 				} catch {
 					if (isMounted) {
-						setDraftStatus("error");
+						setDraftStatus("load-error");
 					}
 				}
 			})();
@@ -73,7 +90,7 @@ export function CaseAuthoringWizard({
 			isMounted = false;
 			window.cancelAnimationFrame(animationFrame);
 		};
-	}, []);
+	}, [draftCaseId]);
 
 	useEffect(() => {
 		const previewUrls = attachmentPreviewUrls.current;
@@ -124,7 +141,10 @@ export function CaseAuthoringWizard({
 			setSectionWarning("");
 			setDraftStatus("saving");
 			const response = await fetch("/api/teacher/case-draft", {
-				body: JSON.stringify({ draft: draftForStorage(draft) }),
+				body: JSON.stringify({
+					...(currentDraftCaseId ? { caseId: currentDraftCaseId } : {}),
+					draft: draftForStorage(draft),
+				}),
 				headers: {
 					"content-type": "application/json",
 				},
@@ -135,12 +155,27 @@ export function CaseAuthoringWizard({
 				throw new Error("Draft save failed.");
 			}
 
-			const body = (await response.json()) as { draft?: unknown };
+			const body = (await response.json()) as {
+				caseId?: unknown;
+				draft?: unknown;
+			};
 			const savedDraft = body.draft
 				? draftForEditing(caseDraftFromUnknown(body.draft))
 				: draftForEditing(draftForStorage(draft));
+			const savedCaseId = caseIdFromResponse(body) ?? currentDraftCaseId;
 
 			setDraft(savedDraft);
+			if (savedCaseId) {
+				setCurrentDraftCaseId(savedCaseId);
+
+				if (!currentDraftCaseId) {
+					window.history.replaceState(
+						null,
+						"",
+						`/teacher/cases/${encodeURIComponent(savedCaseId)}/edit`,
+					);
+				}
+			}
 			setIsDirty(false);
 			setDraftStatus("saved");
 		} catch {
@@ -311,4 +346,22 @@ function readFileAsDataUrl(file: File) {
 		reader.addEventListener("error", () => reject(reader.error));
 		reader.readAsDataURL(file);
 	});
+}
+
+function caseIdFromResponse(body: { caseId?: unknown; draft?: unknown }) {
+	if (typeof body.caseId === "string" && body.caseId.trim()) {
+		return body.caseId;
+	}
+
+	if (
+		typeof body.draft === "object" &&
+		body.draft !== null &&
+		"caseId" in body.draft
+	) {
+		const caseId = (body.draft as { caseId?: unknown }).caseId;
+
+		return typeof caseId === "string" && caseId.trim() ? caseId : null;
+	}
+
+	return null;
 }

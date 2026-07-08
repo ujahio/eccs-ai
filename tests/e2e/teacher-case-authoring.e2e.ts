@@ -12,13 +12,33 @@ test.describe("Teacher case authoring", () => {
 		await resetTeacherE2EState(request);
 	});
 
-	test("saves an incomplete draft, retains PDF attachments, and validates review readiness", async ({
+	test("reopens a saved draft from All Cases and deletes it with confirmation", async ({
 		page,
 		request,
 	}) => {
 		const email = uniqueEmail("teacher-case-authoring");
+		const now = Date.now();
 
 		await bootstrapVerifiedTeacher(request, email);
+		const dashboardResponse = await request.post(
+			"/api/e2e/teacher-dashboard/state",
+			{
+				data: {
+					activeCase: null,
+					archivedCases: [
+						{
+							title: "Archived renal case discussion",
+							publishedAt: now - 28 * dayInMilliseconds,
+							deadlineAt: now - 14 * dayInMilliseconds,
+							archivedAt: now - 14 * dayInMilliseconds,
+							completionCount: 9,
+							feedbackCount: 3,
+						},
+					],
+				},
+			},
+		);
+		expect(dashboardResponse.ok()).toBe(true);
 		await loginTeacher(page, email);
 		await page.getByTestId("teacher-start-case-button").click();
 		await expect(page).toHaveURL(/\/teacher\/cases\/new$/);
@@ -53,6 +73,8 @@ test.describe("Teacher case authoring", () => {
 		await expect(page.getByTestId("teacher-case-draft-saved")).toHaveText(
 			"Draft saved.",
 		);
+		await expect(page).toHaveURL(/\/teacher\/cases\/[^/]+\/edit$/);
+		const editPath = new URL(page.url()).pathname;
 
 		await page.reload();
 		await expect(page.getByTestId("teacher-case-title")).toHaveValue(
@@ -76,6 +98,45 @@ test.describe("Teacher case authoring", () => {
 			"Draft can be saved",
 		);
 		await expect(page.getByTestId("teacher-case-publish")).toBeDisabled();
+
+		await page.getByTestId("teacher-cases-link").click();
+		await expect(page).toHaveURL(/\/teacher\/cases$/);
+		await expect(page.getByTestId("teacher-case-library-root")).toBeVisible();
+		await expect(page.getByTestId("teacher-draft-case-card")).toHaveCount(1);
+		await expect(page.getByTestId("teacher-draft-cases")).toContainText(
+			"Acute endocrine review",
+		);
+		await expect(page.getByTestId("teacher-draft-cases")).toContainText("PDFs 1");
+		await page.getByTestId("teacher-case-library-archived-mode").click();
+		await expect(page.getByTestId("teacher-library-archived-cases")).toContainText(
+			"Archived renal case discussion",
+		);
+		await page.getByTestId("teacher-case-library-draft-mode").click();
+
+		await page.getByTestId("teacher-draft-edit").click();
+		await expect(page).toHaveURL(new RegExp(`${editPath}$`));
+		await expect(page.getByTestId("teacher-case-title")).toHaveValue(
+			"Acute endocrine review",
+		);
+		await page.getByTestId("teacher-case-section-resources").click();
+		await expect(page.getByTestId("teacher-case-pdf-list")).toContainText(
+			"teaching-resource.pdf",
+		);
+
+		await page.getByTestId("teacher-cases-link").click();
+		await page.getByTestId("teacher-draft-delete").click();
+		await expect(page.getByTestId("teacher-delete-draft-dialog")).toBeVisible();
+		await page.getByTestId("teacher-delete-draft-cancel").click();
+		await expect(page.getByTestId("teacher-delete-draft-dialog")).toBeHidden();
+		await expect(page.getByTestId("teacher-draft-case-card")).toHaveCount(1);
+
+		await page.getByTestId("teacher-draft-delete").click();
+		await page.getByTestId("teacher-delete-draft-confirm").click();
+		await expect(page.getByTestId("teacher-case-library-no-drafts")).toBeVisible();
+		await expect(page.getByTestId("teacher-draft-case-card")).toHaveCount(0);
+
+		await page.goto(editPath);
+		await expect(page.getByTestId("teacher-case-draft-load-error")).toBeVisible();
 	});
 
 	test("blocks publishing while another case is active", async ({

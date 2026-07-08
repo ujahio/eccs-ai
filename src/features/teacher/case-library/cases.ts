@@ -1,0 +1,154 @@
+import "server-only";
+
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+	DynamoDBDocumentClient,
+	QueryCommand,
+	type QueryCommandInput,
+} from "@aws-sdk/lib-dynamodb";
+import {
+	getTeacherCaseDraftRepository,
+	type TeacherCaseDraftListItem,
+} from "@/features/teacher/case-authoring/drafts";
+import {
+	sortArchivedTeacherCases,
+	type TeacherCaseLifecycle,
+} from "@/features/teacher/cases/case-lifecycle";
+import { getSessionAuthResources } from "@/lib/aws/resources";
+import { requireTeacherSession } from "@/lib/auth/session";
+import { getE2ETeacherCaseStore, isE2EMode } from "@/lib/e2e/in-memory-auth";
+
+export type TeacherCaseLibraryArchivedCase = {
+	caseId: string;
+	title: string;
+	publishedAt: number;
+	deadlineAt: number;
+	archivedAt?: number;
+	completionCount: number;
+	feedbackCount: number;
+};
+
+export type TeacherCaseLibrarySummary = {
+	draftCases: TeacherCaseDraftListItem[];
+	archivedCases: TeacherCaseLibraryArchivedCase[];
+};
+
+type StoredTeacherCaseRecord = TeacherCaseLibraryArchivedCase & {
+	lifecycle: TeacherCaseLifecycle;
+};
+
+export async function getTeacherCaseLibrary(): Promise<TeacherCaseLibrarySummary> {
+	const { profile } = await requireTeacherSession();
+	const archivedRepository = isE2EMode()
+		? new InMemoryTeacherCaseLibraryRepository()
+		: new DynamoTeacherCaseLibraryRepository(
+				getSessionAuthResources().teacherCaseTableName,
+			);
+	const [draftCases, archivedCases] = await Promise.all([
+		getTeacherCaseDraftRepository().listDrafts(profile.profileId),
+		archivedRepository.listArchivedCases(Date.now()),
+	]);
+
+	return {
+		draftCases,
+		archivedCases,
+	};
+}
+
+export class InMemoryTeacherCaseLibraryRepository {
+	async listArchivedCases(now: number) {
+		return sortArchivedCases(getE2ETeacherCaseStore(), now);
+	}
+}
+
+export class DynamoTeacherCaseLibraryRepository {
+	private readonly documentClient: DynamoDBDocumentClient;
+
+	constructor(
+		private readonly tableName: string,
+		documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({})),
+	) {
+		this.documentClient = documentClient;
+	}
+
+	async listArchivedCases(now: number) {
+		const [archivedCases, expiredPublishedCases] = await Promise.all([
+			this.queryAll({
+				TableName: this.tableName,
+				IndexName: "LifecycleArchivedIndex",
+				KeyConditionExpression: "#lifecycle = :archived",
+				ExpressionAttributeNames: {
+					"#lifecycle": "lifecycle",
+				},
+				ExpressionAttributeValues: {
+					":archived": "archived",
+				},
+				ScanIndexForward: false,
+			}),
+			this.queryAll({
+				TableName: this.tableName,
+				IndexName: "LifecycleDeadlineIndex",
+				KeyConditionExpression: "#lifecycle = :published AND deadlineAt < :now",
+				ExpressionAttributeNames: {
+					"#lifecycle": "lifecycle",
+				},
+				ExpressionAttributeValues: {
+					":published": "published",
+					":now": now,
+				},
+				ScanIndexForward: false,
+			}),
+		]);
+
+		return sortArchivedCases(
+			[...archivedCases, ...expiredPublishedCases],
+			now,
+		);
+	}
+
+	private async queryAll(input: QueryCommandInput) {
+		const records: StoredTeacherCaseRecord[] = [];
+		let exclusiveStartKey: QueryCommandInput["ExclusiveStartKey"];
+
+		do {
+			const response = await this.documentClient.send(
+				new QueryCommand({
+					...input,
+					...(exclusiveStartKey
+						? { ExclusiveStartKey: exclusiveStartKey }
+						: {}),
+				}),
+			);
+
+			records.push(...((response.Items ?? []) as StoredTeacherCaseRecord[]));
+			exclusiveStartKey = response.LastEvaluatedKey;
+		} while (exclusiveStartKey);
+
+		return records;
+	}
+}
+
+function sortArchivedCases(
+	cases: StoredTeacherCaseRecord[],
+	now: number,
+): TeacherCaseLibraryArchivedCase[] {
+	return sortArchivedTeacherCases(cases, now).map(
+		({
+			caseId,
+			title,
+			publishedAt,
+			deadlineAt,
+			archivedAt: storedArchivedAt,
+			completionCount,
+			feedbackCount,
+		}) => ({
+			caseId,
+			title,
+			publishedAt,
+			deadlineAt,
+			...(storedArchivedAt ? { archivedAt: storedArchivedAt } : {}),
+			completionCount,
+			feedbackCount,
+		}),
+	);
+}

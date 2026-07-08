@@ -4,7 +4,7 @@ import { sectionLabels } from "./constants";
 import { caseAuthoringSections, type CaseAuthoringSection } from "./schema";
 import { StatusMessage } from "./shared";
 
-export type DraftStatus = "idle" | "saving" | "saved" | "error";
+export type DraftStatus = "idle" | "saving" | "saved" | "error" | "load-error";
 
 export function WizardHeader({
 	isDirty,
@@ -92,6 +92,13 @@ export function WizardStatusMessages({
 					testId="teacher-case-draft-error"
 					tone="error"
 					value="The draft could not be saved. Try again."
+				/>
+			) : null}
+			{draftStatus === "load-error" ? (
+				<StatusMessage
+					testId="teacher-case-draft-load-error"
+					tone="error"
+					value="The draft could not be loaded. Return to Case Studies and try again."
 				/>
 			) : null}
 			{sectionWarning ? (

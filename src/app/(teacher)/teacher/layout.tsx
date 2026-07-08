@@ -38,7 +38,7 @@ export default async function TeacherLayout({
 						<Link
 							className="transition hover:text-brand-teal"
 							data-testid="teacher-cases-link"
-							href="/teacher/cases/new"
+							href="/teacher/cases"
 						>
 							Case Studies
 						</Link>
