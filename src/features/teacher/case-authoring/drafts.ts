@@ -1,10 +1,12 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
 	DynamoDBDocumentClient,
-	GetCommand,
 	PutCommand,
+	QueryCommand,
+	type QueryCommandInput,
 } from "@aws-sdk/lib-dynamodb";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import {
@@ -48,10 +50,6 @@ export function getTeacherCaseDraftRepository(): TeacherCaseDraftRepository {
 			);
 }
 
-export function teacherDraftCaseId(teacherProfileId: string) {
-	return `draft#${teacherProfileId}`;
-}
-
 export class InMemoryTeacherCaseDraftRepository
 	implements TeacherCaseDraftRepository
 {
@@ -88,13 +86,7 @@ export class DynamoTeacherCaseDraftRepository
 	}
 
 	async getDraft(teacherProfileId: string) {
-		const response = await this.documentClient.send(
-			new GetCommand({
-				TableName: this.tableName,
-				Key: { caseId: teacherDraftCaseId(teacherProfileId) },
-			}),
-		);
-		const record = response.Item as TeacherCaseDraftRecord | undefined;
+		const record = await this.getDraftRecord(teacherProfileId);
 
 		return record?.draft ? draftForEditing(record.draft) : null;
 	}
@@ -109,8 +101,9 @@ export class DynamoTeacherCaseDraftRepository
 		teacherProfileId: string;
 	}) {
 		const storedDraft = draftForStorage(draft);
+		const existingRecord = await this.getDraftRecord(teacherProfileId);
 		const record: TeacherCaseDraftRecord = {
-			caseId: teacherDraftCaseId(teacherProfileId),
+			caseId: existingRecord?.caseId ?? createTeacherCaseId(),
 			completionCount: 0,
 			deadlineAt: 0,
 			draft: storedDraft,
@@ -131,4 +124,53 @@ export class DynamoTeacherCaseDraftRepository
 
 		return draftForEditing(storedDraft);
 	}
+
+	private async getDraftRecord(teacherProfileId: string) {
+		const records = await this.listDraftRecords(teacherProfileId);
+
+		return (
+			records.sort((first, second) => second.updatedAt - first.updatedAt)[0] ??
+			null
+		);
+	}
+
+	private async listDraftRecords(teacherProfileId: string) {
+		const records: TeacherCaseDraftRecord[] = [];
+		let exclusiveStartKey: QueryCommandInput["ExclusiveStartKey"];
+
+		do {
+			const response = await this.documentClient.send(
+				new QueryCommand({
+					TableName: this.tableName,
+					IndexName: "LifecycleDeadlineIndex",
+					KeyConditionExpression: "#lifecycle = :draft",
+					FilterExpression: "#teacherProfileId = :teacherProfileId",
+					ExpressionAttributeNames: {
+						"#lifecycle": "lifecycle",
+						"#teacherProfileId": "teacherProfileId",
+					},
+					ExpressionAttributeValues: {
+						":draft": "draft",
+						":teacherProfileId": teacherProfileId,
+					},
+					...(exclusiveStartKey
+						? { ExclusiveStartKey: exclusiveStartKey }
+						: {}),
+				}),
+			);
+
+			records.push(
+				...((response.Items ?? []) as TeacherCaseDraftRecord[]).filter(
+					(record) => record.teacherProfileId === teacherProfileId,
+				),
+			);
+			exclusiveStartKey = response.LastEvaluatedKey;
+		} while (exclusiveStartKey);
+
+		return records;
+	}
+}
+
+function createTeacherCaseId() {
+	return randomUUID();
 }
