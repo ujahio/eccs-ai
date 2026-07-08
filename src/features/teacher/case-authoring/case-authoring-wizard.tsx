@@ -51,6 +51,7 @@ export function CaseAuthoringWizard({
 	);
 	const [sectionWarning, setSectionWarning] = useState("");
 	const attachmentPreviewUrls = useRef(new Set<string>());
+	const isDirtyRef = useRef(false);
 	const validation = useMemo(
 		() => ({ ...validateDraftForPublish(draft), ...publishValidation }),
 		[draft, publishValidation],
@@ -118,7 +119,7 @@ export function CaseAuthoringWizard({
 
 	useEffect(() => {
 		const warnBeforeUnload = (event: BeforeUnloadEvent) => {
-			if (!isDirty) {
+			if (!isDirtyRef.current) {
 				return;
 			}
 
@@ -129,11 +130,16 @@ export function CaseAuthoringWizard({
 		window.addEventListener("beforeunload", warnBeforeUnload);
 
 		return () => window.removeEventListener("beforeunload", warnBeforeUnload);
-	}, [isDirty]);
+	}, []);
+
+	function setDraftDirty(nextIsDirty: boolean) {
+		isDirtyRef.current = nextIsDirty;
+		setIsDirty(nextIsDirty);
+	}
 
 	function updateDraft(update: Partial<CaseDraft>) {
 		setDraft((current) => ({ ...current, ...update }));
-		setIsDirty(true);
+		setDraftDirty(true);
 		setDraftStatus("idle");
 		setPublishStatus("idle");
 		setSaveValidation({});
@@ -191,7 +197,7 @@ export function CaseAuthoringWizard({
 					);
 				}
 			}
-			setIsDirty(false);
+			setDraftDirty(false);
 			setDraftStatus("saved");
 		} catch {
 			setDraftStatus("error");
@@ -231,7 +237,7 @@ export function CaseAuthoringWizard({
 				throw new Error("Case publish failed.");
 			}
 
-			setIsDirty(false);
+			setDraftDirty(false);
 			window.location.assign("/teacher");
 		} catch {
 			setPublishStatus("error");
