@@ -4,15 +4,18 @@ import { randomUUID } from "node:crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
 	DynamoDBDocumentClient,
+	DeleteCommand,
+	GetCommand,
 	PutCommand,
-	QueryCommand,
-	type QueryCommandInput,
 } from "@aws-sdk/lib-dynamodb";
+import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import {
-	getE2ETeacherCaseDraft,
+	deleteE2ETeacherCaseDraftRecord,
 	isE2EMode,
-	saveE2ETeacherCaseDraft,
+	getE2ETeacherCaseDraftRecord,
+	listE2ETeacherCaseDraftRecords,
+	saveE2ETeacherCaseDraftRecord,
 } from "@/lib/e2e/in-memory-auth";
 import {
 	draftForEditing,
@@ -33,13 +36,40 @@ export type TeacherCaseDraftRecord = {
 	completionCount: number;
 };
 
+export type TeacherCaseDraft = CaseDraft & {
+	caseId: string;
+};
+
+export type TeacherCaseDraftListItem = {
+	attachmentCount: number;
+	caseId: string;
+	deadlineDate: string;
+	description: string;
+	title: string;
+	updatedAt: number;
+};
+
+export type TeacherCaseDraftDeleteResult = {
+	attachmentCount: number;
+	caseId: string;
+};
+
 export interface TeacherCaseDraftRepository {
-	getDraft(teacherProfileId: string): Promise<CaseDraft | null>;
+	deleteDraft(args: {
+		caseId: string;
+		teacherProfileId: string;
+	}): Promise<TeacherCaseDraftDeleteResult | null>;
+	getDraft(
+		teacherProfileId: string,
+		caseId?: string,
+	): Promise<TeacherCaseDraft | null>;
+	listDrafts(teacherProfileId: string): Promise<TeacherCaseDraftListItem[]>;
 	saveDraft(args: {
+		caseId?: string;
 		draft: CaseDraft;
 		now: number;
 		teacherProfileId: string;
-	}): Promise<CaseDraft>;
+	}): Promise<TeacherCaseDraft | null>;
 }
 
 export function getTeacherCaseDraftRepository(): TeacherCaseDraftRepository {
@@ -53,23 +83,70 @@ export function getTeacherCaseDraftRepository(): TeacherCaseDraftRepository {
 export class InMemoryTeacherCaseDraftRepository
 	implements TeacherCaseDraftRepository
 {
-	async getDraft(teacherProfileId: string) {
-		return getE2ETeacherCaseDraft(teacherProfileId);
+	async deleteDraft({
+		caseId,
+		teacherProfileId,
+	}: {
+		caseId: string;
+		teacherProfileId: string;
+	}) {
+		const record = getE2ETeacherCaseDraftRecord(teacherProfileId, caseId);
+
+		if (!record) {
+			return null;
+		}
+
+		deleteE2ETeacherCaseDraftRecord(teacherProfileId, caseId);
+
+		return {
+			attachmentCount: record.draft.attachments.length,
+			caseId: record.caseId,
+		};
+	}
+
+	async getDraft(teacherProfileId: string, caseId?: string) {
+		const record = getE2ETeacherCaseDraftRecord(teacherProfileId, caseId);
+
+		return record ? draftRecordForEditing(record) : null;
+	}
+
+	async listDrafts(teacherProfileId: string) {
+		return listE2ETeacherCaseDraftRecords(teacherProfileId).map(
+			draftRecordListItem,
+		);
 	}
 
 	async saveDraft({
+		caseId,
 		draft,
+		now,
 		teacherProfileId,
 	}: {
+		caseId?: string;
 		draft: CaseDraft;
 		now: number;
 		teacherProfileId: string;
 	}) {
 		const storedDraft = draftForStorage(draft);
+		const existingRecord = caseId
+			? getE2ETeacherCaseDraftRecord(teacherProfileId, caseId)
+			: null;
 
-		saveE2ETeacherCaseDraft(teacherProfileId, storedDraft);
+		if (caseId && !existingRecord) {
+			return null;
+		}
 
-		return draftForEditing(storedDraft);
+		const record = {
+			caseId: existingRecord?.caseId ?? createTeacherCaseId(),
+			draft: storedDraft,
+			teacherProfileId,
+			title: storedDraft.title.trim() || "Untitled draft",
+			updatedAt: now,
+		};
+
+		saveE2ETeacherCaseDraftRecord(record);
+
+		return draftRecordForEditing(record);
 	}
 }
 
@@ -85,23 +162,71 @@ export class DynamoTeacherCaseDraftRepository
 		this.documentClient = documentClient;
 	}
 
-	async getDraft(teacherProfileId: string) {
-		const record = await this.getDraftRecord(teacherProfileId);
+	async deleteDraft({
+		caseId,
+		teacherProfileId,
+	}: {
+		caseId: string;
+		teacherProfileId: string;
+	}) {
+		const record = await this.getDraftRecordByCaseId(
+			teacherProfileId,
+			caseId,
+		);
 
-		return record?.draft ? draftForEditing(record.draft) : null;
+		if (!record) {
+			return null;
+		}
+
+		await this.documentClient.send(
+			new DeleteCommand({
+				TableName: this.tableName,
+				Key: { caseId },
+			}),
+		);
+
+		return {
+			attachmentCount: record.draft.attachments.length,
+			caseId: record.caseId,
+		};
+	}
+
+	async getDraft(teacherProfileId: string, caseId?: string) {
+		const record = caseId
+			? await this.getDraftRecordByCaseId(teacherProfileId, caseId)
+			: await this.getLatestDraftRecord(teacherProfileId);
+
+		return record ? draftRecordForEditing(record) : null;
+	}
+
+	async listDrafts(teacherProfileId: string) {
+		const records = await this.listDraftRecords(teacherProfileId);
+
+		return records
+			.sort((first, second) => second.updatedAt - first.updatedAt)
+			.map(draftRecordListItem);
 	}
 
 	async saveDraft({
+		caseId,
 		draft,
 		now,
 		teacherProfileId,
 	}: {
+		caseId?: string;
 		draft: CaseDraft;
 		now: number;
 		teacherProfileId: string;
 	}) {
 		const storedDraft = draftForStorage(draft);
-		const existingRecord = await this.getDraftRecord(teacherProfileId);
+		const existingRecord = caseId
+			? await this.getDraftRecordByCaseId(teacherProfileId, caseId)
+			: null;
+
+		if (caseId && !existingRecord) {
+			return null;
+		}
+
 		const record: TeacherCaseDraftRecord = {
 			caseId: existingRecord?.caseId ?? createTeacherCaseId(),
 			completionCount: 0,
@@ -122,10 +247,33 @@ export class DynamoTeacherCaseDraftRepository
 			}),
 		);
 
-		return draftForEditing(storedDraft);
+		return draftRecordForEditing(record);
 	}
 
-	private async getDraftRecord(teacherProfileId: string) {
+	private async getDraftRecordByCaseId(
+		teacherProfileId: string,
+		caseId: string,
+	) {
+		const response = await this.documentClient.send(
+			new GetCommand({
+				TableName: this.tableName,
+				Key: { caseId },
+			}),
+		);
+		const record = response.Item as TeacherCaseDraftRecord | undefined;
+
+		if (
+			!record ||
+			record.lifecycle !== "draft" ||
+			record.teacherProfileId !== teacherProfileId
+		) {
+			return null;
+		}
+
+		return record;
+	}
+
+	private async getLatestDraftRecord(teacherProfileId: string) {
 		const records = await this.listDraftRecords(teacherProfileId);
 
 		return (
@@ -135,42 +283,50 @@ export class DynamoTeacherCaseDraftRepository
 	}
 
 	private async listDraftRecords(teacherProfileId: string) {
-		const records: TeacherCaseDraftRecord[] = [];
-		let exclusiveStartKey: QueryCommandInput["ExclusiveStartKey"];
+		const records = await queryAllDynamoItems<TeacherCaseDraftRecord>(
+			this.documentClient,
+			{
+				TableName: this.tableName,
+				IndexName: "LifecycleDeadlineIndex",
+				KeyConditionExpression: "#lifecycle = :draft",
+				FilterExpression: "#teacherProfileId = :teacherProfileId",
+				ExpressionAttributeNames: {
+					"#lifecycle": "lifecycle",
+					"#teacherProfileId": "teacherProfileId",
+				},
+				ExpressionAttributeValues: {
+					":draft": "draft",
+					":teacherProfileId": teacherProfileId,
+				},
+			},
+		);
 
-		do {
-			const response = await this.documentClient.send(
-				new QueryCommand({
-					TableName: this.tableName,
-					IndexName: "LifecycleDeadlineIndex",
-					KeyConditionExpression: "#lifecycle = :draft",
-					FilterExpression: "#teacherProfileId = :teacherProfileId",
-					ExpressionAttributeNames: {
-						"#lifecycle": "lifecycle",
-						"#teacherProfileId": "teacherProfileId",
-					},
-					ExpressionAttributeValues: {
-						":draft": "draft",
-						":teacherProfileId": teacherProfileId,
-					},
-					...(exclusiveStartKey
-						? { ExclusiveStartKey: exclusiveStartKey }
-						: {}),
-				}),
-			);
-
-			records.push(
-				...((response.Items ?? []) as TeacherCaseDraftRecord[]).filter(
-					(record) => record.teacherProfileId === teacherProfileId,
-				),
-			);
-			exclusiveStartKey = response.LastEvaluatedKey;
-		} while (exclusiveStartKey);
-
-		return records;
+		return records.filter((record) => record.teacherProfileId === teacherProfileId);
 	}
 }
 
 function createTeacherCaseId() {
 	return randomUUID();
+}
+
+function draftRecordForEditing(
+	record: Pick<TeacherCaseDraftRecord, "caseId" | "draft">,
+): TeacherCaseDraft {
+	return {
+		...draftForEditing(record.draft),
+		caseId: record.caseId,
+	};
+}
+
+function draftRecordListItem(
+	record: Pick<TeacherCaseDraftRecord, "caseId" | "draft" | "title" | "updatedAt">,
+): TeacherCaseDraftListItem {
+	return {
+		attachmentCount: record.draft.attachments.length,
+		caseId: record.caseId,
+		deadlineDate: record.draft.deadlineDate,
+		description: record.draft.description,
+		title: record.title,
+		updatedAt: record.updatedAt,
+	};
 }

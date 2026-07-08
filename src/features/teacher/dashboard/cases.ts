@@ -4,6 +4,11 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import { getE2ETeacherCaseStore, isE2EMode } from "@/lib/e2e/in-memory-auth";
+import {
+	isActiveTeacherCase,
+	sortArchivedTeacherCases,
+	type TeacherCaseLifecycle,
+} from "@/features/teacher/cases/case-lifecycle";
 
 export type TeacherDashboardCaseRecord = {
 	caseId: string;
@@ -21,7 +26,7 @@ export type TeacherDashboardSummary = {
 };
 
 type StoredTeacherCaseRecord = TeacherDashboardCaseRecord & {
-	lifecycle: "published" | "archived" | "draft";
+	lifecycle: TeacherCaseLifecycle;
 };
 
 const recentArchivedLimit = 3;
@@ -131,30 +136,16 @@ function summarizeCases(
 ): TeacherDashboardSummary {
 	const activeCase =
 		cases
-			.filter((caseRecord) => isActiveCase(caseRecord, now))
+			.filter((caseRecord) => isActiveTeacherCase(caseRecord, now))
 			.sort((a, b) => a.deadlineAt - b.deadlineAt)[0] ?? null;
-	const archivedCases = cases
-		.filter((caseRecord) => isArchivedCase(caseRecord, now))
-		.sort((a, b) => archivedAt(b, now) - archivedAt(a, now))
-		.slice(0, recentArchivedLimit);
+	const archivedCases = sortArchivedTeacherCases(
+		cases,
+		now,
+		recentArchivedLimit,
+	);
 
 	return {
 		activeCase,
 		archivedCases,
 	};
-}
-
-function isActiveCase(caseRecord: StoredTeacherCaseRecord, now: number) {
-	return caseRecord.lifecycle === "published" && caseRecord.deadlineAt >= now;
-}
-
-function isArchivedCase(caseRecord: StoredTeacherCaseRecord, now: number) {
-	return (
-		caseRecord.lifecycle === "archived" ||
-		(caseRecord.lifecycle === "published" && caseRecord.deadlineAt < now)
-	);
-}
-
-function archivedAt(caseRecord: StoredTeacherCaseRecord, now: number) {
-	return caseRecord.archivedAt ?? Math.min(caseRecord.deadlineAt, now);
 }

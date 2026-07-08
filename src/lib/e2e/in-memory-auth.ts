@@ -97,7 +97,7 @@ type E2EAuthStoreShape = {
 			feedbackCount: number;
 		}
 	>;
-	teacherCaseDrafts: Map<string, CaseDraft>;
+	teacherCaseDrafts: Map<string, E2ETeacherCaseDraftRecord>;
 	users: Map<
 		string,
 		{
@@ -115,6 +115,14 @@ type E2EAuthStoreShape = {
 		}
 	>;
 	emails: E2EEmailRecord[];
+};
+
+export type E2ETeacherCaseDraftRecord = {
+	caseId: string;
+	draft: CaseDraft;
+	teacherProfileId: string;
+	title: string;
+	updatedAt: number;
 };
 
 const GLOBAL_KEY = "__E2E_AUTH_STORE__";
@@ -185,15 +193,41 @@ export function seedE2ETeacherCases(
 	}
 }
 
-export function getE2ETeacherCaseDraft(teacherProfileId: string) {
-	return getStore().teacherCaseDrafts.get(teacherProfileId) ?? null;
+export function deleteE2ETeacherCaseDraftRecord(
+	teacherProfileId: string,
+	caseId: string,
+) {
+	const store = getStore();
+	const record = store.teacherCaseDrafts.get(caseId);
+
+	if (record?.teacherProfileId === teacherProfileId) {
+		store.teacherCaseDrafts.delete(caseId);
+	}
 }
 
-export function saveE2ETeacherCaseDraft(
+export function getE2ETeacherCaseDraftRecord(
 	teacherProfileId: string,
-	draft: CaseDraft,
+	caseId?: string,
 ) {
-	getStore().teacherCaseDrafts.set(teacherProfileId, draft);
+	const records = listE2ETeacherCaseDraftRecords(teacherProfileId);
+
+	if (caseId) {
+		return records.find((record) => record.caseId === caseId) ?? null;
+	}
+
+	return records[0] ?? null;
+}
+
+export function listE2ETeacherCaseDraftRecords(teacherProfileId: string) {
+	return Array.from(getStore().teacherCaseDrafts.values())
+		.filter((record) => record.teacherProfileId === teacherProfileId)
+		.sort((first, second) => second.updatedAt - first.updatedAt);
+}
+
+export function saveE2ETeacherCaseDraftRecord(
+	record: E2ETeacherCaseDraftRecord,
+) {
+	getStore().teacherCaseDrafts.set(record.caseId, record);
 }
 
 export class InMemoryIdentityProvider
