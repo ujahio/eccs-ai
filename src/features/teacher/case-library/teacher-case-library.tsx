@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import type {
 	TeacherCaseLibraryArchivedCase,
 	TeacherCaseLibrarySummary,
@@ -251,7 +251,6 @@ function TeacherCaseCard({
 				<Link
 					aria-label={`Edit ${caseRecord.title}`}
 					className="block flex-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-teal"
-					data-testid="teacher-draft-edit"
 					href={`/teacher/cases/${encodeURIComponent(caseRecord.caseId)}/edit`}
 				>
 					<TeacherCaseCardContent caseRecord={caseRecord} />
@@ -261,7 +260,17 @@ function TeacherCaseCard({
 			)}
 
 			{caseRecord.kind === "draft" ? (
-				<div className="mt-4 border-t border-border-gray pt-3">
+				<div className="mt-4 flex flex-col gap-2 border-t border-border-gray pt-3 sm:flex-row">
+					<ButtonLink
+						className="w-full sm:w-auto"
+						data-testid="teacher-draft-edit"
+						href={`/teacher/cases/${encodeURIComponent(caseRecord.caseId)}/edit`}
+						size="sm"
+						title={`Edit ${caseRecord.title}`}
+						variant="secondary"
+					>
+						Edit
+					</ButtonLink>
 					<Button
 						className="w-full sm:w-auto"
 						data-testid="teacher-draft-delete"
