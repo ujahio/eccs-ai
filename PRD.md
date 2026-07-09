@@ -30,7 +30,7 @@ For v1, ECCS is a single-tenant platform with one teacher account/persona. The p
 11. As a student, I want clear subscription copy stating that the account will renew annually and can be cancelled at any time, so that renewal expectations are transparent.
 12. [Deferred until payment provider research] As a student, I want to pay via credit card during checkout, so that I can activate my subscription immediately.
 13. [Deferred until payment provider research] As a student, I want to manage my subscription from my profile, so that I can see my plan details, renewal date, and cancel if needed.
-14. As a student, I want to view a "Coming soon" message on my dashboard when no active case exists, so that I know the platform is still active.
+14. As a student, when no case is currently active, I want the dashboard to clearly show that no case is available right now, so that I understand my account is still active and know to check back for the next case.
 15. As a student, I want to receive an email when a new case is published, so that I don't miss it.
 16. As a student, I want to read a case presentation with clinical scenario (that may include pertinent information like patient history, and lab results), so that I can understand the medical context.
 17. As a student, I want to write a personal analysis (150–700 words) for each case, so that I can practice clinical reasoning.

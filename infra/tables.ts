@@ -74,3 +74,24 @@ export const teacherCaseTable = new sst.aws.Dynamo("TeacherCaseTable", {
 		}
 	}
 });
+
+export const studentCertificateTable = new sst.aws.Dynamo(
+	"StudentCertificateTable",
+	{
+		fields: {
+			certificateId: "string",
+			studentProfileId: "string",
+			completedAt: "number"
+		},
+		primaryIndex: {
+			hashKey: "certificateId"
+		},
+		globalIndexes: {
+			StudentCompletedAtIndex: {
+				hashKey: "studentProfileId",
+				rangeKey: "completedAt",
+				projection: "all"
+			}
+		}
+	}
+);

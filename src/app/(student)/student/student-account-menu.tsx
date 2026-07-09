@@ -16,7 +16,7 @@ export function StudentAccountMenu({ studentName }: StudentAccountMenuProps) {
 				},
 				{
 					className: "sm:hidden",
-					href: "/student",
+					href: "/student/certificates",
 					label: "Certificates",
 					testId: "student-account-menu-certificates",
 				},

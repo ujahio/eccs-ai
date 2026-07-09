@@ -8,6 +8,7 @@ export type LinkedResources = {
 	RegistrationWorkflowTable: { name: string };
 	UserProfileTable: { name: string };
 	TeacherCaseTable: { name: string };
+	StudentCertificateTable: { name: string };
 	ResendApiKey: { value: string };
 	BetterAuthSecret: { value: string };
 };
@@ -75,6 +76,12 @@ export function getSessionAuthResources() {
 			: required(
 					linkedValue(() => linkedResources.TeacherCaseTable?.name),
 					"TeacherCaseTable.name",
+				),
+		studentCertificateTableName: e2eMode
+			? "e2e-student-certificate-table"
+			: required(
+					linkedValue(() => linkedResources.StudentCertificateTable?.name),
+					"StudentCertificateTable.name",
 				),
 		betterAuthSecret: required(
 			linkedValue(() => linkedResources.BetterAuthSecret?.value) ??
