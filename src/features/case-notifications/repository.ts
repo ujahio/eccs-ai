@@ -15,9 +15,8 @@ import {
 } from "@/lib/e2e/in-memory-auth";
 import {
 	deadlineReminderLeadTimeMs,
-	deadlineReminderWindowMs,
 	isEligibleForCaseLifecycleEmail,
-	isInDeadlineReminderWindow,
+	isReadyForDeadlineReminder,
 	type CaseLifecycleEmailRecipient,
 	type CaseLifecycleNotificationCase,
 	type CaseLifecycleNotificationRepository,
@@ -46,7 +45,7 @@ export class InMemoryCaseLifecycleNotificationRepository
 	async listCasesReadyForDeadlineReminder(now: number) {
 		return getE2ETeacherCaseStore()
 			.filter(isStoredTeacherCaseRecord)
-			.filter((caseRecord) => isInDeadlineReminderWindow(caseRecord, now))
+			.filter((caseRecord) => isReadyForDeadlineReminder(caseRecord, now))
 			.map(notificationCaseFromRecord);
 	}
 
@@ -116,9 +115,7 @@ export class DynamoCaseLifecycleNotificationRepository
 	}
 
 	async listCasesReadyForDeadlineReminder(now: number) {
-		const reminderWindowOpensAt =
-			now + deadlineReminderLeadTimeMs - deadlineReminderWindowMs;
-		const reminderWindowClosesAt = now + deadlineReminderLeadTimeMs;
+		const reminderThresholdAt = now + deadlineReminderLeadTimeMs;
 
 		const records = await queryAllDynamoItems<StoredTeacherCaseRecord>(
 			this.documentClient,
@@ -126,21 +123,21 @@ export class DynamoCaseLifecycleNotificationRepository
 				TableName: this.teacherCaseTableName,
 				IndexName: "LifecycleDeadlineIndex",
 				KeyConditionExpression:
-					"#lifecycle = :published AND deadlineAt BETWEEN :opensAt AND :closesAt",
+					"#lifecycle = :published AND deadlineAt BETWEEN :now AND :thresholdAt",
 				ExpressionAttributeNames: {
 					"#lifecycle": "lifecycle",
 				},
 				ExpressionAttributeValues: {
 					":published": "published",
-					":opensAt": reminderWindowOpensAt,
-					":closesAt": reminderWindowClosesAt,
+					":now": now,
+					":thresholdAt": reminderThresholdAt,
 				},
 			},
 		);
 
 		return records
 			.filter(isStoredTeacherCaseRecord)
-			.filter((caseRecord) => isInDeadlineReminderWindow(caseRecord, now))
+			.filter((caseRecord) => isReadyForDeadlineReminder(caseRecord, now))
 			.map(notificationCaseFromRecord);
 	}
 

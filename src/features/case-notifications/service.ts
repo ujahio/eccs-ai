@@ -1,7 +1,6 @@
 import type { AppRole } from "@/lib/auth/roles";
 
 export const deadlineReminderLeadTimeMs = 48 * 60 * 60 * 1000;
-export const deadlineReminderWindowMs = 60 * 60 * 1000;
 
 export type CaseLifecycleNotificationCase = {
 	caseId: string;
@@ -121,7 +120,7 @@ export function isEligibleForCaseLifecycleEmail(
 	);
 }
 
-export function isInDeadlineReminderWindow(
+export function isReadyForDeadlineReminder(
 	caseRecord: {
 		deadlineAt: number;
 		deadlineReminderSentAt?: number;
@@ -132,13 +131,11 @@ export function isInDeadlineReminderWindow(
 		return false;
 	}
 
-	const reminderWindowOpensAt =
-		now + deadlineReminderLeadTimeMs - deadlineReminderWindowMs;
-	const reminderWindowClosesAt = now + deadlineReminderLeadTimeMs;
+	const reminderThresholdAt = now + deadlineReminderLeadTimeMs;
 
 	return (
-		caseRecord.deadlineAt >= reminderWindowOpensAt &&
-		caseRecord.deadlineAt <= reminderWindowClosesAt
+		caseRecord.deadlineAt > now &&
+		caseRecord.deadlineAt <= reminderThresholdAt
 	);
 }
 

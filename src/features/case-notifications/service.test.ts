@@ -2,9 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	CaseLifecycleNotificationService,
 	deadlineReminderLeadTimeMs,
-	deadlineReminderWindowMs,
 	isEligibleForCaseLifecycleEmail,
-	isInDeadlineReminderWindow,
+	isReadyForDeadlineReminder,
 	type CaseLifecycleEmailSender,
 	type CaseLifecycleNotificationRepository,
 } from "./service";
@@ -183,34 +182,34 @@ describe("case lifecycle notification service", () => {
 });
 
 describe("deadline reminder timing", () => {
-	it("matches cases in the one-hour delivery window that opens 48 hours before deadline", () => {
+	it("matches unsent active cases due within the next 48 hours", () => {
 		expect(
-			isInDeadlineReminderWindow(
+			isReadyForDeadlineReminder(
 				{ deadlineAt: now + deadlineReminderLeadTimeMs },
 				now,
 			),
 		).toBe(true);
 		expect(
-			isInDeadlineReminderWindow(
+			isReadyForDeadlineReminder(
 				{ deadlineAt: now + deadlineReminderLeadTimeMs + 1 },
 				now,
 			),
 		).toBe(false);
 		expect(
-			isInDeadlineReminderWindow(
-				{
-					deadlineAt:
-						now + deadlineReminderLeadTimeMs - deadlineReminderWindowMs / 2,
-				},
+			isReadyForDeadlineReminder(
+				{ deadlineAt: now + 60 * 60 * 1000 },
 				now,
 			),
 		).toBe(true);
 		expect(
-			isInDeadlineReminderWindow(
-				{
-					deadlineAt:
-						now + deadlineReminderLeadTimeMs - deadlineReminderWindowMs - 1,
-				},
+			isReadyForDeadlineReminder(
+				{ deadlineAt: now },
+				now,
+			),
+		).toBe(false);
+		expect(
+			isReadyForDeadlineReminder(
+				{ deadlineAt: now - 1 },
 				now,
 			),
 		).toBe(false);
@@ -218,7 +217,7 @@ describe("deadline reminder timing", () => {
 
 	it("does not match cases that already recorded a reminder", () => {
 		expect(
-			isInDeadlineReminderWindow(
+			isReadyForDeadlineReminder(
 				{
 					deadlineAt: now + deadlineReminderLeadTimeMs,
 					deadlineReminderSentAt: now - 1,

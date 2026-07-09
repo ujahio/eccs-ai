@@ -1,3 +1,4 @@
+import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	bootstrapE2EStudent,
@@ -7,11 +8,11 @@ import {
 	seedE2EStudentCertificates,
 	seedE2ETeacherCases,
 } from "@/lib/e2e/in-memory-auth";
+import { deadlineReminderLeadTimeMs } from "./service";
 import {
-	deadlineReminderLeadTimeMs,
-	deadlineReminderWindowMs,
-} from "./service";
-import { InMemoryCaseLifecycleNotificationRepository } from "./repository";
+	DynamoCaseLifecycleNotificationRepository,
+	InMemoryCaseLifecycleNotificationRepository,
+} from "./repository";
 
 vi.mock("server-only", () => ({}));
 
@@ -70,14 +71,23 @@ describe("InMemoryCaseLifecycleNotificationRepository", () => {
 		]);
 	});
 
-	it("selects unsent published cases in the 48-hour reminder window", async () => {
+	it("selects unsent active published cases due within the next 48 hours", async () => {
 		seedE2ETeacherCases([
 			{
-				caseId: "in-window",
-				title: "In window",
+				caseId: "at-threshold",
+				title: "At threshold",
 				lifecycle: "published",
 				publishedAt: now - 1,
 				deadlineAt: now + deadlineReminderLeadTimeMs,
+				completionCount: 0,
+				feedbackCount: 0,
+			},
+			{
+				caseId: "catch-up",
+				title: "Catch up",
+				lifecycle: "published",
+				publishedAt: now - 1,
+				deadlineAt: now + 60 * 60 * 1000,
 				completionCount: 0,
 				feedbackCount: 0,
 			},
@@ -91,12 +101,11 @@ describe("InMemoryCaseLifecycleNotificationRepository", () => {
 				feedbackCount: 0,
 			},
 			{
-				caseId: "too-late",
-				title: "Too late",
+				caseId: "expired",
+				title: "Expired",
 				lifecycle: "published",
 				publishedAt: now - 1,
-				deadlineAt:
-					now + deadlineReminderLeadTimeMs - deadlineReminderWindowMs - 1,
+				deadlineAt: now,
 				completionCount: 0,
 				feedbackCount: 0,
 			},
@@ -117,9 +126,14 @@ describe("InMemoryCaseLifecycleNotificationRepository", () => {
 			repository.listCasesReadyForDeadlineReminder(now),
 		).resolves.toEqual([
 			{
-				caseId: "in-window",
+				caseId: "at-threshold",
 				deadlineAt: now + deadlineReminderLeadTimeMs,
-				title: "In window",
+				title: "At threshold",
+			},
+			{
+				caseId: "catch-up",
+				deadlineAt: now + 60 * 60 * 1000,
+				title: "Catch up",
 			},
 		]);
 	});
@@ -149,5 +163,62 @@ describe("InMemoryCaseLifecycleNotificationRepository", () => {
 				studentProfileId: "student-1",
 			}),
 		).resolves.toBe(false);
+	});
+});
+
+describe("DynamoCaseLifecycleNotificationRepository", () => {
+	it("queries active cases from now through the 48-hour reminder threshold", async () => {
+		const sentInputs: Array<Record<string, unknown>> = [];
+		const documentClient = {
+			send: vi.fn(async (command: { input: Record<string, unknown> }) => {
+				sentInputs.push(command.input);
+
+				return {
+					Items: [
+						{
+							caseId: "expires-now",
+							deadlineAt: now,
+							lifecycle: "published",
+							recordType: "case",
+							title: "Expires now",
+						},
+						{
+							caseId: "catch-up",
+							deadlineAt: now + 60 * 60 * 1000,
+							lifecycle: "published",
+							recordType: "case",
+							title: "Catch up",
+						},
+					],
+				};
+			}),
+		} as unknown as DynamoDBDocumentClient;
+		const repository = new DynamoCaseLifecycleNotificationRepository(
+			"UserProfileTable",
+			"TeacherCaseTable",
+			"StudentCertificateTable",
+			documentClient,
+		);
+
+		await expect(
+			repository.listCasesReadyForDeadlineReminder(now),
+		).resolves.toEqual([
+			{
+				caseId: "catch-up",
+				deadlineAt: now + 60 * 60 * 1000,
+				title: "Catch up",
+			},
+		]);
+		expect(sentInputs).toEqual([
+			expect.objectContaining({
+				ExpressionAttributeValues: {
+					":now": now,
+					":published": "published",
+					":thresholdAt": now + deadlineReminderLeadTimeMs,
+				},
+				KeyConditionExpression:
+					"#lifecycle = :published AND deadlineAt BETWEEN :now AND :thresholdAt",
+			}),
+		]);
 	});
 });
