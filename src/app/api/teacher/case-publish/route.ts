@@ -26,9 +26,13 @@ export async function POST(request: Request) {
 			now: Date.now(),
 			teacherProfileId: profile.profileId,
 		});
-		await getCaseLifecycleNotificationService().sendNewCasePublishedEmail(
-			publishedCase,
-		);
+		try {
+			await getCaseLifecycleNotificationService().sendNewCasePublishedEmail(
+				publishedCase,
+			);
+		} catch {
+			// Publishing has already committed; notification delivery must not fail this response.
+		}
 
 		return NextResponse.json({
 			case: {

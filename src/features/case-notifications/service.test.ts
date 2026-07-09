@@ -138,7 +138,7 @@ describe("case lifecycle notification service", () => {
 
 		const result = await service.sendDeadlineReminderEmails(now);
 
-		expect(result).toEqual({ casesChecked: 1, sent: 1 });
+		expect(result).toEqual({ casesChecked: 1, failed: 0, sent: 1 });
 		expect(email.sendDeadlineReminderEmail).toHaveBeenCalledWith({
 			to: "student@example.com",
 			firstName: "Jordan",
@@ -146,6 +146,35 @@ describe("case lifecycle notification service", () => {
 			deadlineAt: Date.UTC(2026, 6, 11, 8),
 		});
 		expect(email.sendDeadlineReminderEmail).toHaveBeenCalledTimes(1);
+		expect(repository.markDeadlineReminderSent).toHaveBeenCalledWith({
+			caseId: "case-1",
+			sentAt: now,
+		});
+	});
+
+	it("marks a reminder case after a recipient delivery failure so successful sends are not retried", async () => {
+		const caseRecord = notificationCase();
+		const repository = fakeRepository({
+			listCasesReadyForDeadlineReminder: vi.fn(async () => [caseRecord]),
+			listCaseLifecycleEmailRecipients: vi.fn(async () => [
+				recipient(),
+				recipient({
+					email: "failing@example.com",
+					firstName: "Fallon",
+					profileId: "student-2",
+				}),
+			]),
+		});
+		const service = new CaseLifecycleNotificationService(repository, email);
+
+		vi.mocked(email.sendDeadlineReminderEmail)
+			.mockResolvedValueOnce()
+			.mockRejectedValueOnce(new Error("email provider unavailable"));
+
+		const result = await service.sendDeadlineReminderEmails(now);
+
+		expect(result).toEqual({ casesChecked: 1, failed: 1, sent: 1 });
+		expect(email.sendDeadlineReminderEmail).toHaveBeenCalledTimes(2);
 		expect(repository.markDeadlineReminderSent).toHaveBeenCalledWith({
 			caseId: "case-1",
 			sentAt: now,

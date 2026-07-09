@@ -72,6 +72,7 @@ export class CaseLifecycleNotificationService {
 	async sendDeadlineReminderEmails(now = Date.now()) {
 		const cases =
 			await this.repository.listCasesReadyForDeadlineReminder(now);
+		let failed = 0;
 		let sent = 0;
 
 		for (const caseRecord of cases) {
@@ -89,10 +90,14 @@ export class CaseLifecycleNotificationService {
 					continue;
 				}
 
-				await this.email.sendDeadlineReminderEmail(
-					emailFromCaseAndRecipient(caseRecord, recipient),
-				);
-				sent += 1;
+				try {
+					await this.email.sendDeadlineReminderEmail(
+						emailFromCaseAndRecipient(caseRecord, recipient),
+					);
+					sent += 1;
+				} catch {
+					failed += 1;
+				}
 			}
 
 			await this.repository.markDeadlineReminderSent({
@@ -101,7 +106,7 @@ export class CaseLifecycleNotificationService {
 			});
 		}
 
-		return { casesChecked: cases.length, sent };
+		return { casesChecked: cases.length, failed, sent };
 	}
 }
 

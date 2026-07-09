@@ -91,6 +91,39 @@ describe("teacher case publish route", () => {
 		});
 	});
 
+	it("keeps publish successful when new-case email delivery fails", async () => {
+		mocks.publishDraft.mockResolvedValue({
+			caseId: "case-1",
+			deadlineAt: Date.UTC(2026, 7, 12, 19, 59, 59, 999),
+			publishedAt: Date.UTC(2026, 6, 7),
+			title: "Acute endocrine review",
+		});
+		mocks.sendNewCasePublishedEmail.mockRejectedValue(
+			new Error("email provider unavailable"),
+		);
+
+		const response = await POST(
+			new Request("http://localhost/api/teacher/case-publish", {
+				body: JSON.stringify({
+					caseId: "case-1",
+					draft: { title: "Acute endocrine review" },
+				}),
+				headers: { "content-type": "application/json" },
+				method: "POST",
+			}),
+		);
+
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({
+			case: {
+				caseId: "case-1",
+				deadlineAt: Date.UTC(2026, 7, 12, 19, 59, 59, 999),
+				publishedAt: Date.UTC(2026, 6, 7),
+				title: "Acute endocrine review",
+			},
+		});
+	});
+
 	it("returns validation errors for incomplete publish content", async () => {
 		mocks.publishDraft.mockRejectedValue(
 			new PublishValidationError({ deadlineDate: "Select the student deadline date." }),
