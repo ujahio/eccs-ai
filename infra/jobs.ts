@@ -24,6 +24,7 @@ export const caseDeadlineReminderJob = new sst.aws.CronV2(
 	{
 		schedule: "rate(1 hour)",
 		function: {
+			dev: false,
 			handler: "src/features/case-notifications/deadline-reminders.handler",
 			link: [
 				secrets.resendApiKey,
