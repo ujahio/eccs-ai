@@ -32,12 +32,9 @@ export function StudentDashboard({
 				</h1>
 			</div>
 
-			<div className="grid gap-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.95fr)]">
+			<div className="flex flex-col gap-5">
 				<ActiveCasePanel activeCase={activeCase} />
-				<RecentCertificates
-					certificates={recentCertificates}
-					hasActiveCase={activeCase !== null}
-				/>
+				<RecentCertificates certificates={recentCertificates} />
 			</div>
 		</section>
 	);
@@ -136,20 +133,11 @@ function ActiveCasePanel({
 
 function RecentCertificates({
 	certificates,
-	hasActiveCase,
 }: {
 	certificates: StudentDashboardCertificate[];
-	hasActiveCase: boolean;
 }) {
 	return (
-		<aside
-			className={[
-				"rounded border border-border-gray bg-white p-5 sm:p-6",
-				hasActiveCase ? "lg:mt-7" : undefined,
-			]
-				.filter(Boolean)
-				.join(" ")}
-		>
+		<aside className="rounded border border-border-gray bg-white p-5 sm:p-6">
 			<div className="mb-1 border-b border-border-gray pb-4">
 				<p className="text-xs font-semibold uppercase text-muted-gray">
 					Recent certificates

@@ -37,6 +37,9 @@ describe("StudentDashboard", () => {
 		expect(markup).toContain("View Case Study");
 		expect(markup).toContain("Respiratory complications review");
 		expect(markup).toContain("Download");
+		expect(markup.indexOf("Ongoing Case Study")).toBeLessThan(
+			markup.indexOf("Recent certificates"),
+		);
 	});
 
 	it("renders no-active-case and empty certificate states", () => {
