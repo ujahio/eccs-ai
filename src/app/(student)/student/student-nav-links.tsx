@@ -13,7 +13,7 @@ type StudentNavItem = {
 const navItems: StudentNavItem[] = [
 	{ href: "/student", label: "Dashboard", testId: "student-dashboard-link" },
 	{
-		href: "/student",
+		href: "/student/certificates",
 		label: "Certificates",
 		testId: "student-certificates-link",
 		className: "hidden sm:inline",
@@ -26,7 +26,7 @@ export function StudentNavLinks() {
 	return (
 		<div className="hidden items-center gap-6 text-sm font-medium sm:flex sm:justify-center">
 			{navItems.map((item) => {
-				const isActive = pathname === item.href && item.label === "Dashboard";
+				const isActive = pathname === item.href;
 
 				return (
 					<Link

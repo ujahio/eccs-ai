@@ -21,6 +21,7 @@ export const client = new sst.aws.Nextjs("eccsfeweb", {
 		tables.registrationWorkflowTable,
 		tables.userProfileTable,
 		tables.teacherCaseTable,
+		tables.studentCertificateTable,
 	],
 	dev: {
 		command: "bunx next dev -p 3001",

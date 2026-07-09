@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+	bootstrapE2EStudent,
 	bootstrapE2ETeacher,
 	getE2EAuthStore,
 	isE2EMode,
@@ -40,6 +41,19 @@ export async function POST(request: Request) {
 	}
 
 	const body = await request.json().catch(() => null);
+
+	if (body?.action === "bootstrap_student") {
+		const result = bootstrapE2EStudent({
+			email: String(body.email ?? ""),
+			firstName: String(body.firstName ?? ""),
+			lastName: String(body.lastName ?? ""),
+			password: String(body.password ?? ""),
+			emailVerified:
+				typeof body.emailVerified === "boolean" ? body.emailVerified : true,
+		});
+
+		return NextResponse.json({ student: result });
+	}
 
 	if (body?.action !== "bootstrap_teacher") {
 		return NextResponse.json(

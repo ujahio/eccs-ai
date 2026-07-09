@@ -85,6 +85,7 @@ export type E2EEmailRecord =
 type E2EAuthStoreShape = {
 	registrations: Map<string, PendingRegistrationRecord>;
 	profiles: Map<string, AppProfileRecord>;
+	studentCertificates: Map<string, E2EStudentCertificateRecord>;
 	teacherCases: Map<string, E2ETeacherCaseRecord>;
 	teacherCaseDrafts: Map<string, E2ETeacherCaseDraftRecord>;
 	users: Map<
@@ -128,6 +129,15 @@ type E2ETeacherCaseRecord = {
 	recordType: typeof teacherCaseRecordType;
 };
 
+export type E2EStudentCertificateRecord = {
+	certificateId: string;
+	caseId: string;
+	caseTitle: string;
+	completedAt: number;
+	studentDisplayName: string;
+	studentProfileId: string;
+};
+
 const GLOBAL_KEY = "__E2E_AUTH_STORE__";
 const EMAIL_STORE_PATH =
 	process.env.ECCS_E2E_EMAIL_STORE_PATH ??
@@ -140,6 +150,7 @@ function getStore(): E2EAuthStoreShape {
 		processStore[GLOBAL_KEY] = {
 			registrations: new Map(),
 			profiles: new Map(),
+			studentCertificates: new Map(),
 			teacherCases: new Map(),
 			teacherCaseDrafts: new Map(),
 			users: new Map(),
@@ -159,6 +170,7 @@ export function resetE2EAuthStore() {
 
 	store.registrations.clear();
 	store.profiles.clear();
+	store.studentCertificates.clear();
 	store.teacherCases.clear();
 	store.teacherCaseDrafts.clear();
 	store.users.clear();
@@ -173,6 +185,24 @@ export function isE2EMode(): boolean {
 
 export function getE2ETeacherCaseStore() {
 	return Array.from(getStore().teacherCases.values());
+}
+
+export function getE2EStudentCertificateStore(studentProfileId: string) {
+	return Array.from(getStore().studentCertificates.values()).filter(
+		(certificate) => certificate.studentProfileId === studentProfileId,
+	);
+}
+
+export function seedE2EStudentCertificates(
+	certificates: E2EStudentCertificateRecord[],
+) {
+	const store = getStore();
+
+	store.studentCertificates.clear();
+
+	for (const certificate of certificates) {
+		store.studentCertificates.set(certificate.certificateId, certificate);
+	}
 }
 
 export function seedE2ETeacherCases(
@@ -852,6 +882,45 @@ export function bootstrapE2ETeacher(input: {
 		fullName,
 		role: "teacher",
 		emailVerifiedAt: input.emailVerified === false ? 0 : now,
+		createdAt: now,
+		updatedAt: now,
+	});
+
+	return {
+		emailNormalized,
+		profileId: cognitoSub,
+	};
+}
+
+export function bootstrapE2EStudent(input: {
+	email: string;
+	firstName: string;
+	lastName: string;
+	password: string;
+	emailVerified?: boolean;
+}) {
+	const store = getStore();
+	const emailNormalized = input.email.trim().toLowerCase();
+	const now = Math.floor(Date.now() / 1000);
+	const cognitoSub = `e2e-sub-${emailNormalized}`;
+	const fullName = `${input.firstName.trim()} ${input.lastName.trim()}`.trim();
+
+	store.users.set(emailNormalized, {
+		cognitoSub,
+		enabled: true,
+		emailVerified: input.emailVerified ?? true,
+		groups: [COGNITO_GROUPS.student],
+		password: input.password,
+	});
+	store.profiles.set(emailNormalized, {
+		profileId: cognitoSub,
+		emailNormalized,
+		firstName: input.firstName.trim(),
+		lastName: input.lastName.trim(),
+		fullName,
+		role: "student",
+		emailVerifiedAt: input.emailVerified === false ? 0 : now,
+		canAccessCases: true,
 		createdAt: now,
 		updatedAt: now,
 	});
