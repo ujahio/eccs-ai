@@ -92,6 +92,7 @@ describe("teacher case publish route", () => {
 	});
 
 	it("keeps publish successful when new-case email delivery fails", async () => {
+		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 		mocks.publishDraft.mockResolvedValue({
 			caseId: "case-1",
 			deadlineAt: Date.UTC(2026, 7, 12, 19, 59, 59, 999),
@@ -122,6 +123,14 @@ describe("teacher case publish route", () => {
 				title: "Acute endocrine review",
 			},
 		});
+		expect(warnSpy).toHaveBeenCalledWith(
+			"Case publication notification email failed",
+			expect.any(Error),
+		);
+		expect((warnSpy.mock.calls[0]?.[1] as Error).message).toBe(
+			"email provider unavailable",
+		);
+		warnSpy.mockRestore();
 	});
 
 	it("returns validation errors for incomplete publish content", async () => {

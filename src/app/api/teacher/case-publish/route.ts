@@ -30,8 +30,9 @@ export async function POST(request: Request) {
 			await getCaseLifecycleNotificationService().sendNewCasePublishedEmail(
 				publishedCase,
 			);
-		} catch {
+		} catch (error) {
 			// Publishing has already committed; notification delivery must not fail this response.
+			console.warn("Case publication notification email failed", error);
 		}
 
 		return NextResponse.json({
