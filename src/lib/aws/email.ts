@@ -6,21 +6,29 @@ import type {
 	RegistrationEmailSender,
 	RegistrationVerificationEmail,
 } from "@/features/auth/registration/email";
+import type {
+	CaseLifecycleEmail,
+	CaseLifecycleEmailSender,
+} from "@/features/case-notifications/service";
 import type { ProfileSecurityEmailSender } from "@/features/profile-security/service";
 import { eccsLogoAttachment } from "@/lib/email-templates/logo-attachment";
 import {
 	forgotPasswordUrl,
+	renderCaseDeadlineReminderEmail,
+	renderCasePublishedEmail,
 	renderEmailChangeVerificationEmail,
 	renderPasswordChangedEmail,
 	renderPasswordResetEmail,
 	renderRegistrationVerificationEmail,
+	studentDashboardUrl,
 } from "@/lib/email-templates/transactional";
 
 export class ResendRegistrationEmailSender
 	implements
 		RegistrationEmailSender,
 		PasswordResetEmailSender,
-		ProfileSecurityEmailSender
+		ProfileSecurityEmailSender,
+		CaseLifecycleEmailSender
 {
 	private readonly client: Resend;
 
@@ -102,6 +110,42 @@ export class ResendRegistrationEmailSender
 			from: this.sender,
 			to: email.to,
 			subject: "Verify your new ECCS email",
+			html: content.html,
+			text: content.text
+		});
+	}
+
+	async sendNewCasePublishedEmail(email: CaseLifecycleEmail) {
+		const content = await renderCasePublishedEmail({
+			caseTitle: email.caseTitle,
+			deadlineAt: email.deadlineAt,
+			firstName: email.firstName,
+			studentDashboardUrl: studentDashboardUrl(this.appBaseUrl),
+		});
+
+		await this.client.emails.send({
+			attachments: [eccsLogoAttachment()],
+			from: this.sender,
+			to: email.to,
+			subject: `New ECCS case available: ${email.caseTitle}`,
+			html: content.html,
+			text: content.text
+		});
+	}
+
+	async sendDeadlineReminderEmail(email: CaseLifecycleEmail) {
+		const content = await renderCaseDeadlineReminderEmail({
+			caseTitle: email.caseTitle,
+			deadlineAt: email.deadlineAt,
+			firstName: email.firstName,
+			studentDashboardUrl: studentDashboardUrl(this.appBaseUrl),
+		});
+
+		await this.client.emails.send({
+			attachments: [eccsLogoAttachment()],
+			from: this.sender,
+			to: email.to,
+			subject: `48-hour ECCS case reminder: ${email.caseTitle}`,
 			html: content.html,
 			text: content.text
 		});

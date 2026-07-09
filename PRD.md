@@ -109,7 +109,7 @@ No super-admin UI is included in v1. Teacher setup is handled through bootstrap/
 - Case active/archive behavior is computed dynamically from the published case deadline for correctness.
 - A scheduled backend job also persists archived lifecycle state for operational clarity.
 - Students cannot access cases after the deadline unless they already earned a certificate. The only lasting student access is to their own certificates.
-- Payments are deferred until payment provider research is complete. While payments are deferred, verified students can access active cases through a `canAccessCases` policy boundary. When payments are introduced, case access must require both verification and paid access.
+- Payments are deferred until payment provider research is complete. While payments are deferred, verified students are eligible to access active cases. Keep active-case eligibility behind a clearly defined product rule boundary so future payment rules can be added without changing every student flow.
 
 ### Teacher Dashboard
 
@@ -235,7 +235,7 @@ Feedback is shown to the teacher with the student's name in v1.
 - Case publication emails send when a new case is published.
 - Deadline reminder emails send 48 hours before the deadline.
 - While payments are deferred, case publication and reminder emails go to verified students.
-- When payments are introduced, case publication and reminder emails must go only to verified paid students who have not yet earned the active case certificate for reminders.
+- When payments are introduced, case publication and reminder emails must go only to verified paid students. Deadline reminders exclude students who have already earned the active case certificate.
 
 ### Public Site
 

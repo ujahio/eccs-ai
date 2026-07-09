@@ -49,6 +49,38 @@ export function getAuthResources() {
 	};
 }
 
+export function getCaseNotificationResources() {
+	const e2eMode = isE2EMode();
+
+	return {
+		userProfileTableName: e2eMode
+			? "e2e-user-profile-table"
+			: required(
+					linkedValue(() => linkedResources.UserProfileTable?.name),
+					"UserProfileTable.name",
+				),
+		teacherCaseTableName: e2eMode
+			? "e2e-teacher-case-table"
+			: required(
+					linkedValue(() => linkedResources.TeacherCaseTable?.name),
+					"TeacherCaseTable.name",
+				),
+		studentCertificateTableName: e2eMode
+			? "e2e-student-certificate-table"
+			: required(
+					linkedValue(() => linkedResources.StudentCertificateTable?.name),
+					"StudentCertificateTable.name",
+				),
+		emailSender:
+			process.env.ECCS_EMAIL_SENDER ?? "no-reply@contact.eccs-online.xyz",
+		resendApiKey: required(
+			linkedValue(() => linkedResources.ResendApiKey?.value),
+			"ResendApiKey.value",
+		),
+		appBaseUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001",
+	};
+}
+
 export function getSessionAuthResources() {
 	const e2eMode = isE2EMode();
 

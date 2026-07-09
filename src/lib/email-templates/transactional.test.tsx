@@ -6,6 +6,8 @@ import {
 } from "./logo-attachment";
 import {
 	forgotPasswordUrl,
+	renderCaseDeadlineReminderEmail,
+	renderCasePublishedEmail,
 	renderEmailChangeVerificationEmail,
 	renderPasswordChangedEmail,
 	renderPasswordResetEmail,
@@ -67,6 +69,37 @@ describe("ECCS transactional email templates", () => {
 		);
 		expect(email.text).toContain("Your current login email stays");
 		expect(email.text).toContain("active until this verification succeeds.");
+	});
+
+	it("renders the new-case notification with a student dashboard action", async () => {
+		const email = await renderCasePublishedEmail({
+			caseTitle: "Acute endocrine review",
+			deadlineAt: Date.UTC(2026, 7, 12, 19, 59, 59, 999),
+			firstName: "Jordan",
+			studentDashboardUrl: "https://eccs.example/student",
+		});
+
+		expect(email.html).toContain("View case");
+		expect(email.html).toContain("Acute endocrine review");
+		expect(email.html).toContain("https://eccs.example/student");
+		expect(email.text).toContain("Hello Jordan");
+		expect(email.text).toContain("Aug 12, 2026");
+		expect(email.text).toContain("UAE time");
+	});
+
+	it("renders the 48-hour deadline reminder with completion guidance", async () => {
+		const email = await renderCaseDeadlineReminderEmail({
+			caseTitle: "Acute endocrine review",
+			deadlineAt: Date.UTC(2026, 7, 12, 19, 59, 59, 999),
+			firstName: "Jordan",
+			studentDashboardUrl: "https://eccs.example/student",
+		});
+
+		expect(email.html).toContain("Continue case");
+		expect(email.html).toContain("48-hour reminder");
+		expect(email.text).toContain("Acute endocrine review");
+		expect(email.text).toContain("Aug 12, 2026");
+		expect(email.text).toContain("Earn your certificate before the deadline");
 	});
 
 	it("builds the inline logo attachment used by transactional emails", () => {

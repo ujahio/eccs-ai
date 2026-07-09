@@ -14,6 +14,7 @@ import {
 	render
 } from "jsx-email";
 import type { ReactElement } from "react";
+import { formatDubaiDate } from "@/lib/date-format";
 import { ECCS_LOGO_SRC } from "./logo-attachment";
 
 type RenderedEmail = {
@@ -57,8 +58,19 @@ export type EmailChangeVerificationTemplateInput = {
 	verificationUrl: string;
 };
 
+export type CaseLifecycleEmailTemplateInput = {
+	caseTitle: string;
+	deadlineAt: number;
+	firstName: string;
+	studentDashboardUrl: string;
+};
+
 export function forgotPasswordUrl(appBaseUrl: string) {
 	return new URL("/forgot-password", appBaseUrl).toString();
+}
+
+export function studentDashboardUrl(appBaseUrl: string) {
+	return new URL("/student", appBaseUrl).toString();
 }
 
 export function renderRegistrationVerificationEmail(
@@ -147,6 +159,56 @@ export function renderEmailChangeVerificationEmail(
 			logoUrl={ECCS_LOGO_SRC}
 			preview="Confirm your new ECCS email address."
 			supportingNote={`This verification link expires in ${input.expiresInHours} hours.`}
+		/>
+	);
+}
+
+export function renderCasePublishedEmail(input: CaseLifecycleEmailTemplateInput) {
+	const deadline = formatDubaiDate(input.deadlineAt);
+
+	return renderEccsEmail(
+		<EccsTransactionalEmail
+			action={{
+				href: input.studentDashboardUrl,
+				label: "View case"
+			}}
+			body={[
+				`Hello ${input.firstName},`,
+				`A new ECCS case is now available: ${input.caseTitle}.`,
+				"Open your student dashboard to review the presentation, submit your analysis, and complete the CME quiz."
+			]}
+			eyebrow="New case published"
+			footerNote="You are receiving this because your ECCS student account is eligible for active case notifications."
+			heading="A new case is ready"
+			logoUrl={ECCS_LOGO_SRC}
+			preview={`New ECCS case available: ${input.caseTitle}.`}
+			supportingNote={`Complete this case by ${deadline} UAE time to stay within the published access window.`}
+		/>
+	);
+}
+
+export function renderCaseDeadlineReminderEmail(
+	input: CaseLifecycleEmailTemplateInput
+) {
+	const deadline = formatDubaiDate(input.deadlineAt);
+
+	return renderEccsEmail(
+		<EccsTransactionalEmail
+			action={{
+				href: input.studentDashboardUrl,
+				label: "Continue case"
+			}}
+			body={[
+				`Hello ${input.firstName},`,
+				`This is your 48-hour reminder for ${input.caseTitle}.`,
+				"Return to your student dashboard to finish the case flow before the active case closes."
+			]}
+			eyebrow="48-hour reminder"
+			footerNote="You can ignore this reminder if you have already completed the case and earned the certificate."
+			heading="Finish your active ECCS case"
+			logoUrl={ECCS_LOGO_SRC}
+			preview={`48-hour reminder for ${input.caseTitle}.`}
+			supportingNote={`Earn your certificate before the deadline: ${deadline} UAE time.`}
 		/>
 	);
 }

@@ -24,6 +24,10 @@ import {
 } from "@/features/auth/password-reset/service";
 import type { PasswordResetEmailSender } from "@/features/auth/password-reset/email";
 import type {
+	CaseLifecycleEmail,
+	CaseLifecycleEmailSender,
+} from "@/features/case-notifications/service";
+import type {
 	CreatePendingStudentInput,
 	CreatePendingStudentResult,
 	RegistrationIdentityProvider
@@ -80,6 +84,22 @@ export type E2EEmailRecord =
 			verificationUrl: string;
 			expiresInHours: number;
 			sentAt: number;
+	  }
+	| {
+			type: "case_published";
+			to: string;
+			firstName: string;
+			caseTitle: string;
+			deadlineAt: number;
+			sentAt: number;
+	  }
+	| {
+			type: "case_deadline_reminder";
+			to: string;
+			firstName: string;
+			caseTitle: string;
+			deadlineAt: number;
+			sentAt: number;
 	  };
 
 type E2EAuthStoreShape = {
@@ -122,6 +142,7 @@ type E2ETeacherCaseRecord = {
 	lifecycle: "published" | "archived" | "draft";
 	publishedAt: number;
 	deadlineAt: number;
+	deadlineReminderSentAt?: number;
 	archivedAt?: number;
 	draft?: CaseDraft;
 	teacherProfileId?: string;
@@ -214,6 +235,7 @@ export function seedE2ETeacherCases(
 		lifecycle: "published" | "archived" | "draft";
 		publishedAt: number;
 		deadlineAt: number;
+		deadlineReminderSentAt?: number;
 		archivedAt?: number;
 		draft?: CaseDraft;
 		teacherProfileId?: string;
@@ -938,7 +960,8 @@ export class InMemoryEmailSender
 	implements
 		RegistrationEmailSender,
 		PasswordResetEmailSender,
-		ProfileSecurityEmailSender
+		ProfileSecurityEmailSender,
+		CaseLifecycleEmailSender
 {
 	async sendRegistrationVerificationEmail(email: {
 		to: string;
@@ -1038,6 +1061,28 @@ export class InMemoryEmailSender
 			);
 
 		return record && "verificationUrl" in record ? record.verificationUrl : null;
+	}
+
+	async sendNewCasePublishedEmail(email: CaseLifecycleEmail) {
+		const record = {
+			type: "case_published" as const,
+			...email,
+			sentAt: Date.now()
+		};
+
+		getStore().emails.push(record);
+		appendEmailRecord(record);
+	}
+
+	async sendDeadlineReminderEmail(email: CaseLifecycleEmail) {
+		const record = {
+			type: "case_deadline_reminder" as const,
+			...email,
+			sentAt: Date.now()
+		};
+
+		getStore().emails.push(record);
+		appendEmailRecord(record);
 	}
 }
 
