@@ -83,8 +83,9 @@ describe("ECCS transactional email templates", () => {
 		expect(email.html).toContain("Acute endocrine review");
 		expect(email.html).toContain("https://eccs.example/student");
 		expect(email.text).toContain("Hello Jordan");
-		expect(email.text).toContain("Aug 12, 2026");
-		expect(email.text).toContain("UAE time");
+		expect(normalizeWhitespace(email.text)).toContain(
+			expectedCaseDeadlineCertificateNote
+		);
 	});
 
 	it("renders the 48-hour deadline reminder with completion guidance", async () => {
@@ -98,8 +99,9 @@ describe("ECCS transactional email templates", () => {
 		expect(email.html).toContain("Continue case");
 		expect(email.html).toContain("48-hour reminder");
 		expect(email.text).toContain("Acute endocrine review");
-		expect(email.text).toContain("Aug 12, 2026");
-		expect(email.text).toContain("Earn your certificate before the deadline");
+		expect(normalizeWhitespace(email.text)).toContain(
+			expectedCaseDeadlineCertificateNote
+		);
 	});
 
 	it("builds the inline logo attachment used by transactional emails", () => {
@@ -114,3 +116,10 @@ describe("ECCS transactional email templates", () => {
 		expect(Buffer.byteLength(attachment.content as Buffer)).toBeGreaterThan(0);
 	});
 });
+
+const expectedCaseDeadlineCertificateNote =
+	"This case closes at 11:59 PM UAE time on Aug 12, 2026. Complete it before then to earn your certificate.";
+
+function normalizeWhitespace(value: string) {
+	return value.replace(/\s+/g, " ").trim();
+}

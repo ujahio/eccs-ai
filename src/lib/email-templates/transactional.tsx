@@ -182,7 +182,7 @@ export function renderCasePublishedEmail(input: CaseLifecycleEmailTemplateInput)
 			heading="A new case is ready"
 			logoUrl={ECCS_LOGO_SRC}
 			preview={`New ECCS case available: ${input.caseTitle}.`}
-			supportingNote={`Complete this case by ${deadline} UAE time to stay within the published access window.`}
+			supportingNote={caseDeadlineCertificateNote(deadline)}
 		/>
 	);
 }
@@ -208,9 +208,13 @@ export function renderCaseDeadlineReminderEmail(
 			heading="Finish your active ECCS case"
 			logoUrl={ECCS_LOGO_SRC}
 			preview={`48-hour reminder for ${input.caseTitle}.`}
-			supportingNote={`Earn your certificate before the deadline: ${deadline} UAE time.`}
+			supportingNote={caseDeadlineCertificateNote(deadline)}
 		/>
 	);
+}
+
+function caseDeadlineCertificateNote(deadline: string) {
+	return `This case closes at 11:59 PM UAE time on ${deadline}. Complete it before then to earn your certificate.`;
 }
 
 async function renderEccsEmail(template: ReactElement): Promise<RenderedEmail> {
