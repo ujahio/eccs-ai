@@ -1,6 +1,6 @@
 import "server-only";
 
-import { Resend } from "resend";
+import { Resend, type CreateEmailResponse } from "resend";
 import type { PasswordResetEmailSender } from "@/features/auth/password-reset/email";
 import type {
 	RegistrationEmailSender,
@@ -50,14 +50,14 @@ export class ResendRegistrationEmailSender
 			expiresInHours: email.expiresInHours
 		});
 
-		await this.client.emails.send({
+		await sendResendEmail(this.client.emails.send({
 			attachments: [eccsLogoAttachment()],
 			from: this.sender,
 			to: email.to,
 			subject: "Verify your ECCS account",
 			html: content.html,
 			text: content.text
-		});
+		}));
 	}
 
 	async sendPasswordResetCodeEmail(email: {
@@ -70,14 +70,14 @@ export class ResendRegistrationEmailSender
 			expiresInMinutes: email.expiresInMinutes
 		});
 
-		await this.client.emails.send({
+		await sendResendEmail(this.client.emails.send({
 			attachments: [eccsLogoAttachment()],
 			from: this.sender,
 			to: email.to,
 			subject: "Reset your ECCS password",
 			html: content.html,
 			text: content.text
-		});
+		}));
 	}
 
 	async sendPasswordChangedEmail(email: { to: string }) {
@@ -85,14 +85,14 @@ export class ResendRegistrationEmailSender
 			forgotPasswordUrl: forgotPasswordUrl(this.appBaseUrl)
 		});
 
-		await this.client.emails.send({
+		await sendResendEmail(this.client.emails.send({
 			attachments: [eccsLogoAttachment()],
 			from: this.sender,
 			to: email.to,
 			subject: "Your password was changed",
 			html: content.html,
 			text: content.text
-		});
+		}));
 	}
 
 	async sendEmailChangeVerificationEmail(email: {
@@ -105,14 +105,14 @@ export class ResendRegistrationEmailSender
 			expiresInHours: email.expiresInHours
 		});
 
-		await this.client.emails.send({
+		await sendResendEmail(this.client.emails.send({
 			attachments: [eccsLogoAttachment()],
 			from: this.sender,
 			to: email.to,
 			subject: "Verify your new ECCS email",
 			html: content.html,
 			text: content.text
-		});
+		}));
 	}
 
 	async sendNewCasePublishedEmail(email: CaseLifecycleEmail) {
@@ -123,14 +123,14 @@ export class ResendRegistrationEmailSender
 			studentDashboardUrl: studentDashboardUrl(this.appBaseUrl),
 		});
 
-		await this.client.emails.send({
+		await sendResendEmail(this.client.emails.send({
 			attachments: [eccsLogoAttachment()],
 			from: this.sender,
 			to: email.to,
 			subject: `New ECCS case available: ${email.caseTitle}`,
 			html: content.html,
 			text: content.text
-		});
+		}));
 	}
 
 	async sendDeadlineReminderEmail(email: CaseLifecycleEmail) {
@@ -141,13 +141,23 @@ export class ResendRegistrationEmailSender
 			studentDashboardUrl: studentDashboardUrl(this.appBaseUrl),
 		});
 
-		await this.client.emails.send({
+		await sendResendEmail(this.client.emails.send({
 			attachments: [eccsLogoAttachment()],
 			from: this.sender,
 			to: email.to,
 			subject: `48-hour ECCS case reminder: ${email.caseTitle}`,
 			html: content.html,
 			text: content.text
-		});
+		}));
+	}
+}
+
+async function sendResendEmail(send: Promise<CreateEmailResponse>) {
+	const response = await send;
+
+	if (response.error) {
+		throw new Error(
+			`Resend email failed: ${response.error.name}: ${response.error.message}`,
+		);
 	}
 }
