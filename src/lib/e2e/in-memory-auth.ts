@@ -117,6 +117,7 @@ export type E2ETeacherCaseDraftRecord = {
 
 type E2ETeacherCaseRecord = {
 	caseId: string;
+	description?: string;
 	title: string;
 	lifecycle: "published" | "archived" | "draft";
 	publishedAt: number;
@@ -208,6 +209,7 @@ export function seedE2EStudentCertificates(
 export function seedE2ETeacherCases(
 	cases: Array<{
 		caseId: string;
+		description?: string;
 		title: string;
 		lifecycle: "published" | "archived" | "draft";
 		publishedAt: number;
@@ -231,6 +233,7 @@ export function seedE2ETeacherCases(
 
 export function saveE2ETeacherCaseRecord(record: {
 	caseId: string;
+	description?: string;
 	title: string;
 	lifecycle: "published" | "archived" | "draft";
 	publishedAt: number;

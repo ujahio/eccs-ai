@@ -9,6 +9,8 @@ describe("StudentDashboard", () => {
 			<StudentDashboard
 				activeCase={{
 					caseId: "active-case",
+					description:
+						"Learn how patients with a serious infection can be managed in outpatient settings.",
 					title: "Acute endocrine case review",
 					deadlineAt: now + 14 * 24 * 60 * 60 * 1000,
 				}}
@@ -26,7 +28,13 @@ describe("StudentDashboard", () => {
 		);
 
 		expect(markup).toContain("Welcome back, Jordan");
+		expect(markup).toContain("Ongoing Case Study");
 		expect(markup).toContain("Acute endocrine case review");
+		expect(markup).toContain(
+			"Learn how patients with a serious infection can be managed in outpatient settings.",
+		);
+		expect(markup).toContain("Deadline:");
+		expect(markup).toContain("View Case Study");
 		expect(markup).toContain("Respiratory complications review");
 		expect(markup).toContain("Download");
 	});

@@ -30,6 +30,7 @@ describe("InMemoryStudentDashboardRepository", () => {
 		seedE2ETeacherCases([
 			{
 				caseId: "expired-case",
+				description: "Expired case description.",
 				title: "Expired case",
 				lifecycle: "published",
 				publishedAt: now - 10_000,
@@ -39,6 +40,7 @@ describe("InMemoryStudentDashboardRepository", () => {
 			},
 			{
 				caseId: "active-case",
+				description: "A focused active case for learners.",
 				title: "Acute endocrine case review",
 				lifecycle: "published",
 				publishedAt: now - 1_000,
@@ -95,6 +97,7 @@ describe("InMemoryStudentDashboardRepository", () => {
 
 		expect(summary.activeCase).toEqual({
 			caseId: "active-case",
+			description: "A focused active case for learners.",
 			title: "Acute endocrine case review",
 			deadlineAt: now + 86_400_000,
 		});
@@ -164,6 +167,7 @@ describe("DynamoStudentDashboardRepository", () => {
 						Items: [
 							{
 								caseId: "active-case",
+								description: "A focused active case for learners.",
 								title: "Acute endocrine case review",
 								lifecycle: "published",
 								deadlineAt: now + 86_400_000,

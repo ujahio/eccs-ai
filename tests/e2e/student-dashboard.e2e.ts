@@ -48,6 +48,7 @@ async function seedStudentDashboard(
 	request: APIRequestContext,
 	data: {
 		activeCase: {
+			description?: string;
 			title: string;
 			publishedAt: number;
 			deadlineAt: number;
@@ -93,6 +94,8 @@ test.describe("Student dashboard", () => {
 
 		await seedStudentDashboard(request, {
 			activeCase: {
+				description:
+					"Learn how patients with a serious infection can be managed in outpatient settings with the help of an OPAT service.",
 				title: "Acute endocrine case review",
 				publishedAt,
 				deadlineAt,
@@ -150,8 +153,16 @@ test.describe("Student dashboard", () => {
 		await expect(page.getByTestId("student-active-case-title")).toHaveText(
 			"Acute endocrine case review",
 		);
+		await expect(
+			page.getByTestId("student-active-case-description"),
+		).toHaveText(
+			"Learn how patients with a serious infection can be managed in outpatient settings with the help of an OPAT service.",
+		);
 		await expect(page.getByTestId("student-active-case-expiration")).toHaveText(
-			`${formatDubaiDate(deadlineAt)} UAE`,
+			`Deadline: ${formatDubaiDate(deadlineAt)} UAE`,
+		);
+		await expect(page.getByTestId("student-active-case-cta")).toHaveText(
+			"View Case Study",
 		);
 		await expect(page.getByTestId("student-recent-certificate-card")).toHaveCount(
 			3,

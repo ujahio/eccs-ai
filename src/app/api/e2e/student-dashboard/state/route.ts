@@ -10,6 +10,7 @@ import { isActiveTeacherCase } from "@/features/teacher/cases/case-lifecycle";
 import { rejectNonE2EMode } from "@/lib/e2e/route-helpers";
 
 type E2EStudentDashboardActiveCase = {
+	description: string;
 	title: string;
 	publishedAt: number;
 	deadlineAt: number;
@@ -25,6 +26,7 @@ function parseActiveCase(value: unknown): E2EStudentDashboardActiveCase | null {
 	}
 
 	const input = value as Record<string, unknown>;
+	const description = String(input.description ?? "").trim();
 	const title = String(input.title ?? "").trim();
 	const publishedAt = Number(input.publishedAt);
 	const deadlineAt = Number(input.deadlineAt);
@@ -34,6 +36,9 @@ function parseActiveCase(value: unknown): E2EStudentDashboardActiveCase | null {
 	}
 
 	return {
+		description:
+			description ||
+			"Review the active case presentation and begin your clinical reasoning.",
 		title,
 		publishedAt,
 		deadlineAt,

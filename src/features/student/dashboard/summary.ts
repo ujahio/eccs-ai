@@ -17,6 +17,7 @@ import {
 
 export type StudentDashboardActiveCase = {
 	caseId: string;
+	description: string;
 	title: string;
 	deadlineAt: number;
 };
@@ -49,7 +50,11 @@ type StudentDashboardRepository = {
 	): Promise<StudentDashboardCertificate | null>;
 };
 
-type StoredTeacherCaseRecord = StudentDashboardActiveCase & {
+type StoredTeacherCaseRecord = Omit<StudentDashboardActiveCase, "description"> & {
+	description?: string;
+	draft?: {
+		description?: unknown;
+	};
 	lifecycle: "published" | "archived" | "draft";
 	publishedAt?: number;
 };
@@ -234,9 +239,24 @@ function activeCaseFromRecords(records: unknown[], now: number) {
 
 	return {
 		caseId: record.caseId,
+		description: caseDescriptionFromRecord(record),
 		title: record.title,
 		deadlineAt: record.deadlineAt,
 	};
+}
+
+function caseDescriptionFromRecord(record: StoredTeacherCaseRecord) {
+	const draftDescription =
+		typeof record.draft?.description === "string"
+			? record.draft.description.trim()
+			: "";
+	const seededDescription = record.description?.trim() ?? "";
+
+	return (
+		draftDescription ||
+		seededDescription ||
+		"Review the active case presentation and begin your clinical reasoning."
+	);
 }
 
 function certificatesFromRecords(records: unknown[], limit?: number) {
