@@ -231,10 +231,7 @@ export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
 					data-testid="student-case-analysis-form"
 					onSubmit={submitAnalysis}
 				>
-					<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-						<div>
-							<h2 className="text-lg font-semibold">Personal Analysis</h2>
-						</div>
+					<div className="flex justify-end">
 						<p
 							className={[
 								"text-sm font-semibold",
@@ -246,13 +243,13 @@ export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
 						</p>
 					</div>
 					<label
-						className="mt-5 block text-sm font-semibold"
+						className="sr-only"
 						htmlFor="student-case-analysis"
 					>
-						Your Analysis
+						Personal Analysis Response
 					</label>
 					<textarea
-						className="mt-2 min-h-72 w-full resize-y border border-border-gray bg-white p-4 text-base leading-7 text-primary-text outline-none transition placeholder:text-muted-gray focus:border-brand-teal"
+						className="mt-3 min-h-72 w-full resize-y border border-border-gray bg-white p-4 text-base leading-7 text-primary-text outline-none transition placeholder:text-muted-gray focus:border-brand-teal"
 						data-testid="student-case-analysis"
 						id="student-case-analysis"
 						name="analysis"
