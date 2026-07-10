@@ -145,7 +145,7 @@ export class ResendRegistrationEmailSender
 			attachments: [eccsLogoAttachment()],
 			from: this.sender,
 			to: email.to,
-			subject: `48-hour ECCS case reminder: ${email.caseTitle}`,
+			subject: "Complete your ECCS case before it closes",
 			html: content.html,
 			text: content.text
 		}));

@@ -1,8 +1,8 @@
-import { getCaseLifecycleNotificationService } from "./server";
+import { getCaseDeadlineReminderService } from "./deadline-reminders-service";
 
 export async function handler() {
 	const result =
-		await getCaseLifecycleNotificationService().sendDeadlineReminderEmails();
+		await getCaseDeadlineReminderService().sendDeadlineReminderEmails();
 
 	return {
 		statusCode: 200,

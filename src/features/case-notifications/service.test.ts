@@ -4,6 +4,7 @@ import {
 	deadlineReminderLeadTimeMs,
 	isEligibleForCaseLifecycleEmail,
 	isReadyForDeadlineReminder,
+	oneHourMs,
 	type CaseLifecycleEmailSender,
 	type CaseLifecycleNotificationRepository,
 } from "./service";
@@ -197,7 +198,7 @@ describe("deadline reminder timing", () => {
 		).toBe(false);
 		expect(
 			isReadyForDeadlineReminder(
-				{ deadlineAt: now + 60 * 60 * 1000 },
+				{ deadlineAt: now + oneHourMs },
 				now,
 			),
 		).toBe(true);

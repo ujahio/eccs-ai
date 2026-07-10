@@ -8,7 +8,7 @@ import {
 	seedE2EStudentCertificates,
 	seedE2ETeacherCases,
 } from "@/lib/e2e/in-memory-auth";
-import { deadlineReminderLeadTimeMs } from "./service";
+import { deadlineReminderLeadTimeMs, oneHourMs } from "./service";
 import {
 	DynamoCaseLifecycleNotificationRepository,
 	InMemoryCaseLifecycleNotificationRepository,
@@ -87,7 +87,7 @@ describe("InMemoryCaseLifecycleNotificationRepository", () => {
 				title: "Catch up",
 				lifecycle: "published",
 				publishedAt: now - 1,
-				deadlineAt: now + 60 * 60 * 1000,
+				deadlineAt: now + oneHourMs,
 				completionCount: 0,
 				feedbackCount: 0,
 			},
@@ -132,7 +132,7 @@ describe("InMemoryCaseLifecycleNotificationRepository", () => {
 			},
 			{
 				caseId: "catch-up",
-				deadlineAt: now + 60 * 60 * 1000,
+				deadlineAt: now + oneHourMs,
 				title: "Catch up",
 			},
 		]);
@@ -184,7 +184,7 @@ describe("DynamoCaseLifecycleNotificationRepository", () => {
 						},
 						{
 							caseId: "catch-up",
-							deadlineAt: now + 60 * 60 * 1000,
+							deadlineAt: now + oneHourMs,
 							lifecycle: "published",
 							recordType: "case",
 							title: "Catch up",
@@ -205,7 +205,7 @@ describe("DynamoCaseLifecycleNotificationRepository", () => {
 		).resolves.toEqual([
 			{
 				caseId: "catch-up",
-				deadlineAt: now + 60 * 60 * 1000,
+				deadlineAt: now + oneHourMs,
 				title: "Catch up",
 			},
 		]);

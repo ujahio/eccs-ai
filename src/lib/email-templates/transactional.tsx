@@ -11,7 +11,7 @@ import {
 	Preview,
 	Section,
 	Text,
-	render
+	render,
 } from "jsx-email";
 import type { ReactElement } from "react";
 import { formatDubaiDate } from "@/lib/date-format";
@@ -30,7 +30,7 @@ type ActionLink = {
 type EccsTransactionalEmailProps = {
 	action?: ActionLink;
 	body: string[];
-	eyebrow: string;
+	eyebrow?: string;
 	footerNote: string;
 	heading: string;
 	logoUrl: string;
@@ -74,17 +74,17 @@ export function studentDashboardUrl(appBaseUrl: string) {
 }
 
 export function renderRegistrationVerificationEmail(
-	input: RegistrationVerificationEmailTemplateInput
+	input: RegistrationVerificationEmailTemplateInput,
 ) {
 	return renderEccsEmail(
 		<EccsTransactionalEmail
 			action={{
 				href: input.verificationUrl,
-				label: "Verify account"
+				label: "Verify account",
 			}}
 			body={[
 				`Hello ${input.firstName},`,
-				"Welcome to E-Clinical Case Solutions. Please confirm your account so you can securely access your case-based learning dashboard."
+				"Welcome to E-Clinical Case Solutions. Please confirm your account so you can securely access your case-based learning dashboard.",
 			]}
 			eyebrow="Account verification"
 			footerNote="If you did not create an ECCS account, you can ignore this email."
@@ -92,20 +92,22 @@ export function renderRegistrationVerificationEmail(
 			logoUrl={ECCS_LOGO_SRC}
 			preview="Confirm your ECCS account to begin your case-based learning."
 			supportingNote={`This verification link expires in ${input.expiresInHours} hours.`}
-		/>
+		/>,
 	);
 }
 
-export function renderPasswordResetEmail(input: PasswordResetEmailTemplateInput) {
+export function renderPasswordResetEmail(
+	input: PasswordResetEmailTemplateInput,
+) {
 	return renderEccsEmail(
 		<EccsTransactionalEmail
 			action={{
 				href: input.resetUrl,
-				label: "Reset password"
+				label: "Reset password",
 			}}
 			body={[
 				"We received a request to reset the password for your E-Clinical Case Solutions account.",
-				"Use the secure link below to choose a new password and regain access to your account."
+				"Use the secure link below to choose a new password and regain access to your account.",
 			]}
 			eyebrow="Password reset"
 			footerNote="If you did not request a password reset, you can ignore this email."
@@ -113,22 +115,22 @@ export function renderPasswordResetEmail(input: PasswordResetEmailTemplateInput)
 			logoUrl={ECCS_LOGO_SRC}
 			preview="Use this secure link to reset your ECCS password."
 			supportingNote={`This reset link expires in ${input.expiresInMinutes} minutes.`}
-		/>
+		/>,
 	);
 }
 
 export function renderPasswordChangedEmail(
-	input: PasswordChangedEmailTemplateInput
+	input: PasswordChangedEmailTemplateInput,
 ) {
 	return renderEccsEmail(
 		<EccsTransactionalEmail
 			action={{
 				href: input.forgotPasswordUrl,
-				label: "Reset password"
+				label: "Reset password",
 			}}
 			body={[
 				"Your E-Clinical Case Solutions password was changed successfully.",
-				"If this was you, no further action is needed."
+				"If this was you, no further action is needed.",
 			]}
 			eyebrow="Security notice"
 			footerNote="If you did not make this change, reset your password immediately and contact support."
@@ -136,22 +138,22 @@ export function renderPasswordChangedEmail(
 			logoUrl={ECCS_LOGO_SRC}
 			preview="Your ECCS password was changed."
 			supportingNote="This notice helps protect your account from unauthorized access."
-		/>
+		/>,
 	);
 }
 
 export function renderEmailChangeVerificationEmail(
-	input: EmailChangeVerificationTemplateInput
+	input: EmailChangeVerificationTemplateInput,
 ) {
 	return renderEccsEmail(
 		<EccsTransactionalEmail
 			action={{
 				href: input.verificationUrl,
-				label: "Verify new email"
+				label: "Verify new email",
 			}}
 			body={[
 				"We received a request to use this email address for your E-Clinical Case Solutions account.",
-				"Confirm this address to complete the change. Your current login email stays active until this verification succeeds."
+				"Confirm this address to complete the change. Your current login email stays active until this verification succeeds.",
 			]}
 			eyebrow="Email change"
 			footerNote="If you did not request this email change, you can ignore this email."
@@ -159,36 +161,12 @@ export function renderEmailChangeVerificationEmail(
 			logoUrl={ECCS_LOGO_SRC}
 			preview="Confirm your new ECCS email address."
 			supportingNote={`This verification link expires in ${input.expiresInHours} hours.`}
-		/>
+		/>,
 	);
 }
 
-export function renderCasePublishedEmail(input: CaseLifecycleEmailTemplateInput) {
-	const deadline = formatDubaiDate(input.deadlineAt);
-
-	return renderEccsEmail(
-		<EccsTransactionalEmail
-			action={{
-				href: input.studentDashboardUrl,
-				label: "View case"
-			}}
-			body={[
-				`Hello ${input.firstName},`,
-				`A new ECCS case is now available: ${input.caseTitle}.`,
-				"Open your student dashboard to review the presentation, submit your analysis, and complete the CME quiz."
-			]}
-			eyebrow="New case published"
-			footerNote="You are receiving this because your ECCS student account is eligible for active case notifications."
-			heading="A new case is ready"
-			logoUrl={ECCS_LOGO_SRC}
-			preview={`New ECCS case available: ${input.caseTitle}.`}
-			supportingNote={caseDeadlineCertificateNote(deadline)}
-		/>
-	);
-}
-
-export function renderCaseDeadlineReminderEmail(
-	input: CaseLifecycleEmailTemplateInput
+export function renderCasePublishedEmail(
+	input: CaseLifecycleEmailTemplateInput,
 ) {
 	const deadline = formatDubaiDate(input.deadlineAt);
 
@@ -196,25 +174,50 @@ export function renderCaseDeadlineReminderEmail(
 		<EccsTransactionalEmail
 			action={{
 				href: input.studentDashboardUrl,
-				label: "Continue case"
+				label: "Login",
 			}}
 			body={[
 				`Hello ${input.firstName},`,
-				`This is your 48-hour reminder for ${input.caseTitle}.`,
-				"Return to your student dashboard to finish the case flow before the active case closes."
+				`A new ECCS case is now available: ${input.caseTitle}.`,
+				"Open your student dashboard to review the presentation, submit your analysis, and complete the CME quiz.",
 			]}
-			eyebrow="48-hour reminder"
-			footerNote="You can ignore this reminder if you have already completed the case and earned the certificate."
-			heading="Finish your active ECCS case"
+			eyebrow="New case published"
+			footerNote="You are receiving this because your ECCS student account is eligible for active case notifications."
+			heading="A new case is ready"
 			logoUrl={ECCS_LOGO_SRC}
-			preview={`48-hour reminder for ${input.caseTitle}.`}
+			preview={`New ECCS case available: ${input.caseTitle}.`}
 			supportingNote={caseDeadlineCertificateNote(deadline)}
-		/>
+		/>,
+	);
+}
+
+export function renderCaseDeadlineReminderEmail(
+	input: CaseLifecycleEmailTemplateInput,
+) {
+	const deadline = formatDubaiDate(input.deadlineAt);
+
+	return renderEccsEmail(
+		<EccsTransactionalEmail
+			action={{
+				href: input.studentDashboardUrl,
+				label: "Login",
+			}}
+			body={[
+				`Hello ${input.firstName},`,
+				`${input.caseTitle} closes in 2 days.`,
+				"Return to your student dashboard to complete the case and earn your certificate before it closes.",
+			]}
+			footerNote="You can ignore this reminder if you have already completed the case and earned the certificate."
+			heading="Case closing soon"
+			logoUrl={ECCS_LOGO_SRC}
+			preview={`2-day reminder for ${input.caseTitle}.`}
+			supportingNote={caseDeadlineCertificateNote(deadline)}
+		/>,
 	);
 }
 
 function caseDeadlineCertificateNote(deadline: string) {
-	return `This case closes at 11:59 PM UAE time on ${deadline}. Complete it before then to earn your certificate.`;
+	return `This case closes at 11:59 PM UAE time on ${deadline}. Complete it before then to earn your CME/CPD credit.`;
 }
 
 async function renderEccsEmail(template: ReactElement): Promise<RenderedEmail> {
@@ -232,7 +235,7 @@ function EccsTransactionalEmail({
 	heading,
 	logoUrl,
 	preview,
-	supportingNote
+	supportingNote,
 }: EccsTransactionalEmailProps) {
 	return (
 		<Html lang="en">
@@ -248,7 +251,7 @@ function EccsTransactionalEmail({
 							style={styles.logo}
 							width="150"
 						/>
-						<Text style={styles.eyebrow}>{eyebrow}</Text>
+						{eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
 						<Heading as="h1" style={styles.heading}>
 							{heading}
 						</Heading>
@@ -299,14 +302,13 @@ function EccsTransactionalEmail({
 
 const styles = {
 	actionWrap: {
-		margin: "28px 0 26px"
+		margin: "28px 0 26px",
 	},
 	body: {
 		backgroundColor: "#F8FAFB",
-		fontFamily:
-			"Nunito Sans, Montserrat, Avenir, Inter, Arial, sans-serif",
+		fontFamily: "Nunito Sans, Montserrat, Avenir, Inter, Arial, sans-serif",
 		margin: "0",
-		padding: "0"
+		padding: "0",
 	},
 	button: {
 		backgroundColor: "#2F4358",
@@ -317,17 +319,17 @@ const styles = {
 		fontWeight: "700",
 		lineHeight: "1",
 		padding: "14px 20px",
-		textDecoration: "none"
+		textDecoration: "none",
 	},
 	card: {
 		backgroundColor: "#FFFFFF",
 		border: "1px solid #E5EBEF",
 		borderTop: "4px solid #159A9C",
-		padding: "34px 32px 30px"
+		padding: "34px 32px 30px",
 	},
 	divider: {
 		borderColor: "#E5EBEF",
-		margin: "28px 0 20px"
+		margin: "28px 0 20px",
 	},
 	eyebrow: {
 		color: "#159A9C",
@@ -335,59 +337,59 @@ const styles = {
 		fontWeight: "700",
 		lineHeight: "1.4",
 		margin: "28px 0 8px",
-		textTransform: "uppercase" as const
+		textTransform: "uppercase" as const,
 	},
 	fallbackLink: {
 		color: "#2F4358",
 		textDecoration: "underline",
-		wordBreak: "break-all" as const
+		wordBreak: "break-all" as const,
 	},
 	fallbackText: {
 		color: "#4B5A67",
 		fontSize: "12px",
 		lineHeight: "1.7",
-		margin: "0"
+		margin: "0",
 	},
 	footerNote: {
 		color: "#4B5A67",
 		fontSize: "13px",
 		lineHeight: "1.6",
-		margin: "0"
+		margin: "0",
 	},
 	heading: {
 		color: "#223244",
 		fontSize: "24px",
 		fontWeight: "700",
 		lineHeight: "1.3",
-		margin: "0 0 18px"
+		margin: "0 0 18px",
 	},
 	logo: {
 		display: "block",
 		height: "auto",
-		width: "150px"
+		width: "150px",
 	},
 	noticeBox: {
 		backgroundColor: "#F2F7F8",
 		border: "1px solid #E5EBEF",
 		margin: "0 0 22px",
-		padding: "13px 15px"
+		padding: "13px 15px",
 	},
 	noticeText: {
 		color: "#223244",
 		fontSize: "13px",
 		fontWeight: "600",
 		lineHeight: "1.55",
-		margin: "0"
+		margin: "0",
 	},
 	shell: {
 		margin: "0 auto",
 		maxWidth: "560px",
-		padding: "34px 18px"
+		padding: "34px 18px",
 	},
 	text: {
 		color: "#223244",
 		fontSize: "15px",
 		lineHeight: "1.7",
-		margin: "0 0 14px"
-	}
+		margin: "0 0 14px",
+	},
 };

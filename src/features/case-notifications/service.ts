@@ -1,6 +1,7 @@
 import type { AppRole } from "@/lib/auth/roles";
 
-export const deadlineReminderLeadTimeMs = 48 * 60 * 60 * 1000;
+export const oneHourMs = 60 * 60 * 1000;
+export const deadlineReminderLeadTimeMs = 48 * oneHourMs;
 
 export type CaseLifecycleNotificationCase = {
 	caseId: string;

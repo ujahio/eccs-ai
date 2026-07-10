@@ -58,4 +58,31 @@ describe("ResendRegistrationEmailSender", () => {
 			}),
 		);
 	});
+
+	it("uses the approved deadline reminder subject", async () => {
+		mocks.sendEmail.mockResolvedValue({
+			data: { id: "email-1" },
+			error: null,
+			headers: {},
+		});
+
+		const sender = new ResendRegistrationEmailSender(
+			"no-reply@example.invalid",
+			"re_test",
+			"https://eccs.example",
+		);
+
+		await sender.sendDeadlineReminderEmail({
+			caseTitle: "Acute endocrine review",
+			deadlineAt: Date.UTC(2026, 7, 12, 19, 59, 59, 999),
+			firstName: "Jordan",
+			to: "student@example.com",
+		});
+
+		expect(mocks.sendEmail).toHaveBeenCalledWith(
+			expect.objectContaining({
+				subject: "Complete your ECCS case before it closes",
+			}),
+		);
+	});
 });
