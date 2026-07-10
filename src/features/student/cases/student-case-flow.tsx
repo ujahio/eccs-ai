@@ -153,7 +153,7 @@ export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
 
 	return (
 		<section
-			className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-8 lg:py-10"
+			className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:py-10"
 			data-testid="student-case-flow-root"
 		>
 			<header className="mb-5 border-b border-border-gray pb-5 sm:mb-7">
