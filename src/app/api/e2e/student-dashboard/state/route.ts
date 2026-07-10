@@ -6,11 +6,15 @@ import {
 	seedE2ETeacherCases,
 	type E2EStudentCertificateRecord,
 } from "@/lib/e2e/in-memory-auth";
+import type { CaseDraft } from "@/features/teacher/case-authoring/schema";
 import { isActiveTeacherCase } from "@/features/teacher/cases/case-lifecycle";
 import { rejectNonE2EMode } from "@/lib/e2e/route-helpers";
 
 type E2EStudentDashboardActiveCase = {
+	caseId?: string;
 	description: string;
+	modelAnswer: string;
+	presentation: string;
 	title: string;
 	publishedAt: number;
 	deadlineAt: number;
@@ -26,7 +30,10 @@ function parseActiveCase(value: unknown): E2EStudentDashboardActiveCase | null {
 	}
 
 	const input = value as Record<string, unknown>;
+	const caseId = String(input.caseId ?? "").trim();
 	const description = String(input.description ?? "").trim();
+	const modelAnswer = String(input.modelAnswer ?? "").trim();
+	const presentation = String(input.presentation ?? "").trim();
 	const title = String(input.title ?? "").trim();
 	const publishedAt = Number(input.publishedAt);
 	const deadlineAt = Number(input.deadlineAt);
@@ -36,9 +43,16 @@ function parseActiveCase(value: unknown): E2EStudentDashboardActiveCase | null {
 	}
 
 	return {
+		...(caseId ? { caseId } : {}),
 		description:
 			description ||
 			"Review the active case presentation and begin your clinical reasoning.",
+		modelAnswer:
+			modelAnswer ||
+			"The model answer is provided by the teacher for side-by-side comparison.",
+		presentation:
+			presentation ||
+			"Patient history, presenting symptoms, laboratory findings, and the clinical decision context are described for learners.",
 		title,
 		publishedAt,
 		deadlineAt,
@@ -125,11 +139,13 @@ export async function POST(request: Request) {
 			activeCase
 				? [
 						{
-							caseId: "e2e-active-student-dashboard-case",
+							caseId:
+								activeCase.caseId ?? "e2e-active-student-dashboard-case",
 							lifecycle: "published" as const,
 							completionCount: 0,
 							feedbackCount: 0,
 							...activeCase,
+							draft: activeCaseDraft(activeCase),
 						},
 					]
 				: [],
@@ -156,4 +172,18 @@ export async function DELETE() {
 	seedE2EStudentCertificates([]);
 
 	return NextResponse.json({ reset: true });
+}
+
+function activeCaseDraft(activeCase: E2EStudentDashboardActiveCase): CaseDraft {
+	return {
+		title: activeCase.title,
+		description: activeCase.description,
+		presentation: activeCase.presentation,
+		modelAnswer: activeCase.modelAnswer,
+		lectureText:
+			"Teaching resources are provided by the teacher in the next case-flow slice.",
+		attachments: [],
+		cmeQuestions: [],
+		deadlineDate: "",
+	};
 }

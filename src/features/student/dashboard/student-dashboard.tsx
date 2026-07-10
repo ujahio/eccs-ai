@@ -1,4 +1,4 @@
-import { Button, ButtonLink, buttonVariants } from "@/components/ui/button";
+import { ButtonLink, buttonVariants } from "@/components/ui/button";
 import { formatDubaiDate } from "@/lib/date-format";
 import type {
 	StudentDashboardActiveCase,
@@ -98,16 +98,15 @@ function ActiveCasePanel({
 									{formatDubaiDate(activeCase.deadlineAt)} UAE
 								</p>
 							</div>
-							<Button
-								aria-label={`Case study flow for ${activeCase.title} is not available yet`}
-								className="w-full bg-white px-6 text-primary-text hover:border-white hover:bg-white hover:text-primary-text sm:w-auto lg:mr-7"
+							<ButtonLink
+								aria-label={`View case study for ${activeCase.title}`}
+								className="w-full border border-white/30 px-6 shadow-sm sm:w-auto lg:mr-7"
 								data-testid="student-active-case-cta"
-								disabled
+								href={`/student/cases/${activeCase.caseId}`}
 								size="md"
-								variant="secondary"
 							>
 								View Case Study
-							</Button>
+							</ButtonLink>
 						</div>
 					) : (
 						<div

@@ -65,7 +65,7 @@ Use `Nunito Sans` as the implementation default for the entire application. If t
 
 Typography rules:
 
-- Use sentence case for page titles and form labels, except the teacher case authoring wizard uses title case for authoring section labels and field labels to match the XD case-creation screens (`Title & Description`, `Case Presentation`, `Model Answer`, `Case Study`, `CME Questions`, `Final Review`, `Case Title`, `Deadline Date`). PRs that change teacher authoring label capitalization should list the updated label set in the PR notes.
+- Use Title Case for page titles, step labels, section labels, and form labels going forward.
 - Use uppercase only for primary CTA buttons and some compact nav/action labels.
 - Keep letter spacing neutral; do not over-track labels.
 - Long clinical/case text should be readable, with comfortable line height and constrained width.
