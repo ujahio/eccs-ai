@@ -34,7 +34,7 @@ For v1, ECCS is a single-tenant platform with one teacher account/persona. The p
 15. As a student, I want to receive an email when a new case is published, so that I don't miss it.
 16. As a student, I want to read a case presentation with clinical scenario (that may include pertinent information like patient history, and lab results), so that I can understand the medical context.
 17. As a student, I want to write a personal analysis (150–700 words) for each case, so that I can practice clinical reasoning.
-18. As a student, I want my analysis to remain editable until I pass the CME quiz, so that I can refine my thinking after reviewing the model answer.
+18. As a student, I want my submitted analysis to remain editable within the same case response flow until I pass the CME quiz, so that I can refine my thinking after reviewing the model answer.
 19. As a student, I want to submit my analysis and view the teacher's model answer side-by-side with my own, so that I can compare my clinical reasoning to an expert's.
 20. As a student, I want to access teaching resources (lecture text, optional PDF and attachments), so that I can deepen my understanding of the case.
 21. As a student, I want to take a CME quiz of 3–5 multiple-choice questions per case, so that I can demonstrate my understanding.
@@ -125,12 +125,14 @@ No super-admin UI is included in v1. Teacher setup is handled through bootstrap/
 ### Student Case Flow (Sequential, Gated)
 
 1. **Case Presentation** — Reading only. "Continue" button advances.
-2. **Personal Analysis** — 150-word minimum and 700-word maximum enforced before advancing. Show live word count. Editable until quiz is passed.
-3. **Side-by-side Comparison** — Student's analysis on the left, teacher's model answer on the right. "Edit My Analysis" button available. Student can edit their analysis after comparing; edits are saved until quiz is passed.
+2. **Personal Analysis** — 150-word minimum and 700-word maximum enforced before advancing. Show live word count. In-progress analysis text is not saved as a recoverable draft or backend progress record.
+3. **Side-by-side Comparison** — Student's submitted analysis on the left, teacher's model answer on the right. "Edit My Analysis" button available. Student can edit their submitted analysis after comparing within the same browser-based case response flow; edits replace the local submitted response until quiz pass.
 4. **Teaching Resources** — Lecture text, PDF attachments.
 5. **CME Quiz** — 3–5 MCQs. Shuffle question order only; keep answer option order exactly as authored. Must score 100%. Failed attempts show pass/fail only, not per-question correctness. On 3rd fail: forced navigation to re-read case presentation, model answer, and resources, then retry. Unlimited retries while the case is active.
 6. **Case Feedback** — The student is given invited to give the case study a rating (1–5) and comment section. The students can partake or skip to next page
 7. **Certificate** — Certificate record is created when the quiz is passed. Analysis locks at pass time. Certificate preview is available for viewing from certificate data; PDF generation/download occurs only when the student requests it.
+
+The student case response flow must be completed in one sitting. If the student leaves the experience before earning the certificate, no draft response is available when they return; they must restart the response flow. Student case-flow progress and analysis response state are tracked in the front end for the active browser experience only; do not create backend progress, draft-response, or per-student case-step records for this flow. Within the active uninterrupted flow, a valid analysis submission is the front-end progression marker and can be edited until quiz pass.
 
 Quiz attempts must be completed in one sitting. Leaving before submitting does not count as a failed attempt, and the UI must warn students before exiting the CME questions without finishing.
 
@@ -138,7 +140,7 @@ If the browser closes after quiz pass but before the certificate screen, the cer
 
 Uploaded case PDFs are viewable inline when supported by the browser and always downloadable. PDF access uses short-lived signed URLs.
 
-Teacher-authored case content uses Markdown in v1. PDF attachments cover richer supplemental material.
+PDF attachments cover richer supplemental material.
 
 Feedback is optional and skippable. Passing the quiz earns the certificate; feedback does not gate certificate access.
 
@@ -214,7 +216,7 @@ Feedback is shown to the teacher with the student's name in v1.
 - Certificate records are created at quiz pass time.
 - Certificate records include certificate-facing immutable facts only: student display name, case title, completion date, ECCS branding fields, partner/issuing authority fields, and unique certificate ID.
 - Certificate previews and PDFs display the shared v1 CE credit hour value. Do not store CE credit hours per case study or per student completion record.
-- Personal analysis remains in the case progress/completion record, not the certificate record.
+- Final locked personal analysis remains in the case completion record, not the certificate record.
 - Certificate PDFs are generated on demand only when the student clicks download.
 - PDF generation uses the current certificate template with immutable certificate facts.
 - The app shows a visual certificate preview from the certificate record.
