@@ -97,10 +97,11 @@ describe("ECCS transactional email templates", () => {
 		});
 
 		expect(email.html).toContain("Login");
-		expect(email.html).toContain("Case closing soon");
+		expect(email.html).not.toContain("Case closing soon");
+		expect(email.text).not.toContain("Case closing soon");
 		expect(email.text).toContain("Acute endocrine review closes in 2 days.");
 		expect(normalizeWhitespace(email.text)).toContain(
-			"Return to your student dashboard to complete the case and earn your certificate before it closes.",
+			"Log in now to complete the case and earn your certificate before it closes.",
 		);
 		expect(normalizeWhitespace(email.text)).toContain(
 			expectedCaseDeadlineCertificateNote,

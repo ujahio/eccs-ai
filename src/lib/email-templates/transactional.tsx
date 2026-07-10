@@ -32,7 +32,7 @@ type EccsTransactionalEmailProps = {
 	body: string[];
 	eyebrow?: string;
 	footerNote: string;
-	heading: string;
+	heading?: string;
 	logoUrl: string;
 	preview: string;
 	supportingNote?: string;
@@ -205,10 +205,9 @@ export function renderCaseDeadlineReminderEmail(
 			body={[
 				`Hello ${input.firstName},`,
 				`${input.caseTitle} closes in 2 days.`,
-				"Return to your student dashboard to complete the case and earn your certificate before it closes.",
+				"Log in now to complete the case and earn your certificate before it closes.",
 			]}
 			footerNote="You can ignore this reminder if you have already completed the case and earned the certificate."
-			heading="Case closing soon"
 			logoUrl={ECCS_LOGO_SRC}
 			preview={`2-day reminder for ${input.caseTitle}.`}
 			supportingNote={caseDeadlineCertificateNote(deadline)}
@@ -252,9 +251,11 @@ function EccsTransactionalEmail({
 							width="150"
 						/>
 						{eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
-						<Heading as="h1" style={styles.heading}>
-							{heading}
-						</Heading>
+						{heading ? (
+							<Heading as="h1" style={styles.heading}>
+								{heading}
+							</Heading>
+						) : null}
 
 						{body.map((paragraph) => (
 							<Text key={paragraph} style={styles.text}>
