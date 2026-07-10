@@ -134,7 +134,9 @@ describe("case lifecycle notification service", () => {
 				studentProfileId === "student-2"
 			),
 		});
-		const service = new CaseLifecycleNotificationService(repository, email);
+		const service = new CaseLifecycleNotificationService(repository, {
+			deadlineReminder: email,
+		});
 
 		const result = await service.sendDeadlineReminderEmails(now);
 
@@ -165,7 +167,9 @@ describe("case lifecycle notification service", () => {
 				}),
 			]),
 		});
-		const service = new CaseLifecycleNotificationService(repository, email);
+		const service = new CaseLifecycleNotificationService(repository, {
+			deadlineReminder: email,
+		});
 
 		vi.mocked(email.sendDeadlineReminderEmail)
 			.mockResolvedValueOnce()

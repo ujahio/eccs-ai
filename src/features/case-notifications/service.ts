@@ -28,10 +28,23 @@ export type CaseLifecycleEmail = {
 	to: string;
 };
 
-export interface CaseLifecycleEmailSender {
+export interface CasePublishedEmailSender {
 	sendNewCasePublishedEmail(email: CaseLifecycleEmail): Promise<void>;
+}
+
+export interface CaseDeadlineReminderEmailSender {
 	sendDeadlineReminderEmail(email: CaseLifecycleEmail): Promise<void>;
 }
+
+export type CaseLifecycleEmailSender = CasePublishedEmailSender &
+	CaseDeadlineReminderEmailSender;
+
+export type CaseLifecycleEmailDependencies =
+	| CaseLifecycleEmailSender
+	| {
+			deadlineReminder?: CaseDeadlineReminderEmailSender;
+			newCasePublished?: CasePublishedEmailSender;
+	  };
 
 export interface CaseLifecycleNotificationRepository {
 	listCaseLifecycleEmailRecipients(): Promise<CaseLifecycleEmailRecipient[]>;
@@ -49,18 +62,31 @@ export interface CaseLifecycleNotificationRepository {
 }
 
 export class CaseLifecycleNotificationService {
+	private readonly email: {
+		deadlineReminder?: CaseDeadlineReminderEmailSender;
+		newCasePublished?: CasePublishedEmailSender;
+	};
+
 	constructor(
 		private readonly repository: CaseLifecycleNotificationRepository,
-		private readonly email: CaseLifecycleEmailSender,
-	) {}
+		email: CaseLifecycleEmailDependencies,
+	) {
+		this.email = normalizeEmailDependencies(email);
+	}
 
 	async sendNewCasePublishedEmail(caseRecord: CaseLifecycleNotificationCase) {
+		const email = this.email.newCasePublished;
+
+		if (!email) {
+			throw new Error("Case publication email sender is not configured.");
+		}
+
 		const recipients =
 			await this.repository.listCaseLifecycleEmailRecipients();
 
 		await Promise.all(
 			recipients.map((recipient) =>
-				this.email.sendNewCasePublishedEmail(
+				email.sendNewCasePublishedEmail(
 					emailFromCaseAndRecipient(caseRecord, recipient),
 				),
 			),
@@ -70,6 +96,12 @@ export class CaseLifecycleNotificationService {
 	}
 
 	async sendDeadlineReminderEmails(now = Date.now()) {
+		const email = this.email.deadlineReminder;
+
+		if (!email) {
+			throw new Error("Deadline reminder email sender is not configured.");
+		}
+
 		const cases =
 			await this.repository.listCasesReadyForDeadlineReminder(now);
 		let failed = 0;
@@ -91,7 +123,7 @@ export class CaseLifecycleNotificationService {
 				}
 
 				try {
-					await this.email.sendDeadlineReminderEmail(
+					await email.sendDeadlineReminderEmail(
 						emailFromCaseAndRecipient(caseRecord, recipient),
 					);
 					sent += 1;
@@ -150,4 +182,31 @@ function emailFromCaseAndRecipient(
 		caseTitle: caseRecord.title,
 		deadlineAt: caseRecord.deadlineAt,
 	};
+}
+
+function normalizeEmailDependencies(
+	email: CaseLifecycleEmailDependencies,
+): {
+	deadlineReminder?: CaseDeadlineReminderEmailSender;
+	newCasePublished?: CasePublishedEmailSender;
+} {
+	if (isCaseLifecycleEmailSender(email)) {
+		return {
+			deadlineReminder: email,
+			newCasePublished: email,
+		};
+	}
+
+	return email;
+}
+
+function isCaseLifecycleEmailSender(
+	email: CaseLifecycleEmailDependencies,
+): email is CaseLifecycleEmailSender {
+	return (
+		"sendNewCasePublishedEmail" in email &&
+		typeof email.sendNewCasePublishedEmail === "function" &&
+		"sendDeadlineReminderEmail" in email &&
+		typeof email.sendDeadlineReminderEmail === "function"
+	);
 }
