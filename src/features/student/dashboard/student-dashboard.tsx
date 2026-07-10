@@ -99,9 +99,10 @@ function ActiveCasePanel({
 								</p>
 							</div>
 							<Button
-								aria-label={`View case study for ${activeCase.title}`}
+								aria-label={`Case study flow for ${activeCase.title} is not available yet`}
 								className="w-full bg-white px-6 text-primary-text hover:border-white hover:bg-white hover:text-primary-text sm:w-auto lg:mr-7"
 								data-testid="student-active-case-cta"
+								disabled
 								size="md"
 								variant="secondary"
 							>

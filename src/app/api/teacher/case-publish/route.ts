@@ -5,6 +5,7 @@ import {
 	PublishDraftNotFoundError,
 	PublishValidationError,
 } from "@/features/teacher/case-authoring/publishing";
+import { getCaseLifecycleNotificationService } from "@/features/case-notifications/server";
 import { caseDraftFromUnknown } from "@/features/teacher/case-authoring/schema";
 import { requireTeacherSession } from "@/lib/auth/session";
 
@@ -25,6 +26,14 @@ export async function POST(request: Request) {
 			now: Date.now(),
 			teacherProfileId: profile.profileId,
 		});
+		try {
+			await getCaseLifecycleNotificationService().sendNewCasePublishedEmail(
+				publishedCase,
+			);
+		} catch (error) {
+			// Publishing has already committed; notification delivery must not fail this response.
+			console.warn("Case publication notification email failed", error);
+		}
 
 		return NextResponse.json({
 			case: {

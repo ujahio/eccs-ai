@@ -6,6 +6,7 @@ import {
 } from "@/features/teacher/case-authoring/publishing";
 
 const mocks = vi.hoisted(() => ({
+	sendNewCasePublishedEmail: vi.fn(),
 	publishDraft: vi.fn(),
 }));
 
@@ -23,6 +24,12 @@ vi.mock("@/features/teacher/case-authoring/publishing", async () => {
 	};
 });
 
+vi.mock("@/features/case-notifications/server", () => ({
+	getCaseLifecycleNotificationService: () => ({
+		sendNewCasePublishedEmail: mocks.sendNewCasePublishedEmail,
+	}),
+}));
+
 vi.mock("@/lib/auth/session", () => ({
 	requireTeacherSession: vi.fn(async () => ({
 		profile: { profileId: "teacher-1" },
@@ -37,6 +44,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
 	mocks.publishDraft.mockReset();
+	mocks.sendNewCasePublishedEmail.mockReset();
 });
 
 describe("teacher case publish route", () => {
@@ -75,6 +83,54 @@ describe("teacher case publish route", () => {
 				teacherProfileId: "teacher-1",
 			}),
 		);
+		expect(mocks.sendNewCasePublishedEmail).toHaveBeenCalledWith({
+			caseId: "case-1",
+			deadlineAt: Date.UTC(2026, 7, 12, 19, 59, 59, 999),
+			publishedAt: Date.UTC(2026, 6, 7),
+			title: "Acute endocrine review",
+		});
+	});
+
+	it("keeps publish successful when new-case email delivery fails", async () => {
+		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+		mocks.publishDraft.mockResolvedValue({
+			caseId: "case-1",
+			deadlineAt: Date.UTC(2026, 7, 12, 19, 59, 59, 999),
+			publishedAt: Date.UTC(2026, 6, 7),
+			title: "Acute endocrine review",
+		});
+		mocks.sendNewCasePublishedEmail.mockRejectedValue(
+			new Error("email provider unavailable"),
+		);
+
+		const response = await POST(
+			new Request("http://localhost/api/teacher/case-publish", {
+				body: JSON.stringify({
+					caseId: "case-1",
+					draft: { title: "Acute endocrine review" },
+				}),
+				headers: { "content-type": "application/json" },
+				method: "POST",
+			}),
+		);
+
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({
+			case: {
+				caseId: "case-1",
+				deadlineAt: Date.UTC(2026, 7, 12, 19, 59, 59, 999),
+				publishedAt: Date.UTC(2026, 6, 7),
+				title: "Acute endocrine review",
+			},
+		});
+		expect(warnSpy).toHaveBeenCalledWith(
+			"Case publication notification email failed",
+			expect.any(Error),
+		);
+		expect((warnSpy.mock.calls[0]?.[1] as Error).message).toBe(
+			"email provider unavailable",
+		);
+		warnSpy.mockRestore();
 	});
 
 	it("returns validation errors for incomplete publish content", async () => {
