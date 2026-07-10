@@ -8,7 +8,12 @@ import {
 	seedE2EStudentCertificates,
 	seedE2ETeacherCases,
 } from "@/lib/e2e/in-memory-auth";
-import { deadlineReminderLeadTimeMs, oneHourMs } from "./service";
+import {
+	CaseLifecycleNotificationService,
+	deadlineReminderLeadTimeMs,
+	oneHourMs,
+	type CaseLifecycleEmailSender,
+} from "./service";
 import {
 	DynamoCaseLifecycleNotificationRepository,
 	InMemoryCaseLifecycleNotificationRepository,
@@ -163,6 +168,66 @@ describe("InMemoryCaseLifecycleNotificationRepository", () => {
 				studentProfileId: "student-1",
 			}),
 		).resolves.toBe(false);
+	});
+
+	it("excludes students with the active case certificate when sending deadline reminders", async () => {
+		const reminderRecipient = bootstrapE2EStudent({
+			email: "needs-reminder@example.com",
+			firstName: "Jordan",
+			lastName: "Rivera",
+			password: "password-123",
+		});
+		const completedStudent = bootstrapE2EStudent({
+			email: "completed@example.com",
+			firstName: "Casey",
+			lastName: "Complete",
+			password: "password-123",
+		});
+		seedE2ETeacherCases([
+			{
+				caseId: "case-1",
+				title: "Acute endocrine review",
+				lifecycle: "published",
+				publishedAt: now - 1,
+				deadlineAt: now + oneHourMs,
+				completionCount: 1,
+				feedbackCount: 0,
+			},
+		]);
+		seedE2EStudentCertificates([
+			{
+				certificateId: "certificate-1",
+				caseId: "case-1",
+				caseTitle: "Acute endocrine review",
+				completedAt: now - oneHourMs,
+				studentDisplayName: "Casey Complete",
+				studentProfileId: completedStudent.profileId,
+			},
+		]);
+		const email: CaseLifecycleEmailSender = {
+			sendNewCasePublishedEmail: vi.fn(async () => {}),
+			sendDeadlineReminderEmail: vi.fn(async () => {}),
+		};
+		const service = new CaseLifecycleNotificationService(
+			new InMemoryCaseLifecycleNotificationRepository(),
+			email,
+		);
+
+		const result = await service.sendDeadlineReminderEmails(now);
+
+		expect(result).toEqual({ casesChecked: 1, failed: 0, sent: 1 });
+		expect(email.sendDeadlineReminderEmail).toHaveBeenCalledTimes(1);
+		expect(email.sendDeadlineReminderEmail).toHaveBeenCalledWith({
+			to: reminderRecipient.emailNormalized,
+			firstName: "Jordan",
+			caseTitle: "Acute endocrine review",
+			deadlineAt: now + oneHourMs,
+		});
+		expect(email.sendDeadlineReminderEmail).not.toHaveBeenCalledWith(
+			expect.objectContaining({
+				to: completedStudent.emailNormalized,
+			}),
+		);
 	});
 });
 
