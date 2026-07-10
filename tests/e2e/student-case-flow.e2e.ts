@@ -164,7 +164,7 @@ test.describe("Student case presentation and analysis flow", () => {
 		await page.getByTestId("student-case-submit-analysis").click();
 		await expect(page.getByTestId("student-case-comparison-step")).toBeVisible();
 		await expect(page.getByTestId("student-case-flow-heading")).toHaveText(
-			"Side-By-Side Comparison",
+			"Analysis Review",
 		);
 		await expect(page.getByTestId("student-case-submitted-analysis")).toContainText(
 			"clinical149",

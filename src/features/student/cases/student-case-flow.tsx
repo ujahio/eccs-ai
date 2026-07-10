@@ -34,7 +34,7 @@ const stepCopy: Record<
 		description: "Write your clinical reasoning before continuing.",
 	},
 	comparison: {
-		heading: "Side-By-Side Comparison",
+		heading: "Analysis Review",
 		description:
 			"Compare your clinical reasoning with the teacher's model answer.",
 	},
