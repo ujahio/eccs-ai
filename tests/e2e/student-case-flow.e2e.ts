@@ -172,6 +172,28 @@ test.describe("Student case presentation and analysis flow", () => {
 		await expect(page.getByTestId("student-case-model-answer")).toContainText(
 			"Teacher model answer",
 		);
+		await expect(page.getByTestId("student-case-review-mode-both")).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		);
+
+		await page.getByTestId("student-case-review-mode-model-answer").click();
+		await expect(page.getByTestId("student-case-model-answer-card")).toBeVisible();
+		await expect(
+			page.getByTestId("student-case-personal-analysis-card"),
+		).toHaveCount(0);
+
+		await page.getByTestId("student-case-review-mode-personal-analysis").click();
+		await expect(
+			page.getByTestId("student-case-personal-analysis-card"),
+		).toBeVisible();
+		await expect(page.getByTestId("student-case-model-answer-card")).toHaveCount(0);
+
+		await page.getByTestId("student-case-review-mode-both").click();
+		await expect(
+			page.getByTestId("student-case-personal-analysis-card"),
+		).toBeVisible();
+		await expect(page.getByTestId("student-case-model-answer-card")).toBeVisible();
 
 		await page.getByTestId("student-case-edit-analysis").click();
 		await expect(page.getByTestId("student-case-analysis")).toHaveValue(

@@ -16,6 +16,25 @@ type StudentCaseFlowProps = {
 };
 
 type CaseFlowStep = "presentation" | "analysis" | "comparison";
+type AnalysisReviewMode = "both" | "personalAnalysis" | "modelAnswer";
+
+const analysisReviewOptions: Array<{
+	label: string;
+	mode: AnalysisReviewMode;
+	testId: string;
+}> = [
+	{ label: "Both", mode: "both", testId: "student-case-review-mode-both" },
+	{
+		label: "Personal Analysis",
+		mode: "personalAnalysis",
+		testId: "student-case-review-mode-personal-analysis",
+	},
+	{
+		label: "Model Answer",
+		mode: "modelAnswer",
+		testId: "student-case-review-mode-model-answer",
+	},
+];
 
 const stepCopy: Record<
 	CaseFlowStep,
@@ -47,6 +66,8 @@ export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
 	const [step, setStep] = useState<CaseFlowStep>("presentation");
 	const [analysisText, setAnalysisText] = useState("");
 	const [submittedAnalysis, setSubmittedAnalysis] = useState("");
+	const [analysisReviewMode, setAnalysisReviewMode] =
+		useState<AnalysisReviewMode>("both");
 	const [message, setMessage] = useState("");
 	const [isExpired, setIsExpired] = useState(
 		() => Date.now() > caseRecord.deadlineAt,
@@ -59,6 +80,8 @@ export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
 	const isAnalysisValid = validation.valid;
 	const currentStepCopy = stepCopy[step];
 	const visibleMessage = isExpired ? expiredMessage : message;
+	const showPersonalAnalysis = analysisReviewMode !== "modelAnswer";
+	const showModelAnswer = analysisReviewMode !== "personalAnalysis";
 
 	useEffect(() => {
 		if (isExpired) {
@@ -128,6 +151,7 @@ export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
 		const trimmedAnalysis = analysisText.trim();
 		setAnalysisText(trimmedAnalysis);
 		setSubmittedAnalysis(trimmedAnalysis);
+		setAnalysisReviewMode("both");
 		setMessage("");
 		setStep("comparison");
 	}
@@ -303,36 +327,80 @@ export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
 					className="border border-border-gray bg-white p-5 sm:p-7"
 					data-testid="student-case-comparison-step"
 				>
-					<div className="grid gap-4 lg:grid-cols-2">
-						<section className="border border-border-gray bg-app-canvas p-4">
-							<h2 className="text-base font-semibold">Your Analysis</h2>
-							<div
-								className="mt-4 whitespace-pre-wrap text-base leading-7 text-primary-text"
-								data-testid="student-case-submitted-analysis"
-							>
-								{submittedAnalysis}
-							</div>
-						</section>
-						<section className="border border-border-gray bg-app-canvas p-4">
-							<h2 className="text-base font-semibold">Model Answer</h2>
-							<div
-								className="mt-4 whitespace-pre-wrap text-base leading-7 text-primary-text"
-								data-testid="student-case-model-answer"
-							>
-								{caseRecord.modelAnswer}
-							</div>
-						</section>
-					</div>
-					<div className="mt-7 flex justify-end">
+					<div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+						<div
+							aria-label="Analysis Review View"
+							className="grid w-full grid-cols-1 gap-2 min-[520px]:grid-cols-3 sm:flex sm:w-auto sm:flex-wrap"
+							data-testid="student-case-review-mode"
+							role="group"
+						>
+							{analysisReviewOptions.map((option) => {
+								const isSelected = analysisReviewMode === option.mode;
+
+								return (
+									<button
+										aria-pressed={isSelected}
+										className={[
+											"min-h-11 w-full border px-4 text-xs font-semibold transition sm:w-auto",
+											isSelected
+												? "border-primary-action bg-primary-action text-white"
+												: "border-border-gray bg-white text-primary-text hover:border-primary-action",
+										].join(" ")}
+										data-testid={option.testId}
+										key={option.mode}
+										onClick={() => setAnalysisReviewMode(option.mode)}
+										type="button"
+									>
+										{option.label}
+									</button>
+								);
+							})}
+						</div>
 						<Button
-							className="w-full sm:w-auto"
+							className="w-full shrink-0 sm:w-auto"
 							data-testid="student-case-edit-analysis"
 							onClick={editAnalysis}
+							size="sm"
 							type="button"
 							variant="secondary"
 						>
 							Edit My Analysis
 						</Button>
+					</div>
+					<div
+						className={[
+							"grid gap-4",
+							analysisReviewMode === "both" ? "lg:grid-cols-2" : "",
+						].join(" ")}
+					>
+						{showPersonalAnalysis ? (
+							<section
+								className="border border-border-gray bg-app-canvas p-4"
+								data-testid="student-case-personal-analysis-card"
+							>
+								<h2 className="text-base font-semibold">Personal Analysis</h2>
+								<div
+									className="mt-4 whitespace-pre-wrap text-base leading-7 text-primary-text"
+									data-testid="student-case-submitted-analysis"
+								>
+									{submittedAnalysis}
+								</div>
+							</section>
+						) : null}
+						{showModelAnswer ? (
+							<section
+								className="border border-border-gray bg-app-canvas p-4"
+								data-testid="student-case-model-answer-card"
+							>
+								<h2 className="text-base font-semibold">Model Answer</h2>
+								<div
+									className="mt-4 whitespace-pre-wrap text-base leading-7 text-primary-text"
+									data-testid="student-case-model-answer"
+								>
+									{caseRecord.modelAnswer}
+								</div>
+							</section>
+						) : null}
 					</div>
 				</article>
 			) : null}
