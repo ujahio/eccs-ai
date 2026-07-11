@@ -91,6 +91,7 @@ const stepCopy: Record<
 
 const expiredMessage =
 	"This case is no longer active. Return to your dashboard for the current case status.";
+const deadlineReminderWindowMilliseconds = 2 * 24 * 60 * 60 * 1_000;
 
 export function StudentCaseFlow({
 	caseRecord,
@@ -134,6 +135,10 @@ export function StudentCaseFlow({
 		quizQuestions.every((question) => Boolean(quizAnswers[question.questionId]));
 	const hasPassedQuiz = quizState.status === "passed";
 	const shouldWarnBeforeLeavingQuiz = step === "quiz" && !hasPassedQuiz;
+	const isDeadlineInReminderWindow = isDeadlineWithinReminderWindow(
+		caseRecord.deadlineAt,
+		isExpired,
+	);
 
 	useEffect(() => {
 		if (isExpired) {
@@ -283,6 +288,16 @@ export function StudentCaseFlow({
 		setStep("quiz");
 	}
 
+	function reviewLectureText() {
+		if (!guardActiveCase()) {
+			return;
+		}
+
+		setShowLeaveQuizDialog(false);
+		setMessage("");
+		setStep("resources");
+	}
+
 	function returnToResources() {
 		if (!guardActiveCase()) {
 			return;
@@ -375,7 +390,18 @@ export function StudentCaseFlow({
 						className="text-sm font-semibold text-primary-text"
 						data-testid="student-case-deadline"
 					>
-						Deadline: {formatDubaiDate(caseRecord.deadlineAt)} UAE
+						<span>Deadline: </span>
+						<span
+							className={[
+								isDeadlineInReminderWindow
+									? "border border-error-red bg-[#fff5f5] px-2 py-1 text-error-red"
+									: "text-primary-text",
+							].join(" ")}
+							data-testid="student-case-deadline-date"
+						>
+							{formatDubaiDate(caseRecord.deadlineAt)}
+						</span>
+						<span> UAE</span>
 					</p>
 				</div>
 				<h1
@@ -712,18 +738,30 @@ export function StudentCaseFlow({
 					{quizState.status === "failed" ||
 					quizState.status === "duplicate" ||
 					quizState.status === "error" ? (
-						<p
+						<div
 							className={[
-								"mb-5 border bg-white p-3 text-sm font-medium",
+								"mb-5 flex flex-col gap-3 border bg-white p-3 text-sm font-medium sm:flex-row sm:items-center sm:justify-between",
 								quizState.status === "failed"
-									? "border-warning-gold text-primary-text"
+									? "border-error-red bg-[#fff5f5] text-primary-text"
 									: "border-error-red text-error-red",
 							].join(" ")}
 							data-testid="student-case-quiz-status"
 							role="status"
 						>
-							{quizState.message}
-						</p>
+							<span>{quizState.message}</span>
+							{quizState.status === "failed" ? (
+								<Button
+									className="w-full shrink-0 sm:w-auto"
+									data-testid="student-case-review-lecture-text"
+									onClick={reviewLectureText}
+									size="sm"
+									type="button"
+									variant="secondary"
+								>
+									Review Lecture Text
+								</Button>
+							) : null}
+						</div>
 					) : null}
 
 					<div className="space-y-5">
@@ -910,6 +948,19 @@ function formatPdfSize(size: number) {
 	}
 
 	return `${(size / 1_024 / 1_024).toFixed(1)} MB`;
+}
+
+function isDeadlineWithinReminderWindow(deadlineAt: number, isExpired: boolean) {
+	if (isExpired) {
+		return false;
+	}
+
+	const millisecondsUntilDeadline = deadlineAt - Date.now();
+
+	return (
+		millisecondsUntilDeadline > 0 &&
+		millisecondsUntilDeadline <= deadlineReminderWindowMilliseconds
+	);
 }
 
 function PdfFileIcon() {

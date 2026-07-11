@@ -1,46 +1,17 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudentCaseFlow } from "./student-case-flow";
+import type { StudentCasePresentation } from "./student-case";
 
 describe("StudentCaseFlow", () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
 	it("renders active case presentation content", () => {
 		const markup = renderToStaticMarkup(
 			<StudentCaseFlow
-				caseRecord={{
-					attachments: [],
-					caseId: "case-1",
-					cmeQuestions: [
-						{
-							questionId: "question-1",
-							prompt: "Which finding best supports the diagnosis?",
-							options: [
-								{ optionId: "q1-a", text: "Expected finding" },
-								{ optionId: "q1-b", text: "Distractor finding" },
-							],
-						},
-						{
-							questionId: "question-2",
-							prompt: "Which next step is most appropriate?",
-							options: [
-								{ optionId: "q2-a", text: "Expected next step" },
-								{ optionId: "q2-b", text: "Distractor next step" },
-							],
-						},
-						{
-							questionId: "question-3",
-							prompt: "Which teaching point should be prioritized?",
-							options: [
-								{ optionId: "q3-a", text: "Expected teaching point" },
-								{ optionId: "q3-b", text: "Distractor teaching point" },
-							],
-						},
-					],
-					deadlineAt: Date.UTC(2026, 6, 31),
-					lectureText: "Teacher lecture text for resources.",
-					modelAnswer: "Teacher model answer for comparison.",
-					presentation: "Patient presentation and clinical context.",
-					title: "Acute endocrine review",
-				}}
+				caseRecord={caseRecordFixture()}
 				quizAction={async () => ({
 					message: "",
 					status: "idle",
@@ -58,4 +29,89 @@ describe("StudentCaseFlow", () => {
 		expect(markup).toContain("Patient presentation and clinical context.");
 		expect(markup).toContain("Continue");
 	});
+
+	it("highlights the deadline date when it is inside the two-day reminder window", () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(Date.UTC(2026, 6, 29, 12));
+
+		const markup = renderToStaticMarkup(
+			<StudentCaseFlow
+				caseRecord={caseRecordFixture({
+					deadlineAt: Date.UTC(2026, 6, 31, 11),
+				})}
+				quizAction={async () => ({
+					message: "",
+					status: "idle",
+				})}
+			/>,
+		);
+
+		expect(markup).toContain('data-testid="student-case-deadline-date"');
+		expect(markup).toContain("border-error-red");
+		expect(markup).toContain("bg-[#fff5f5]");
+		expect(markup).not.toContain("remaining");
+		expect(markup).not.toContain("left");
+	});
+
+	it("does not highlight the deadline date outside the two-day reminder window", () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(Date.UTC(2026, 6, 20, 12));
+
+		const markup = renderToStaticMarkup(
+			<StudentCaseFlow
+				caseRecord={caseRecordFixture({
+					deadlineAt: Date.UTC(2026, 6, 31, 11),
+				})}
+				quizAction={async () => ({
+					message: "",
+					status: "idle",
+				})}
+			/>,
+		);
+
+		expect(markup).toContain('data-testid="student-case-deadline-date"');
+		expect(markup).not.toContain("border-error-red");
+		expect(markup).not.toContain("bg-[#fff5f5]");
+	});
 });
+
+function caseRecordFixture(
+	overrides: Partial<StudentCasePresentation> = {},
+): StudentCasePresentation {
+	return {
+		attachments: [],
+		caseId: "case-1",
+		cmeQuestions: [
+			{
+				questionId: "question-1",
+				prompt: "Which finding best supports the diagnosis?",
+				options: [
+					{ optionId: "q1-a", text: "Expected finding" },
+					{ optionId: "q1-b", text: "Distractor finding" },
+				],
+			},
+			{
+				questionId: "question-2",
+				prompt: "Which next step is most appropriate?",
+				options: [
+					{ optionId: "q2-a", text: "Expected next step" },
+					{ optionId: "q2-b", text: "Distractor next step" },
+				],
+			},
+			{
+				questionId: "question-3",
+				prompt: "Which teaching point should be prioritized?",
+				options: [
+					{ optionId: "q3-a", text: "Expected teaching point" },
+					{ optionId: "q3-b", text: "Distractor teaching point" },
+				],
+			},
+		],
+		deadlineAt: Date.UTC(2026, 6, 31),
+		lectureText: "Teacher lecture text for resources.",
+		modelAnswer: "Teacher model answer for comparison.",
+		presentation: "Patient presentation and clinical context.",
+		title: "Acute endocrine review",
+		...overrides,
+	};
+}

@@ -465,12 +465,27 @@ test.describe("Student case presentation and analysis flow", () => {
 
 		for (let attempt = 1; attempt <= 2; attempt += 1) {
 			await page.getByTestId("student-case-submit-quiz").click();
-			await expect(page.getByTestId("student-case-quiz-status")).toContainText(
-				"did not pass",
-			);
+			const quizStatus = page.getByTestId("student-case-quiz-status");
+
+			await expect(quizStatus).toContainText("did not pass");
+			await expect(quizStatus).toHaveClass(/border-error-red/);
+			await expect(quizStatus).toHaveClass(/bg-\[#fff5f5\]/);
+			await expect(
+				page.getByTestId("student-case-review-lecture-text"),
+			).toBeVisible();
 			await expect(page.getByTestId("student-case-quiz-form")).not.toContainText(
 				"Incorrect",
 			);
+
+			if (attempt === 1) {
+				await page.getByTestId("student-case-review-lecture-text").click();
+				await expect(page.getByTestId("student-case-resources-step")).toBeVisible();
+				await expect(page.getByTestId("student-case-lecture-text")).toContainText(
+					"Teaching resources summarize",
+				);
+				await page.getByTestId("student-case-continue-to-quiz").click();
+				await expect(page.getByTestId("student-case-quiz-form")).toBeVisible();
+			}
 		}
 
 		await page.getByTestId("student-case-submit-quiz").click();
