@@ -256,6 +256,12 @@ export function seedE2EStudentCertificates(
 	}
 }
 
+export function saveE2EStudentCertificate(
+	certificate: E2EStudentCertificateRecord,
+) {
+	getStore().studentCertificates.set(certificate.certificateId, certificate);
+}
+
 export function seedE2ETeacherCases(
 	cases: Array<{
 		caseId: string;

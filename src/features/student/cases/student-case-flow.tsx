@@ -1,7 +1,13 @@
 "use client";
 
-import { type FormEvent, useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
+import {
+	type FormEvent,
+	useEffect,
+	useMemo,
+	useState,
+	useTransition,
+} from "react";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { formatDubaiDate } from "@/lib/date-format";
 import {
 	countAnalysisWords,
@@ -9,13 +15,25 @@ import {
 	minimumAnalysisWordCount,
 	validateAnalysisWordCount,
 } from "./analysis";
+import { quizOptionLabel, shuffleStudentCaseQuizQuestions } from "./quiz";
+import {
+	initialStudentCaseQuizFormState,
+	type StudentCaseQuizAction,
+} from "./state";
 import type { StudentCasePresentation } from "./student-case";
 
 type StudentCaseFlowProps = {
 	caseRecord: StudentCasePresentation;
+	quizAction: StudentCaseQuizAction;
 };
 
-type CaseFlowStep = "presentation" | "analysis" | "comparison" | "resources";
+type CaseFlowStep =
+	| "presentation"
+	| "analysis"
+	| "comparison"
+	| "resources"
+	| "quiz"
+	| "certificate";
 type AnalysisReviewMode = "both" | "personalAnalysis" | "modelAnswer";
 
 const analysisReviewOptions: Array<{
@@ -61,24 +79,49 @@ const stepCopy: Record<
 		heading: "Teaching Resources",
 		description: "Review the lecture text and case materials before continuing.",
 	},
+	quiz: {
+		heading: "CME Quiz",
+		description: "Answer every question correctly to earn your certificate.",
+	},
+	certificate: {
+		heading: "Certificate",
+		description: "Your certificate is ready for download.",
+	},
 };
 
 const expiredMessage =
 	"This case is no longer active. Return to your dashboard for the current case status.";
 
-export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
+export function StudentCaseFlow({
+	caseRecord,
+	quizAction,
+}: StudentCaseFlowProps) {
 	const [step, setStep] = useState<CaseFlowStep>("presentation");
 	const [analysisText, setAnalysisText] = useState("");
 	const [submittedAnalysis, setSubmittedAnalysis] = useState("");
 	const [analysisReviewMode, setAnalysisReviewMode] =
 		useState<AnalysisReviewMode>("both");
+	const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
+	const [quizFailuresSinceReview, setQuizFailuresSinceReview] = useState(0);
+	const [showLeaveQuizDialog, setShowLeaveQuizDialog] = useState(false);
+	const [reviewRequired, setReviewRequired] = useState(false);
 	const [message, setMessage] = useState("");
 	const [isExpired, setIsExpired] = useState(
 		() => Date.now() > caseRecord.deadlineAt,
 	);
+	const [quizState, setQuizState] = useState(initialStudentCaseQuizFormState);
+	const [isQuizPending, startQuizSubmission] = useTransition();
 	const wordCount = useMemo(
 		() => countAnalysisWords(analysisText),
 		[analysisText],
+	);
+	const quizQuestions = useMemo(
+		() =>
+			shuffleStudentCaseQuizQuestions(
+				caseRecord.cmeQuestions,
+				`${caseRecord.caseId}:${caseRecord.deadlineAt}`,
+			),
+		[caseRecord.caseId, caseRecord.cmeQuestions, caseRecord.deadlineAt],
 	);
 	const validation = validateAnalysisWordCount(analysisText);
 	const isAnalysisValid = validation.valid;
@@ -86,6 +129,11 @@ export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
 	const visibleMessage = isExpired ? expiredMessage : message;
 	const showPersonalAnalysis = analysisReviewMode !== "modelAnswer";
 	const showModelAnswer = analysisReviewMode !== "personalAnalysis";
+	const hasAllQuizAnswers =
+		quizQuestions.length > 0 &&
+		quizQuestions.every((question) => Boolean(quizAnswers[question.questionId]));
+	const hasPassedQuiz = quizState.status === "passed";
+	const shouldWarnBeforeLeavingQuiz = step === "quiz" && !hasPassedQuiz;
 
 	useEffect(() => {
 		if (isExpired) {
@@ -115,6 +163,23 @@ export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
 		};
 	}, [caseRecord.deadlineAt, isExpired]);
 
+	useEffect(() => {
+		if (!shouldWarnBeforeLeavingQuiz) {
+			return;
+		}
+
+		function warnBeforeUnload(event: BeforeUnloadEvent) {
+			event.preventDefault();
+			event.returnValue = "";
+		}
+
+		window.addEventListener("beforeunload", warnBeforeUnload);
+
+		return () => {
+			window.removeEventListener("beforeunload", warnBeforeUnload);
+		};
+	}, [shouldWarnBeforeLeavingQuiz]);
+
 	function isDeadlineExpired() {
 		return isExpired || Date.now() > caseRecord.deadlineAt;
 	}
@@ -131,6 +196,12 @@ export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
 
 	function continueToAnalysis() {
 		if (!guardActiveCase()) {
+			return;
+		}
+
+		if (reviewRequired && submittedAnalysis) {
+			setMessage("");
+			setStep("comparison");
 			return;
 		}
 
@@ -195,6 +266,99 @@ export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
 
 		setMessage("");
 		setStep("comparison");
+	}
+
+	function continueToQuiz() {
+		if (!guardActiveCase()) {
+			return;
+		}
+
+		if (quizQuestions.length < 3) {
+			setMessage("This case does not have an available CME quiz.");
+			return;
+		}
+
+		setReviewRequired(false);
+		setMessage("");
+		setStep("quiz");
+	}
+
+	function returnToResources() {
+		if (!guardActiveCase()) {
+			return;
+		}
+
+		if (shouldWarnBeforeLeavingQuiz) {
+			setShowLeaveQuizDialog(true);
+			return;
+		}
+
+		leaveQuizForResources();
+	}
+
+	function leaveQuizForResources() {
+		setShowLeaveQuizDialog(false);
+		setMessage("");
+		setStep("resources");
+	}
+
+	function submitQuiz(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+
+		if (!guardActiveCase()) {
+			return;
+		}
+
+		if (!hasAllQuizAnswers) {
+			setMessage("Answer every CME question before submitting.");
+			return;
+		}
+
+		const formData = new FormData(event.currentTarget);
+
+		startQuizSubmission(async () => {
+			const result = await quizAction(quizState, formData);
+
+			setQuizState(result);
+			handleQuizSubmissionResult(result);
+		});
+	}
+
+	function handleQuizSubmissionResult(result: typeof quizState) {
+		if (result.status === "expired") {
+			setIsExpired(true);
+			setMessage(result.message);
+			return;
+		}
+
+		if (result.status === "failed") {
+			const nextFailureCount = quizFailuresSinceReview + 1;
+
+			if (nextFailureCount >= 3) {
+				setQuizFailuresSinceReview(0);
+				setReviewRequired(true);
+				setAnalysisReviewMode("both");
+				setStep("presentation");
+				setMessage(
+					"Quiz attempt submitted. Result: did not pass. Review the case presentation, model answer, and teaching resources before retrying.",
+				);
+				return;
+			}
+
+			setQuizFailuresSinceReview(nextFailureCount);
+			setMessage("");
+			return;
+		}
+
+		if (result.status === "passed") {
+			setMessage("");
+			setStep("certificate");
+			return;
+		}
+
+		if (result.status === "duplicate" || result.status === "error") {
+			setMessage("");
+		}
 	}
 
 	return (
@@ -500,7 +664,7 @@ export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
 						</section>
 					) : null}
 
-					<div className="mt-7 flex justify-start">
+					<div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-between">
 						<Button
 							className="w-full sm:w-auto"
 							data-testid="student-case-back-to-comparison"
@@ -510,8 +674,233 @@ export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
 						>
 							Previous
 						</Button>
+						<Button
+							className="w-full sm:w-auto"
+							data-testid="student-case-continue-to-quiz"
+							onClick={continueToQuiz}
+							type="button"
+						>
+							Continue
+						</Button>
 					</div>
 				</article>
+			) : null}
+
+			{!isExpired && step === "quiz" ? (
+				<form
+					className="border border-border-gray bg-white p-5 sm:p-7"
+					data-testid="student-case-quiz-form"
+					onSubmit={submitQuiz}
+				>
+					<input
+						name="caseId"
+						type="hidden"
+						value={caseRecord.caseId}
+					/>
+					<div className="mb-5 flex flex-col gap-2 border-b border-border-gray pb-4 sm:flex-row sm:items-center sm:justify-between">
+						<p
+							className="text-sm font-semibold text-primary-text"
+							data-testid="student-case-quiz-progress"
+						>
+							{Object.keys(quizAnswers).length} of {quizQuestions.length} answered
+						</p>
+						<p className="text-sm text-muted-gray">
+							Passing score: 100%
+						</p>
+					</div>
+
+					{quizState.status === "failed" ||
+					quizState.status === "duplicate" ||
+					quizState.status === "error" ? (
+						<p
+							className={[
+								"mb-5 border bg-white p-3 text-sm font-medium",
+								quizState.status === "failed"
+									? "border-warning-gold text-primary-text"
+									: "border-error-red text-error-red",
+							].join(" ")}
+							data-testid="student-case-quiz-status"
+							role="status"
+						>
+							{quizState.message}
+						</p>
+					) : null}
+
+					<div className="space-y-5">
+						{quizQuestions.map((question, questionIndex) => (
+							<section
+								className="border border-border-gray bg-app-canvas p-4 sm:p-5"
+								data-testid={`student-case-quiz-question-${question.questionId}`}
+								key={question.questionId}
+							>
+								<p className="text-xs font-semibold uppercase text-brand-teal">
+									Question {questionIndex + 1}
+								</p>
+								<h2
+									className="mt-3 text-base font-semibold leading-7 text-primary-text"
+									data-testid={`student-case-quiz-prompt-${question.questionId}`}
+								>
+									{question.prompt}
+								</h2>
+								<div className="mt-4 space-y-3">
+									{question.options.map((option, optionIndex) => {
+										const isSelected =
+											quizAnswers[question.questionId] === option.optionId;
+
+											return (
+												<label
+													aria-checked={isSelected}
+													className={[
+														"grid min-h-12 cursor-pointer grid-cols-[40px_minmax(0,1fr)] items-center border bg-white text-sm transition",
+														isSelected
+															? "border-primary-action bg-soft-section text-primary-text"
+															: "border-border-gray text-primary-text hover:border-primary-action",
+													].join(" ")}
+													data-testid={`student-case-quiz-option-${question.questionId}-${option.optionId}`}
+													key={option.optionId}
+													role="radio"
+											>
+												<span
+													className={[
+														"flex h-full min-h-12 items-center justify-center border-r text-xs font-semibold",
+														isSelected
+															? "border-brand-teal text-brand-teal"
+															: "border-border-gray text-muted-gray",
+													].join(" ")}
+												>
+													{isSelected ? (
+														<span className="flex h-5 w-5 items-center justify-center">
+															<SmallCheckIcon />
+														</span>
+													) : (
+														quizOptionLabel(optionIndex)
+													)}
+												</span>
+												<span className="flex min-h-12 items-center px-4 leading-6">
+													<input
+														checked={isSelected}
+														className="sr-only"
+														name={`answer:${question.questionId}`}
+														onChange={() => {
+															setQuizAnswers((answers) => ({
+																...answers,
+																[question.questionId]: option.optionId,
+															}));
+															if (!isDeadlineExpired()) {
+																setMessage("");
+															}
+														}}
+														type="radio"
+														value={option.optionId}
+													/>
+													{option.text}
+												</span>
+											</label>
+										);
+									})}
+								</div>
+							</section>
+						))}
+					</div>
+
+					<div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-between">
+						<Button
+							className="w-full sm:w-auto"
+							data-testid="student-case-quiz-back-to-resources"
+							onClick={returnToResources}
+							type="button"
+							variant="secondary"
+						>
+							Previous
+						</Button>
+						<Button
+							className="w-full sm:w-auto"
+							data-testid="student-case-submit-quiz"
+							disabled={!hasAllQuizAnswers || isQuizPending}
+							type="submit"
+						>
+							{isQuizPending ? "Submitting" : "Submit"}
+						</Button>
+					</div>
+				</form>
+			) : null}
+
+			{!isExpired && step === "certificate" ? (
+				<article
+					className="border border-border-gray bg-white p-5 sm:p-7"
+					data-testid="student-case-certificate-step"
+				>
+					<div className="mx-auto max-w-2xl text-center">
+						<div className="mx-auto flex h-14 w-14 items-center justify-center border border-success-mint bg-success-soft text-primary-action">
+							<CheckIcon />
+						</div>
+						<h2 className="mt-5 text-xl font-semibold text-primary-text">
+							Certificate Earned
+						</h2>
+						<p
+							className="mt-3 text-sm leading-6 text-muted-gray"
+							data-testid="student-case-certificate-message"
+						>
+							You passed the CME quiz and earned your certificate for{" "}
+							{caseRecord.title}.
+						</p>
+						<div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
+							{quizState.certificateId ? (
+								<a
+									className="inline-flex h-11 items-center justify-center rounded bg-primary-action px-6 text-sm font-bold uppercase text-white transition hover:bg-success-mint focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal"
+									data-testid="student-case-certificate-download"
+									download
+									href={`/student/certificates/${quizState.certificateId}/download`}
+								>
+									Download Certificate
+								</a>
+							) : null}
+							<ButtonLink
+								data-testid="student-case-certificate-history"
+								href="/student/certificates"
+								variant="secondary"
+							>
+								View Certificates
+							</ButtonLink>
+						</div>
+					</div>
+				</article>
+			) : null}
+
+			{showLeaveQuizDialog ? (
+				<div
+					aria-modal="true"
+					className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(47,64,80,0.78)] px-4"
+					data-testid="student-case-leave-quiz-dialog"
+					role="dialog"
+				>
+					<div className="w-full max-w-md border border-border-gray bg-white p-5 text-primary-text shadow-soft sm:p-6">
+						<h2 className="text-lg font-semibold">Leave CME Quiz?</h2>
+						<p className="mt-3 text-sm leading-6 text-muted-gray">
+							Your current answers will not be submitted. Leaving now does not
+							count as a failed attempt.
+						</p>
+						<div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+							<Button
+								className="w-full sm:w-auto"
+								data-testid="student-case-stay-on-quiz"
+								onClick={() => setShowLeaveQuizDialog(false)}
+								type="button"
+								variant="secondary"
+							>
+								Stay
+							</Button>
+							<Button
+								className="w-full sm:w-auto"
+								data-testid="student-case-confirm-leave-quiz"
+								onClick={leaveQuizForResources}
+								type="button"
+							>
+								Leave
+							</Button>
+						</div>
+					</div>
+				</div>
 			) : null}
 		</section>
 	);
@@ -563,6 +952,38 @@ function DownloadIcon() {
 			/>
 			<path
 				d="M5 18.75h14v1.5H5v-1.5Z"
+				fill="currentColor"
+			/>
+		</svg>
+	);
+}
+
+function CheckIcon() {
+	return (
+		<svg
+			aria-hidden="true"
+			className="h-7 w-7"
+			focusable="false"
+			viewBox="0 0 24 24"
+		>
+			<path
+				d="m9.25 16.35-4.1-4.1 1.1-1.1 3 3 8.5-8.5 1.1 1.1-9.6 9.6Z"
+				fill="currentColor"
+			/>
+		</svg>
+	);
+}
+
+function SmallCheckIcon() {
+	return (
+		<svg
+			aria-hidden="true"
+			className="h-4 w-4"
+			focusable="false"
+			viewBox="0 0 24 24"
+		>
+			<path
+				d="m9.25 16.35-4.1-4.1 1.1-1.1 3 3 8.5-8.5 1.1 1.1-9.6 9.6Z"
 				fill="currentColor"
 			/>
 		</svg>

@@ -59,6 +59,12 @@ async function seedStudentCase(
 			lastModified: number;
 		}>;
 		caseId?: string;
+		cmeQuestions?: Array<{
+			id: string;
+			prompt: string;
+			options: Array<{ id: string; text: string }>;
+			correctOptionId: string;
+		}>;
 		deadlineAt?: number;
 		lectureText?: string;
 		modelAnswer?: string;
@@ -80,6 +86,7 @@ async function seedStudentCase(
 					data?.lectureText ??
 					"Teaching resources summarize the clinical evidence, common diagnostic pitfalls, and next-step management priorities.",
 				attachments: data?.attachments ?? [],
+				cmeQuestions: data?.cmeQuestions,
 				presentation:
 					data?.presentation ??
 					"Patient history, presenting symptoms, laboratory findings, and the clinical decision context are described with enough detail for learners to reason carefully.",
@@ -112,6 +119,41 @@ async function expireBrowserClock(page: Page, deadlineAt: number) {
 	await page.evaluate((expiresAt) => {
 		Date.now = () => expiresAt + 1;
 	}, deadlineAt);
+}
+
+async function reachStudentCaseQuiz(page: Page) {
+	await page.getByTestId("student-case-continue").click();
+	await page.getByTestId("student-case-analysis").fill(validAnalysis());
+	await page.getByTestId("student-case-submit-analysis").click();
+	await page.getByTestId("student-case-continue-to-resources").click();
+	await page.getByTestId("student-case-continue-to-quiz").click();
+	await expect(page.getByTestId("student-case-quiz-form")).toBeVisible();
+}
+
+async function answerQuiz(
+	page: Page,
+	answers: Record<string, string> = correctQuizAnswers(),
+) {
+	for (const [questionId, optionId] of Object.entries(answers)) {
+		await page
+			.getByTestId(`student-case-quiz-option-${questionId}-${optionId}`)
+			.click();
+	}
+}
+
+function correctQuizAnswers() {
+	return {
+		"question-1": "question-1-a",
+		"question-2": "question-2-a",
+		"question-3": "question-3-a",
+	};
+}
+
+function incorrectQuizAnswers() {
+	return {
+		...correctQuizAnswers(),
+		"question-1": "question-1-b",
+	};
 }
 
 test.describe("Student case presentation and analysis flow", () => {
@@ -286,6 +328,148 @@ test.describe("Student case presentation and analysis flow", () => {
 		await expect(
 			page.getByTestId("student-case-pdf-download-attachment-1"),
 		).toHaveAttribute("aria-label", "Download teaching-resource.pdf");
+	});
+
+	test("passes the CME quiz only when all answers are correct", async ({
+		page,
+		request,
+	}) => {
+		const email = uniqueEmail("student-case-quiz-pass");
+
+		await seedStudentCase(request);
+		await bootstrapVerifiedStudent(request, email);
+		await loginStudent(page, email);
+		await startStudentCaseFlow(page);
+		await reachStudentCaseQuiz(page);
+
+		await expect(page.getByTestId("student-case-flow-heading")).toHaveText(
+			"CME Quiz",
+		);
+		await answerQuiz(page);
+		await expect(
+			page.getByTestId("student-case-quiz-option-question-1-question-1-a"),
+		).toHaveAttribute("aria-checked", "true");
+		await expect(page.getByTestId("student-case-quiz-progress")).toHaveText(
+			"3 of 3 answered",
+		);
+		await page.getByTestId("student-case-quiz-back-to-resources").click();
+		await expect(page.getByTestId("student-case-leave-quiz-dialog")).toBeVisible();
+		await page.getByTestId("student-case-stay-on-quiz").click();
+		await expect(page.getByTestId("student-case-leave-quiz-dialog")).toHaveCount(
+			0,
+		);
+		await page.getByTestId("student-case-submit-quiz").click();
+
+		await expect(page.getByTestId("student-case-certificate-step")).toBeVisible();
+		await expect(page.getByTestId("student-case-flow-heading")).toHaveText(
+			"Certificate",
+		);
+		await expect(
+			page.getByTestId("student-case-certificate-download"),
+		).toHaveAttribute("href", /\/student\/certificates\/cert_.*\/download/);
+	});
+
+	test("shows failed quiz attempts without per-question correctness and forces review on the third failure", async ({
+		page,
+		request,
+	}) => {
+		const email = uniqueEmail("student-case-quiz-fail");
+
+		await seedStudentCase(request);
+		await bootstrapVerifiedStudent(request, email);
+		await loginStudent(page, email);
+		await startStudentCaseFlow(page);
+		await reachStudentCaseQuiz(page);
+		await answerQuiz(page, incorrectQuizAnswers());
+
+		for (let attempt = 1; attempt <= 2; attempt += 1) {
+			await page.getByTestId("student-case-submit-quiz").click();
+			await expect(page.getByTestId("student-case-quiz-status")).toContainText(
+				"did not pass",
+			);
+			await expect(page.getByTestId("student-case-quiz-form")).not.toContainText(
+				"Incorrect",
+			);
+		}
+
+		await page.getByTestId("student-case-submit-quiz").click();
+		await expect(page.getByTestId("student-case-flow-message")).toContainText(
+			"Review the case presentation",
+		);
+		await expect(page.getByTestId("student-case-flow-heading")).toHaveText(
+			"Case Presentation",
+		);
+
+		await page.getByTestId("student-case-continue").click();
+		await expect(page.getByTestId("student-case-flow-heading")).toHaveText(
+			"Analysis Review",
+		);
+		await page.getByTestId("student-case-continue-to-resources").click();
+		await page.getByTestId("student-case-continue-to-quiz").click();
+		await expect(page.getByTestId("student-case-flow-heading")).toHaveText(
+			"CME Quiz",
+		);
+
+		await answerQuiz(page);
+		await page.getByTestId("student-case-submit-quiz").click();
+		await expect(page.getByTestId("student-case-certificate-step")).toBeVisible();
+	});
+
+	test("rejects quiz submission when the deadline passes before submit", async ({
+		page,
+		request,
+	}) => {
+		const email = uniqueEmail("student-case-quiz-cutoff");
+
+		await seedStudentCase(request);
+		await bootstrapVerifiedStudent(request, email);
+		await loginStudent(page, email);
+		await startStudentCaseFlow(page);
+		await reachStudentCaseQuiz(page);
+		await answerQuiz(page);
+		await seedStudentCase(request, {
+			deadlineAt: Date.now() - dayInMilliseconds,
+		});
+		await page.getByTestId("student-case-submit-quiz").click();
+
+		await expect(page.getByTestId("student-case-flow-message")).toContainText(
+			"This case is no longer active.",
+		);
+		await expect(page.getByTestId("student-case-expired")).toBeVisible();
+		await expect(page.getByTestId("student-case-quiz-form")).toHaveCount(0);
+	});
+
+	test("rejects duplicate certificate creation from a second tab", async ({
+		page,
+		request,
+	}) => {
+		const email = uniqueEmail("student-case-quiz-duplicate");
+
+		await seedStudentCase(request);
+		await bootstrapVerifiedStudent(request, email);
+		await loginStudent(page, email);
+		await startStudentCaseFlow(page);
+		await reachStudentCaseQuiz(page);
+		await answerQuiz(page);
+
+		const secondPage = await page.context().newPage();
+		await secondPage.goto("/student/cases/e2e-student-flow-case");
+		await reachStudentCaseQuiz(secondPage);
+		await answerQuiz(secondPage);
+
+		await page.getByTestId("student-case-submit-quiz").click();
+		await expect(page.getByTestId("student-case-certificate-step")).toBeVisible();
+
+		await secondPage.getByTestId("student-case-submit-quiz").click();
+		await expect(
+			secondPage.getByTestId("student-case-quiz-status"),
+		).toContainText("already been earned");
+
+		await page.goto("/student/certificates");
+		await expect(page.getByTestId("student-certificate-history-card")).toHaveCount(
+			1,
+		);
+		await secondPage.close();
 	});
 
 	test("blocks direct access after the case deadline", async ({
