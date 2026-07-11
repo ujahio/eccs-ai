@@ -19,6 +19,10 @@ declare module "sst" {
       "type": "sst.sst.Secret"
       "value": string
     }
+    "CaseMaterialBucket": {
+      "name": string
+      "type": "sst.aws.Bucket"
+    }
     "RegistrationWorkflowTable": {
       "name": string
       "type": "sst.aws.Dynamo"

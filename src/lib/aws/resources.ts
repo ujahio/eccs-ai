@@ -5,6 +5,7 @@ import { Resource } from "sst";
 export type LinkedResources = {
 	AuthUserPool: { id: string };
 	AuthUserPoolClient: { id: string };
+	CaseMaterialBucket: { name: string };
 	RegistrationWorkflowTable: { name: string };
 	UserProfileTable: { name: string };
 	TeacherCaseTable: { name: string };
@@ -114,6 +115,12 @@ export function getSessionAuthResources() {
 			: required(
 					linkedValue(() => linkedResources.StudentCertificateTable?.name),
 					"StudentCertificateTable.name",
+				),
+		caseMaterialBucketName: e2eMode
+			? "e2e-case-material-bucket"
+			: required(
+					linkedValue(() => linkedResources.CaseMaterialBucket?.name),
+					"CaseMaterialBucket.name",
 				),
 		betterAuthSecret: required(
 			linkedValue(() => linkedResources.BetterAuthSecret?.value) ??

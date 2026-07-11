@@ -5,6 +5,7 @@ import {
 	studentCaseAttachmentUrlExpiresAt,
 	type StudentCaseAttachmentDisposition,
 } from "@/features/student/cases/student-case";
+import { getCaseMaterialStorage } from "@/features/case-materials/storage";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import { requireStudentSession } from "@/lib/auth/session";
 
@@ -70,39 +71,17 @@ export async function GET(
 		return new Response("Attachment not found.", { status: 404 });
 	}
 
-	return new Response(arrayBufferFromBytes(attachment.bytes), {
-		headers: {
-			"Cache-Control": "private, max-age=0, no-store",
-			"Content-Disposition": `${disposition}; filename="${safeAttachmentFilename(
-				attachment.name,
-			)}"`,
-			"Content-Length": String(attachment.bytes.byteLength),
-			"Content-Type": attachment.contentType,
-		},
+	const signedStorageUrl = await getCaseMaterialStorage().getSignedReadUrl({
+		disposition,
+		name: attachment.name,
+		storageKey: attachment.storageKey,
 	});
+
+	return Response.redirect(new URL(signedStorageUrl, request.url), 307);
 }
 
 function attachmentDispositionFromValue(
 	value: string | null,
 ): StudentCaseAttachmentDisposition | null {
 	return value === "inline" || value === "attachment" ? value : null;
-}
-
-function arrayBufferFromBytes(bytes: Uint8Array) {
-	const body = new ArrayBuffer(bytes.byteLength);
-
-	new Uint8Array(body).set(bytes);
-
-	return body;
-}
-
-function safeAttachmentFilename(filename: string) {
-	const safe = filename
-		.replace(/[^\x20-\x7E]/g, "")
-		.replaceAll("\\", "")
-		.replaceAll("/", "")
-		.replaceAll('"', "")
-		.trim();
-
-	return safe || "case-material.pdf";
 }

@@ -27,10 +27,10 @@ const activeCase = {
 		lectureText: "Lecture text placeholder.",
 		attachments: [
 			{
-				dataUrl: "data:application/pdf;base64,JVBERi0xLjQKJUVPRg==",
 				id: "attachment-1",
 				name: "teaching-resource.pdf",
 				size: 18,
+				storageKey: "case-materials/active-case/attachment-1.pdf",
 				type: "application/pdf",
 				lastModified: 1,
 			},
@@ -77,7 +77,7 @@ describe("InMemoryStudentCaseRepository", () => {
 		expect(attachment?.downloadUrl).not.toContain("signature=");
 	});
 
-	it("returns active PDF attachment bytes only before the deadline", async () => {
+	it("returns active PDF attachment storage references only before the deadline", async () => {
 		const { InMemoryStudentCaseRepository } = await import("./student-case");
 		seedE2ETeacherCases([activeCase]);
 
@@ -88,6 +88,7 @@ describe("InMemoryStudentCaseRepository", () => {
 		).resolves.toMatchObject({
 			contentType: "application/pdf",
 			name: "teaching-resource.pdf",
+			storageKey: "case-materials/active-case/attachment-1.pdf",
 		});
 		await expect(
 			repository.getActiveCaseAttachment("active-case", "attachment-1", 5_001),
@@ -184,7 +185,7 @@ describe("DynamoStudentCaseRepository", () => {
 		);
 	});
 
-	it("loads active PDF attachment content by id", async () => {
+	it("loads active PDF attachment metadata by id", async () => {
 		const { DynamoStudentCaseRepository } = await import("./student-case");
 		const documentClient = {
 			send: vi.fn(async () => ({ Item: activeCase })),
@@ -200,8 +201,10 @@ describe("DynamoStudentCaseRepository", () => {
 			2_000,
 		);
 
-		expect(attachment?.bytes.byteLength).toBeGreaterThan(0);
 		expect(attachment?.contentType).toBe("application/pdf");
 		expect(attachment?.name).toBe("teaching-resource.pdf");
+		expect(attachment?.storageKey).toBe(
+			"case-materials/active-case/attachment-1.pdf",
+		);
 	});
 });

@@ -10,6 +10,7 @@ import type {
 	CaseDraft,
 	DraftAttachment,
 } from "@/features/teacher/case-authoring/schema";
+import { storeDraftAttachments } from "@/features/case-materials/storage";
 import { isActiveTeacherCase } from "@/features/teacher/cases/case-lifecycle";
 import { rejectNonE2EMode } from "@/lib/e2e/route-helpers";
 
@@ -89,11 +90,12 @@ function parseAttachments(value: unknown): DraftAttachment[] {
 		const id = String(input.id ?? "").trim();
 		const name = String(input.name ?? "").trim();
 		const size = Number(input.size);
+		const storageKey = String(input.storageKey ?? "").trim();
 		const type = String(input.type ?? "").trim();
 		const lastModified = Number(input.lastModified);
 
 		if (
-			!dataUrl ||
+			(!dataUrl && !storageKey) ||
 			!id ||
 			!name ||
 			!Number.isFinite(size) ||
@@ -107,10 +109,11 @@ function parseAttachments(value: unknown): DraftAttachment[] {
 
 		return [
 			{
-				dataUrl,
+				...(dataUrl ? { dataUrl } : {}),
 				id,
 				name,
 				size,
+				...(storageKey ? { storageKey } : {}),
 				type,
 				lastModified,
 			},
@@ -193,9 +196,10 @@ export async function POST(request: Request) {
 	try {
 		const activeCase = parseActiveCase(body?.activeCase);
 		const certificates = parseCertificates(body?.certificates);
+		const draft = activeCase ? await activeCaseDraft(activeCase) : null;
 
 		seedE2ETeacherCases(
-			activeCase
+			activeCase && draft
 				? [
 						{
 							caseId:
@@ -204,7 +208,7 @@ export async function POST(request: Request) {
 							completionCount: 0,
 							feedbackCount: 0,
 							...activeCase,
-							draft: activeCaseDraft(activeCase),
+							draft,
 						},
 					]
 				: [],
@@ -233,7 +237,14 @@ export async function DELETE() {
 	return NextResponse.json({ reset: true });
 }
 
-function activeCaseDraft(activeCase: E2EStudentDashboardActiveCase): CaseDraft {
+async function activeCaseDraft(
+	activeCase: E2EStudentDashboardActiveCase,
+): Promise<CaseDraft> {
+	const storedAttachments = await storeDraftAttachments({
+		attachments: activeCase.attachments ?? [],
+		caseId: activeCase.caseId ?? "e2e-active-student-dashboard-case",
+	});
+
 	return {
 		title: activeCase.title,
 		description: activeCase.description,
@@ -242,7 +253,7 @@ function activeCaseDraft(activeCase: E2EStudentDashboardActiveCase): CaseDraft {
 		lectureText:
 			activeCase.lectureText ??
 			"Teaching resources are provided by the teacher for this case study.",
-		attachments: activeCase.attachments ?? [],
+		attachments: storedAttachments.attachments,
 		cmeQuestions: [],
 		deadlineDate: "",
 	};

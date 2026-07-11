@@ -1,4 +1,5 @@
 const auth = await import("./auth");
+const caseMaterials = await import("./case-materials");
 const secrets = await import("./secrets");
 const tables = await import("./tables");
 
@@ -16,6 +17,7 @@ export const client = new sst.aws.Nextjs("eccsfeweb", {
 	link: [
 		auth.userPool,
 		auth.userPoolClient,
+		caseMaterials.caseMaterialBucket,
 		secrets.betterAuthSecret,
 		secrets.resendApiKey,
 		tables.registrationWorkflowTable,

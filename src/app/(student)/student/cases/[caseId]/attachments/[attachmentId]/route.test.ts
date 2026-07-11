@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
 	createStudentCaseAttachmentUrl: vi.fn(),
+	getCaseMaterialStorage: vi.fn(),
 	getStudentCaseAttachment: vi.fn(),
 	getSessionAuthResources: vi.fn(),
 	isValidStudentCaseAttachmentUrl: vi.fn(),
@@ -14,6 +15,10 @@ vi.mock("@/features/student/cases/student-case", () => ({
 	getStudentCaseAttachment: mocks.getStudentCaseAttachment,
 	isValidStudentCaseAttachmentUrl: mocks.isValidStudentCaseAttachmentUrl,
 	studentCaseAttachmentUrlExpiresAt: mocks.studentCaseAttachmentUrlExpiresAt,
+}));
+
+vi.mock("@/features/case-materials/storage", () => ({
+	getCaseMaterialStorage: mocks.getCaseMaterialStorage,
 }));
 
 vi.mock("@/lib/aws/resources", () => ({
@@ -33,6 +38,7 @@ beforeAll(async () => {
 beforeEach(() => {
 	mocks.getStudentCaseAttachment.mockReset();
 	mocks.createStudentCaseAttachmentUrl.mockReset();
+	mocks.getCaseMaterialStorage.mockReset();
 	mocks.getSessionAuthResources.mockReset();
 	mocks.isValidStudentCaseAttachmentUrl.mockReset();
 	mocks.requireStudentSession.mockReset();
@@ -40,6 +46,9 @@ beforeEach(() => {
 	mocks.createStudentCaseAttachmentUrl.mockReturnValue(
 		"/student/cases/case-1/attachments/attachment-1?disposition=inline&expires=2000&signature=fresh",
 	);
+	mocks.getCaseMaterialStorage.mockReturnValue({
+		getSignedReadUrl: vi.fn(async () => "https://materials.example/signed.pdf"),
+	});
 	mocks.getSessionAuthResources.mockReturnValue({
 		betterAuthSecret: "test-secret",
 	});
@@ -61,9 +70,9 @@ function routeContext() {
 describe("student case attachment route", () => {
 	it("redirects unsigned access links to fresh short-lived signed URLs", async () => {
 		mocks.getStudentCaseAttachment.mockResolvedValue({
-			bytes: new TextEncoder().encode("%PDF-1.4"),
 			contentType: "application/pdf",
 			name: "teaching-resource.pdf",
+			storageKey: "case-materials/case-1/attachment-1.pdf",
 		});
 
 		const response = await GET(
@@ -86,12 +95,12 @@ describe("student case attachment route", () => {
 		});
 	});
 
-	it("returns an inline PDF when the signed URL is valid", async () => {
+	it("redirects a valid signed app URL to a storage signed URL", async () => {
 		mocks.isValidStudentCaseAttachmentUrl.mockReturnValue(true);
 		mocks.getStudentCaseAttachment.mockResolvedValue({
-			bytes: new TextEncoder().encode("%PDF-1.4"),
 			contentType: "application/pdf",
 			name: "teaching resource.pdf",
+			storageKey: "case-materials/case-1/attachment-1.pdf",
 		});
 
 		const response = await GET(
@@ -101,27 +110,30 @@ describe("student case attachment route", () => {
 			routeContext(),
 		);
 
-		expect(response.status).toBe(200);
-		expect(response.headers.get("Content-Type")).toBe("application/pdf");
-		expect(response.headers.get("Content-Disposition")).toBe(
-			'inline; filename="teaching resource.pdf"',
+		expect(response.status).toBe(307);
+		expect(response.headers.get("Location")).toBe(
+			"https://materials.example/signed.pdf",
 		);
 		expect(mocks.requireStudentSession).toHaveBeenCalled();
 		expect(mocks.getStudentCaseAttachment).toHaveBeenCalledWith({
 			attachmentId: "attachment-1",
 			caseId: "case-1",
 		});
-		expect(new TextDecoder().decode(await response.arrayBuffer())).toBe(
-			"%PDF-1.4",
+		expect(mocks.getCaseMaterialStorage().getSignedReadUrl).toHaveBeenCalledWith(
+			{
+				disposition: "inline",
+				name: "teaching resource.pdf",
+				storageKey: "case-materials/case-1/attachment-1.pdf",
+			},
 		);
 	});
 
-	it("returns a downloadable PDF when the signed URL asks for attachment disposition", async () => {
+	it("passes attachment disposition to the storage signed URL", async () => {
 		mocks.isValidStudentCaseAttachmentUrl.mockReturnValue(true);
 		mocks.getStudentCaseAttachment.mockResolvedValue({
-			bytes: new TextEncoder().encode("%PDF-1.4"),
 			contentType: "application/pdf",
 			name: "teaching-resource.pdf",
+			storageKey: "case-materials/case-1/attachment-1.pdf",
 		});
 
 		const response = await GET(
@@ -131,9 +143,13 @@ describe("student case attachment route", () => {
 			routeContext(),
 		);
 
-		expect(response.status).toBe(200);
-		expect(response.headers.get("Content-Disposition")).toBe(
-			'attachment; filename="teaching-resource.pdf"',
+		expect(response.status).toBe(307);
+		expect(mocks.getCaseMaterialStorage().getSignedReadUrl).toHaveBeenCalledWith(
+			{
+				disposition: "attachment",
+				name: "teaching-resource.pdf",
+				storageKey: "case-materials/case-1/attachment-1.pdf",
+			},
 		);
 	});
 

@@ -458,37 +458,42 @@ export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
 							data-testid="student-case-pdf-attachments"
 						>
 							<h2 className="text-base font-semibold">Case Materials</h2>
-							<div className="mt-4 space-y-5">
+							<div className="mt-4 space-y-3">
 								{caseRecord.attachments.map((attachment) => (
 									<section
-										className="border border-border-gray bg-app-canvas p-4"
+										className="flex flex-col gap-3 border border-border-gray bg-white p-3 transition hover:border-brand-teal sm:flex-row sm:items-center sm:justify-between"
 										data-testid={`student-case-pdf-attachment-${attachment.attachmentId}`}
 										key={attachment.attachmentId}
 									>
-										<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-											<div>
-												<h3 className="text-sm font-semibold text-primary-text">
+										<a
+											aria-label={`Open ${attachment.name} in a new tab`}
+											className="group flex min-h-14 flex-1 items-center gap-3 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal"
+											data-testid={`student-case-pdf-open-${attachment.attachmentId}`}
+											href={attachment.viewUrl}
+											rel="noopener noreferrer"
+											target="_blank"
+										>
+											<span className="flex h-11 w-11 shrink-0 items-center justify-center border border-border-gray bg-app-canvas text-primary-action transition group-hover:border-brand-teal group-hover:text-brand-teal">
+												<PdfFileIcon />
+											</span>
+											<span className="min-w-0">
+												<span className="block truncate text-sm font-semibold text-primary-text transition group-hover:text-brand-teal group-hover:underline group-hover:underline-offset-4">
 													{attachment.name}
-												</h3>
-												<p className="mt-1 text-xs text-muted-gray">
-													{formatPdfSize(attachment.size)}
-												</p>
-											</div>
-											<a
-												className="inline-flex h-11 items-center justify-center border border-border-gray bg-white px-4 text-xs font-bold uppercase text-primary-text transition hover:border-primary-action focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal"
-												data-testid={`student-case-pdf-download-${attachment.attachmentId}`}
-												download={attachment.name}
-												href={attachment.downloadUrl}
-											>
-												Download
-											</a>
-										</div>
-										<iframe
-											className="mt-4 h-72 w-full border border-border-gray bg-white"
-											data-testid={`student-case-pdf-inline-${attachment.attachmentId}`}
-											src={attachment.viewUrl}
-											title={`${attachment.name} preview`}
-										/>
+												</span>
+												<span className="mt-1 block text-xs text-muted-gray">
+													PDF | {formatPdfSize(attachment.size)}
+												</span>
+											</span>
+										</a>
+										<a
+											aria-label={`Download ${attachment.name}`}
+											className="inline-flex h-11 w-11 shrink-0 items-center justify-center border border-border-gray bg-white text-primary-text transition hover:border-primary-action hover:text-brand-teal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal"
+											data-testid={`student-case-pdf-download-${attachment.attachmentId}`}
+											download={attachment.name}
+											href={attachment.downloadUrl}
+										>
+											<DownloadIcon />
+										</a>
 									</section>
 								))}
 							</div>
@@ -522,4 +527,44 @@ function formatPdfSize(size: number) {
 	}
 
 	return `${(size / 1_024 / 1_024).toFixed(1)} MB`;
+}
+
+function PdfFileIcon() {
+	return (
+		<svg
+			aria-hidden="true"
+			className="h-6 w-6"
+			focusable="false"
+			viewBox="0 0 24 24"
+		>
+			<path
+				d="M6 2.75h8.25L19 7.5v13.75H6V2.75Zm7.5 1.5v4h4l-4-4Zm-6 0v15.5h10V9.75H12v-5.5H7.5Z"
+				fill="currentColor"
+			/>
+			<path
+				d="M8.5 14.25h7v1.5h-7v-1.5Zm0 3h5v1.5h-5v-1.5Z"
+				fill="currentColor"
+			/>
+		</svg>
+	);
+}
+
+function DownloadIcon() {
+	return (
+		<svg
+			aria-hidden="true"
+			className="h-5 w-5"
+			focusable="false"
+			viewBox="0 0 24 24"
+		>
+			<path
+				d="M11.25 3.5h1.5v9.4l3.2-3.2 1.05 1.1-5 5-5-5 1.05-1.1 3.2 3.2V3.5Z"
+				fill="currentColor"
+			/>
+			<path
+				d="M5 18.75h14v1.5H5v-1.5Z"
+				fill="currentColor"
+			/>
+		</svg>
+	);
 }

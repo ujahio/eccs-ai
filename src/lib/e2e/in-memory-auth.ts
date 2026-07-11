@@ -103,6 +103,14 @@ export type E2EEmailRecord =
 	  };
 
 type E2EAuthStoreShape = {
+	caseMaterials: Map<
+		string,
+		{
+			bytes: Uint8Array;
+			contentType: string;
+			name: string;
+		}
+	>;
 	registrations: Map<string, PendingRegistrationRecord>;
 	profiles: Map<string, AppProfileRecord>;
 	studentCertificates: Map<string, E2EStudentCertificateRecord>;
@@ -170,6 +178,7 @@ function getStore(): E2EAuthStoreShape {
 
 	if (!processStore[GLOBAL_KEY]) {
 		processStore[GLOBAL_KEY] = {
+			caseMaterials: new Map(),
 			registrations: new Map(),
 			profiles: new Map(),
 			studentCertificates: new Map(),
@@ -191,6 +200,7 @@ export function resetE2EAuthStore() {
 	const store = getStore();
 
 	store.registrations.clear();
+	store.caseMaterials.clear();
 	store.profiles.clear();
 	store.studentCertificates.clear();
 	store.teacherCases.clear();
@@ -203,6 +213,25 @@ export function resetE2EAuthStore() {
 
 export function isE2EMode(): boolean {
 	return process.env.AUTH_E2E_MODE === "memory";
+}
+
+export function saveE2ECaseMaterial(
+	storageKey: string,
+	material: {
+		bytes: Uint8Array;
+		contentType: string;
+		name: string;
+	},
+) {
+	getStore().caseMaterials.set(storageKey, material);
+}
+
+export function getE2ECaseMaterial(storageKey: string) {
+	return getStore().caseMaterials.get(storageKey) ?? null;
+}
+
+export function deleteE2ECaseMaterial(storageKey: string) {
+	getStore().caseMaterials.delete(storageKey);
 }
 
 export function getE2ETeacherCaseStore() {

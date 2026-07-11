@@ -22,9 +22,9 @@ export type StudentCaseResourceAttachment = {
 };
 
 export type StudentCaseAttachmentFile = {
-	bytes: Uint8Array;
 	contentType: string;
 	name: string;
+	storageKey: string;
 };
 
 export type StudentCasePresentation = {
@@ -297,9 +297,9 @@ function activeAttachmentFromRecord(
 
 		if (parsed?.attachmentId === attachmentId) {
 			return {
-				bytes: parsed.bytes,
 				contentType: parsed.contentType,
 				name: parsed.name,
+				storageKey: parsed.storageKey,
 			};
 		}
 	}
@@ -348,17 +348,17 @@ function attachmentMetadataFromUnknown(
 
 	const candidate = value as Record<string, unknown>;
 	const attachmentId = stringFromUnknown(candidate.id).trim();
-	const dataUrl = stringFromUnknown(candidate.dataUrl).trim();
 	const name = stringFromUnknown(candidate.name).trim();
 	const size = numberFromUnknown(candidate.size);
+	const storageKey = stringFromUnknown(candidate.storageKey).trim();
 	const type = stringFromUnknown(candidate.type).trim() || "application/pdf";
 
 	if (
 		!attachmentId ||
-		!dataUrl ||
+		!storageKey ||
 		!name ||
 		!Number.isFinite(size) ||
-		!isPdfAttachment({ dataUrl, name, type })
+		!isPdfAttachment({ name, type })
 	) {
 		return null;
 	}
@@ -378,61 +378,29 @@ function attachmentFileFromUnknown(value: unknown) {
 		return null;
 	}
 
-	const dataUrl = stringFromUnknown((value as Record<string, unknown>).dataUrl);
-	const decoded = pdfDataUrlBytes(dataUrl);
+	const storageKey = stringFromUnknown(
+		(value as Record<string, unknown>).storageKey,
+	).trim();
 
-	if (!decoded) {
-		return null;
+	if (storageKey) {
+		return {
+			...metadata,
+			contentType: metadata.type,
+			storageKey,
+		};
 	}
 
-	return {
-		...metadata,
-		bytes: decoded.bytes,
-		contentType: decoded.contentType,
-	};
-}
-
-function pdfDataUrlBytes(dataUrl: string) {
-	const match = /^data:([^;,]+)?(;base64)?,([\s\S]*)$/.exec(dataUrl);
-
-	if (!match) {
-		return null;
-	}
-
-	const [, contentTypeValue = "application/pdf", encoding = "", payload = ""] =
-		match;
-	const contentType = contentTypeValue || "application/pdf";
-
-	if (contentType !== "application/pdf") {
-		return null;
-	}
-
-	try {
-		const bytes =
-			encoding === ";base64"
-				? Buffer.from(payload, "base64")
-				: Buffer.from(decodeURIComponent(payload), "utf8");
-
-		return bytes.byteLength > 0 ? { bytes, contentType } : null;
-	} catch {
-		return null;
-	}
+	return null;
 }
 
 function isPdfAttachment({
-	dataUrl,
 	name,
 	type,
 }: {
-	dataUrl: string;
 	name: string;
 	type: string;
 }) {
-	return (
-		type === "application/pdf" ||
-		name.toLowerCase().endsWith(".pdf") ||
-		dataUrl.startsWith("data:application/pdf")
-	);
+	return type === "application/pdf" || name.toLowerCase().endsWith(".pdf");
 }
 
 function studentCaseAttachmentSignature({

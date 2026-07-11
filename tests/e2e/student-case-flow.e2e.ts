@@ -267,13 +267,25 @@ test.describe("Student case presentation and analysis flow", () => {
 			.toContainText("teaching-resource.pdf");
 		await expect(
 			page.getByTestId("student-case-pdf-inline-attachment-1"),
-		).toHaveAttribute("src", /disposition=inline/);
+		).toHaveCount(0);
+		await expect(
+			page.getByTestId("student-case-pdf-open-attachment-1"),
+		).toHaveAttribute("href", /disposition=inline/);
+		await expect(
+			page.getByTestId("student-case-pdf-open-attachment-1"),
+		).toHaveAttribute("target", "_blank");
+		await expect(
+			page.getByTestId("student-case-pdf-attachment-attachment-1"),
+		).not.toContainText("Download");
 		await expect(
 			page.getByTestId("student-case-pdf-download-attachment-1"),
 		).toHaveAttribute("href", /disposition=attachment/);
 		await expect(
 			page.getByTestId("student-case-pdf-download-attachment-1"),
 		).toHaveAttribute("download", "teaching-resource.pdf");
+		await expect(
+			page.getByTestId("student-case-pdf-download-attachment-1"),
+		).toHaveAttribute("aria-label", "Download teaching-resource.pdf");
 	});
 
 	test("blocks direct access after the case deadline", async ({

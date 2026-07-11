@@ -12,6 +12,10 @@ import {
 	isActiveTeacherCase,
 	teacherCaseRecordType,
 } from "@/features/teacher/cases/case-lifecycle";
+import {
+	cleanupUploadedAttachments,
+	storeDraftAttachments,
+} from "@/features/case-materials/storage";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import {
 	deleteE2ETeacherCaseDraftRecord,
@@ -123,8 +127,10 @@ export class InMemoryTeacherCasePublisher implements TeacherCasePublisher {
 			preparedDraft,
 			existingDraft,
 		);
+		const { record: storedRecord } =
+			await publishedCaseRecordWithStoredAttachments(record);
 
-		saveE2ETeacherCaseRecord(record);
+		saveE2ETeacherCaseRecord(storedRecord);
 
 		if (existingDraft) {
 			deleteE2ETeacherCaseDraftRecord(
@@ -133,7 +139,7 @@ export class InMemoryTeacherCasePublisher implements TeacherCasePublisher {
 			);
 		}
 
-		return record;
+		return storedRecord;
 	}
 }
 
@@ -168,6 +174,10 @@ export class DynamoTeacherCasePublisher implements TeacherCasePublisher {
 			preparedDraft,
 			existingDraft,
 		);
+		const {
+			record: storedRecord,
+			uploadedStorageKeys,
+		} = await publishedCaseRecordWithStoredAttachments(record);
 
 		try {
 			await this.documentClient.send(
@@ -176,7 +186,7 @@ export class DynamoTeacherCasePublisher implements TeacherCasePublisher {
 						{
 							Put: {
 								TableName: this.tableName,
-								Item: activeCaseLockRecord(record, preparedDraft.now),
+								Item: activeCaseLockRecord(storedRecord, preparedDraft.now),
 								ConditionExpression:
 									"attribute_not_exists(caseId) OR deadlineAt < :now",
 								ExpressionAttributeValues: {
@@ -188,7 +198,7 @@ export class DynamoTeacherCasePublisher implements TeacherCasePublisher {
 							Put: existingDraft
 								? {
 										TableName: this.tableName,
-										Item: record,
+										Item: storedRecord,
 										ConditionExpression:
 											"#recordType = :caseRecordType AND #lifecycle = :draft AND #teacherProfileId = :teacherProfileId",
 										ExpressionAttributeNames: {
@@ -204,7 +214,7 @@ export class DynamoTeacherCasePublisher implements TeacherCasePublisher {
 									}
 								: {
 										TableName: this.tableName,
-										Item: record,
+										Item: storedRecord,
 										ConditionExpression: "attribute_not_exists(caseId)",
 									},
 						},
@@ -212,6 +222,9 @@ export class DynamoTeacherCasePublisher implements TeacherCasePublisher {
 				}),
 			);
 		} catch (error) {
+			await cleanupUploadedAttachments({
+				storageKeys: uploadedStorageKeys,
+			});
 			if (isConditionalCheckFailed(error)) {
 				if (await this.getActivePublishedCase(preparedDraft.now)) {
 					throw new ActivePublishedCaseError();
@@ -223,7 +236,7 @@ export class DynamoTeacherCasePublisher implements TeacherCasePublisher {
 			throw error;
 		}
 
-		return record;
+		return storedRecord;
 	}
 
 	private async getActivePublishedCase(now: number) {
@@ -337,6 +350,26 @@ function publishedCaseRecord({
 		recordType: teacherCaseRecordType,
 		teacherProfileId,
 		title: storedDraft.title.trim(),
+	};
+}
+
+async function publishedCaseRecordWithStoredAttachments(
+	record: PublishedTeacherCaseRecord,
+) {
+	const storedAttachments = await storeDraftAttachments({
+		attachments: record.draft.attachments,
+		caseId: record.caseId,
+	});
+
+	return {
+		record: {
+			...record,
+			draft: draftForStorage({
+				...record.draft,
+				attachments: storedAttachments.attachments,
+			}),
+		},
+		uploadedStorageKeys: storedAttachments.uploadedStorageKeys,
 	};
 }
 
