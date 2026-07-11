@@ -15,7 +15,7 @@ type StudentCaseFlowProps = {
 	caseRecord: StudentCasePresentation;
 };
 
-type CaseFlowStep = "presentation" | "analysis" | "comparison";
+type CaseFlowStep = "presentation" | "analysis" | "comparison" | "resources";
 type AnalysisReviewMode = "both" | "personalAnalysis" | "modelAnswer";
 
 const analysisReviewOptions: Array<{
@@ -56,6 +56,10 @@ const stepCopy: Record<
 		heading: "Analysis Review",
 		description:
 			"Compare your clinical reasoning with the teacher's model answer.",
+	},
+	resources: {
+		heading: "Teaching Resources",
+		description: "Review the lecture text and case materials before continuing.",
 	},
 };
 
@@ -173,6 +177,24 @@ export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
 
 		setMessage("");
 		setStep("presentation");
+	}
+
+	function continueToResources() {
+		if (!guardActiveCase()) {
+			return;
+		}
+
+		setMessage("");
+		setStep("resources");
+	}
+
+	function returnToComparison() {
+		if (!guardActiveCase()) {
+			return;
+		}
+
+		setMessage("");
+		setStep("comparison");
 	}
 
 	return (
@@ -316,7 +338,7 @@ export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
 							disabled={!isAnalysisValid}
 							type="submit"
 						>
-							Submit
+							{submittedAnalysis ? "Save Revision" : "Submit"}
 						</Button>
 					</div>
 				</form>
@@ -402,8 +424,102 @@ export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
 							</section>
 						) : null}
 					</div>
+					<div className="mt-7 flex justify-end">
+						<Button
+							className="w-full sm:w-auto"
+							data-testid="student-case-continue-to-resources"
+							onClick={continueToResources}
+							type="button"
+						>
+							Continue
+						</Button>
+					</div>
+				</article>
+			) : null}
+
+			{!isExpired && step === "resources" ? (
+				<article
+					className="border border-border-gray bg-white p-5 sm:p-7"
+					data-testid="student-case-resources-step"
+				>
+					<section>
+						<h2 className="text-base font-semibold">Lecture Text</h2>
+						<div
+							className="mt-4 whitespace-pre-wrap text-base leading-8 text-primary-text"
+							data-testid="student-case-lecture-text"
+						>
+							{caseRecord.lectureText}
+						</div>
+					</section>
+
+					{caseRecord.attachments.length > 0 ? (
+						<section
+							className="mt-8"
+							data-testid="student-case-pdf-attachments"
+						>
+							<h2 className="text-base font-semibold">Case Materials</h2>
+							<div className="mt-4 space-y-5">
+								{caseRecord.attachments.map((attachment) => (
+									<section
+										className="border border-border-gray bg-app-canvas p-4"
+										data-testid={`student-case-pdf-attachment-${attachment.attachmentId}`}
+										key={attachment.attachmentId}
+									>
+										<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+											<div>
+												<h3 className="text-sm font-semibold text-primary-text">
+													{attachment.name}
+												</h3>
+												<p className="mt-1 text-xs text-muted-gray">
+													{formatPdfSize(attachment.size)}
+												</p>
+											</div>
+											<a
+												className="inline-flex h-11 items-center justify-center border border-border-gray bg-white px-4 text-xs font-bold uppercase text-primary-text transition hover:border-primary-action focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal"
+												data-testid={`student-case-pdf-download-${attachment.attachmentId}`}
+												download={attachment.name}
+												href={attachment.downloadUrl}
+											>
+												Download
+											</a>
+										</div>
+										<iframe
+											className="mt-4 h-72 w-full border border-border-gray bg-white"
+											data-testid={`student-case-pdf-inline-${attachment.attachmentId}`}
+											src={attachment.viewUrl}
+											title={`${attachment.name} preview`}
+										/>
+									</section>
+								))}
+							</div>
+						</section>
+					) : null}
+
+					<div className="mt-7 flex justify-start">
+						<Button
+							className="w-full sm:w-auto"
+							data-testid="student-case-back-to-comparison"
+							onClick={returnToComparison}
+							type="button"
+							variant="secondary"
+						>
+							Previous
+						</Button>
+					</div>
 				</article>
 			) : null}
 		</section>
 	);
+}
+
+function formatPdfSize(size: number) {
+	if (size < 1_024) {
+		return `${size} B`;
+	}
+
+	if (size < 1_024 * 1_024) {
+		return `${Math.round(size / 1_024)} KB`;
+	}
+
+	return `${(size / 1_024 / 1_024).toFixed(1)} MB`;
 }

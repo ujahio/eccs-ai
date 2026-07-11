@@ -50,8 +50,17 @@ async function loginStudent(page: Page, email: string) {
 async function seedStudentCase(
 	request: APIRequestContext,
 	data?: {
+		attachments?: Array<{
+			dataUrl: string;
+			id: string;
+			name: string;
+			size: number;
+			type: string;
+			lastModified: number;
+		}>;
 		caseId?: string;
 		deadlineAt?: number;
+		lectureText?: string;
 		modelAnswer?: string;
 		presentation?: string;
 		title?: string;
@@ -67,6 +76,10 @@ async function seedStudentCase(
 				modelAnswer:
 					data?.modelAnswer ??
 					"Teacher model answer explains the likely diagnosis, supporting evidence, and next management step.",
+				lectureText:
+					data?.lectureText ??
+					"Teaching resources summarize the clinical evidence, common diagnostic pitfalls, and next-step management priorities.",
+				attachments: data?.attachments ?? [],
 				presentation:
 					data?.presentation ??
 					"Patient history, presenting symptoms, laboratory findings, and the clinical decision context are described with enough detail for learners to reason carefully.",
@@ -199,10 +212,68 @@ test.describe("Student case presentation and analysis flow", () => {
 		await expect(page.getByTestId("student-case-analysis")).toHaveValue(
 			validAnalysis(),
 		);
+		await page.getByTestId("student-case-analysis").fill(
+			`${validAnalysis()} revised`,
+		);
+		await page.getByTestId("student-case-submit-analysis").click();
+		await expect(page.getByTestId("student-case-submitted-analysis")).toContainText(
+			"revised",
+		);
 
 		await page.reload();
 		await expect(page.getByTestId("student-case-presentation-step")).toBeVisible();
 		await expect(page.getByTestId("student-case-comparison-step")).toHaveCount(0);
+	});
+
+	test("shows teaching resources and signed PDF attachment links after comparison", async ({
+		page,
+		request,
+	}) => {
+		const email = uniqueEmail("student-case-resources");
+
+		await seedStudentCase(request, {
+			lectureText:
+				"Teaching resources summarize diagnostic criteria, differential clues, and next-step management priorities.",
+			attachments: [
+				{
+					dataUrl: "data:application/pdf;base64,JVBERi0xLjQKJUVPRg==",
+					id: "attachment-1",
+					name: "teaching-resource.pdf",
+					size: 18,
+					type: "application/pdf",
+					lastModified: 1,
+				},
+			],
+		});
+		await bootstrapVerifiedStudent(request, email);
+		await loginStudent(page, email);
+		await startStudentCaseFlow(page);
+		await page.getByTestId("student-case-continue").click();
+		await page.getByTestId("student-case-analysis").fill(validAnalysis());
+		await page.getByTestId("student-case-submit-analysis").click();
+		await page.getByTestId("student-case-continue-to-resources").click();
+
+		await expect(page.getByTestId("student-case-resources-step")).toBeVisible();
+		await expect(page.getByTestId("student-case-flow-heading")).toHaveText(
+			"Teaching Resources",
+		);
+		await expect(page.getByTestId("student-case-lecture-text")).toContainText(
+			"Teaching resources summarize diagnostic criteria",
+		);
+		await expect(page.getByTestId("student-case-pdf-attachments")).toContainText(
+			"Case Materials",
+		);
+		await expect(page.getByTestId("student-case-pdf-attachment-attachment-1"))
+			.toContainText("teaching-resource.pdf");
+		await expect(
+			page.getByTestId("student-case-pdf-inline-attachment-1"),
+		).toHaveAttribute("src", /disposition=inline/);
+		await expect(
+			page.getByTestId("student-case-pdf-download-attachment-1"),
+		).toHaveAttribute("href", /disposition=attachment/);
+		await expect(
+			page.getByTestId("student-case-pdf-download-attachment-1"),
+		).toHaveAttribute("download", "teaching-resource.pdf");
 	});
 
 	test("blocks direct access after the case deadline", async ({
@@ -286,5 +357,31 @@ test.describe("Student case presentation and analysis flow", () => {
 			"This case is no longer active.",
 		);
 		await expect(page.getByTestId("student-case-expired")).toBeVisible();
+	});
+
+	test("blocks continuing to teaching resources after the deadline passes", async ({
+		page,
+		request,
+	}) => {
+		const email = uniqueEmail("student-case-resources-cutoff");
+		const deadlineAt = Date.now() + 14 * dayInMilliseconds;
+
+		await seedStudentCase(request, { deadlineAt });
+		await bootstrapVerifiedStudent(request, email);
+		await loginStudent(page, email);
+		await startStudentCaseFlow(page);
+		await page.getByTestId("student-case-continue").click();
+		await page.getByTestId("student-case-analysis").fill(validAnalysis());
+		await page.getByTestId("student-case-submit-analysis").click();
+		await expect(page.getByTestId("student-case-comparison-step")).toBeVisible();
+
+		await expireBrowserClock(page, deadlineAt);
+		await page.getByTestId("student-case-continue-to-resources").click();
+
+		await expect(page.getByTestId("student-case-flow-message")).toContainText(
+			"This case is no longer active.",
+		);
+		await expect(page.getByTestId("student-case-expired")).toBeVisible();
+		await expect(page.getByTestId("student-case-resources-step")).toHaveCount(0);
 	});
 });

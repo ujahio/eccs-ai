@@ -77,7 +77,7 @@ Single-context repo. Read `PRD.md` for product scope and `DESIGN.md` for UI rule
 - Identify changes from the plan that can be implemented in parallel, and use sub-agents to implement the features efficiently
 - When using sub-agents to implement features, act as a coordinator only
 - Use the best model for the task - premium models for complex tasks (like coding) and mid-tier models for simpler tasks, like documentation
-- Run lint, typecheck, and build only after a commit has taken place or when the user explicitly asks for those checks.
+- Run lint, typecheck, and build as PR-preparation checks before pushing or opening a PR, or earlier when the user explicitly asks for those checks.
 - When code is ready for manual testing, ask the user to manually test it before staging or committing.
 
 ## Context7
