@@ -747,34 +747,28 @@ export function StudentCaseFlow({
 										const isSelected =
 											quizAnswers[question.questionId] === option.optionId;
 
-											return (
-												<label
-													aria-checked={isSelected}
-													className={[
-														"grid min-h-12 cursor-pointer grid-cols-[40px_minmax(0,1fr)] items-center border bg-white text-sm transition",
-														isSelected
-															? "border-primary-action bg-soft-section text-primary-text"
-															: "border-border-gray text-primary-text hover:border-primary-action",
-													].join(" ")}
-													data-testid={`student-case-quiz-option-${question.questionId}-${option.optionId}`}
-													key={option.optionId}
-													role="radio"
+										return (
+											<label
+												aria-checked={isSelected}
+												className={[
+													"grid min-h-12 cursor-pointer grid-cols-[40px_minmax(0,1fr)] items-center border bg-white text-sm transition",
+													isSelected
+														? "border-primary-action bg-soft-section text-primary-text"
+														: "border-border-gray text-primary-text hover:border-primary-action",
+												].join(" ")}
+												data-testid={`student-case-quiz-option-${question.questionId}-${option.optionId}`}
+												key={option.optionId}
+												role="radio"
 											>
 												<span
 													className={[
 														"flex h-full min-h-12 items-center justify-center border-r text-xs font-semibold",
 														isSelected
-															? "border-brand-teal text-brand-teal"
+															? "border-primary-action text-primary-action"
 															: "border-border-gray text-muted-gray",
 													].join(" ")}
 												>
-													{isSelected ? (
-														<span className="flex h-5 w-5 items-center justify-center">
-															<SmallCheckIcon />
-														</span>
-													) : (
-														quizOptionLabel(optionIndex)
-													)}
+													{quizOptionLabel(optionIndex)}
 												</span>
 												<span className="flex min-h-12 items-center px-4 leading-6">
 													<input
@@ -963,22 +957,6 @@ function CheckIcon() {
 		<svg
 			aria-hidden="true"
 			className="h-7 w-7"
-			focusable="false"
-			viewBox="0 0 24 24"
-		>
-			<path
-				d="m9.25 16.35-4.1-4.1 1.1-1.1 3 3 8.5-8.5 1.1 1.1-9.6 9.6Z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
-}
-
-function SmallCheckIcon() {
-	return (
-		<svg
-			aria-hidden="true"
-			className="h-4 w-4"
 			focusable="false"
 			viewBox="0 0 24 24"
 		>
