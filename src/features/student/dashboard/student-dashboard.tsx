@@ -100,10 +100,11 @@ function ActiveCasePanel({
 							</div>
 							<ButtonLink
 								aria-label={`View case study for ${activeCase.title}`}
-								className="w-full border border-white/30 px-6 shadow-sm sm:w-auto lg:mr-7"
+								className="w-full px-7 sm:w-auto lg:mr-7"
 								data-testid="student-active-case-cta"
 								href={`/student/cases/${activeCase.caseId}`}
 								size="md"
+								variant="inverse"
 							>
 								View Case Study
 							</ButtonLink>

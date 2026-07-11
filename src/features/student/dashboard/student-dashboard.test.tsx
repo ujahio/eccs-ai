@@ -37,6 +37,10 @@ describe("StudentDashboard", () => {
 		expect(markup).toContain("View Case Study");
 		expect(markup).toContain("href=\"/student/cases/active-case\"");
 		expect(markup).toContain("bg-primary-action");
+		expect(markup).toContain(
+			"border border-white bg-white !text-primary-action",
+		);
+		expect(markup).toContain("hover:bg-app-canvas");
 		expect(markup).toContain("Respiratory complications review");
 		expect(markup).toContain("Download");
 		expect(markup.indexOf("Ongoing Case Study")).toBeLessThan(

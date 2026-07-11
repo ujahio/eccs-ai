@@ -30,7 +30,7 @@ describe("StudentCaseFlow", () => {
 		expect(markup).toContain("Continue");
 	});
 
-	it("highlights the deadline date when it is inside the two-day reminder window", () => {
+	it("shows a due-soon deadline indicator inside the two-day reminder window", () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(Date.UTC(2026, 6, 29, 12));
 
@@ -47,13 +47,16 @@ describe("StudentCaseFlow", () => {
 		);
 
 		expect(markup).toContain('data-testid="student-case-deadline-date"');
-		expect(markup).toContain("border-error-red");
-		expect(markup).toContain("bg-[#fff5f5]");
+		expect(markup).toContain('data-testid="student-case-deadline-reminder"');
+		expect(markup).toContain("Due Soon");
+		expect(markup).toContain("border-[#f4c7c7]");
+		expect(markup).toContain("bg-[#fff7f7]");
+		expect(markup).toContain("text-[#b94747]");
 		expect(markup).not.toContain("remaining");
 		expect(markup).not.toContain("left");
 	});
 
-	it("does not highlight the deadline date outside the two-day reminder window", () => {
+	it("does not show the due-soon indicator outside the two-day reminder window", () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(Date.UTC(2026, 6, 20, 12));
 
@@ -70,8 +73,10 @@ describe("StudentCaseFlow", () => {
 		);
 
 		expect(markup).toContain('data-testid="student-case-deadline-date"');
-		expect(markup).not.toContain("border-error-red");
-		expect(markup).not.toContain("bg-[#fff5f5]");
+		expect(markup).not.toContain('data-testid="student-case-deadline-reminder"');
+		expect(markup).not.toContain("Due Soon");
+		expect(markup).not.toContain("border-[#f4c7c7]");
+		expect(markup).not.toContain("bg-[#fff7f7]");
 	});
 });
 

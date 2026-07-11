@@ -349,6 +349,8 @@ export function StudentCaseFlow({
 		if (result.status === "failed") {
 			const nextFailureCount = quizFailuresSinceReview + 1;
 
+			setQuizAnswers({});
+
 			if (nextFailureCount >= 3) {
 				setQuizFailuresSinceReview(0);
 				setReviewRequired(true);
@@ -387,21 +389,29 @@ export function StudentCaseFlow({
 						Case Study
 					</p>
 					<p
-						className="text-sm font-semibold text-primary-text"
+						className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-primary-text sm:justify-end"
 						data-testid="student-case-deadline"
 					>
 						<span>Deadline: </span>
 						<span
-							className={[
-								isDeadlineInReminderWindow
-									? "border border-error-red bg-[#fff5f5] px-2 py-1 text-error-red"
-									: "text-primary-text",
-							].join(" ")}
+							className="text-primary-text"
 							data-testid="student-case-deadline-date"
 						>
 							{formatDubaiDate(caseRecord.deadlineAt)}
 						</span>
 						<span> UAE</span>
+						{isDeadlineInReminderWindow ? (
+							<span
+								className="inline-flex min-h-7 items-center gap-2 border border-[#f4c7c7] bg-[#fff7f7] px-2.5 text-xs font-bold uppercase text-[#b94747]"
+								data-testid="student-case-deadline-reminder"
+							>
+								<span
+									aria-hidden="true"
+									className="h-1.5 w-1.5 rounded-full bg-[#d85b5b]"
+								/>
+								Due Soon
+							</span>
+						) : null}
 					</p>
 				</div>
 				<h1

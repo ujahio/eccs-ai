@@ -461,9 +461,9 @@ test.describe("Student case presentation and analysis flow", () => {
 		await loginStudent(page, email);
 		await startStudentCaseFlow(page);
 		await reachStudentCaseQuiz(page);
-		await answerQuiz(page, incorrectQuizAnswers());
 
 		for (let attempt = 1; attempt <= 2; attempt += 1) {
+			await answerQuiz(page, incorrectQuizAnswers());
 			await page.getByTestId("student-case-submit-quiz").click();
 			const quizStatus = page.getByTestId("student-case-quiz-status");
 
@@ -476,6 +476,10 @@ test.describe("Student case presentation and analysis flow", () => {
 			await expect(page.getByTestId("student-case-quiz-form")).not.toContainText(
 				"Incorrect",
 			);
+			await expect(page.getByTestId("student-case-quiz-progress")).toHaveText(
+				"0 of 3 answered",
+			);
+			await expect(page.getByTestId("student-case-submit-quiz")).toBeDisabled();
 
 			if (attempt === 1) {
 				await page.getByTestId("student-case-review-lecture-text").click();
@@ -488,6 +492,7 @@ test.describe("Student case presentation and analysis flow", () => {
 			}
 		}
 
+		await answerQuiz(page, incorrectQuizAnswers());
 		await page.getByTestId("student-case-submit-quiz").click();
 		await expect(page.getByTestId("student-case-flow-message")).toContainText(
 			"Review the case presentation",
