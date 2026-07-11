@@ -15,6 +15,7 @@ export type DraftAttachment = {
 	name: string;
 	previewUrl?: string;
 	size: number;
+	storageKey?: string;
 	type: string;
 	lastModified: number;
 };
@@ -115,6 +116,7 @@ function attachmentForStorage(attachment: DraftAttachment): DraftAttachment {
 		id: attachment.id,
 		name: attachment.name,
 		size: attachment.size,
+		...(attachment.storageKey ? { storageKey: attachment.storageKey } : {}),
 		type: attachment.type,
 		lastModified: attachment.lastModified,
 	};
@@ -200,12 +202,14 @@ function draftAttachmentFromUnknown(value: unknown): DraftAttachment | null {
 	}
 
 	const dataUrl = stringFromUnknown(value.dataUrl);
+	const storageKey = stringFromUnknown(value.storageKey);
 
 	return {
 		...(dataUrl ? { dataUrl } : {}),
 		id: stringFromUnknown(value.id) || createDraftId("attachment"),
 		name,
 		size: numberFromUnknown(value.size),
+		...(storageKey ? { storageKey } : {}),
 		type: stringFromUnknown(value.type) || "application/pdf",
 		lastModified: numberFromUnknown(value.lastModified),
 	};

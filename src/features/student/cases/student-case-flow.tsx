@@ -15,7 +15,7 @@ type StudentCaseFlowProps = {
 	caseRecord: StudentCasePresentation;
 };
 
-type CaseFlowStep = "presentation" | "analysis" | "comparison";
+type CaseFlowStep = "presentation" | "analysis" | "comparison" | "resources";
 type AnalysisReviewMode = "both" | "personalAnalysis" | "modelAnswer";
 
 const analysisReviewOptions: Array<{
@@ -56,6 +56,10 @@ const stepCopy: Record<
 		heading: "Analysis Review",
 		description:
 			"Compare your clinical reasoning with the teacher's model answer.",
+	},
+	resources: {
+		heading: "Teaching Resources",
+		description: "Review the lecture text and case materials before continuing.",
 	},
 };
 
@@ -173,6 +177,24 @@ export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
 
 		setMessage("");
 		setStep("presentation");
+	}
+
+	function continueToResources() {
+		if (!guardActiveCase()) {
+			return;
+		}
+
+		setMessage("");
+		setStep("resources");
+	}
+
+	function returnToComparison() {
+		if (!guardActiveCase()) {
+			return;
+		}
+
+		setMessage("");
+		setStep("comparison");
 	}
 
 	return (
@@ -316,7 +338,7 @@ export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
 							disabled={!isAnalysisValid}
 							type="submit"
 						>
-							Submit
+							{submittedAnalysis ? "Save Revision" : "Submit"}
 						</Button>
 					</div>
 				</form>
@@ -402,8 +424,147 @@ export function StudentCaseFlow({ caseRecord }: StudentCaseFlowProps) {
 							</section>
 						) : null}
 					</div>
+					<div className="mt-7 flex justify-end">
+						<Button
+							className="w-full sm:w-auto"
+							data-testid="student-case-continue-to-resources"
+							onClick={continueToResources}
+							type="button"
+						>
+							Continue
+						</Button>
+					</div>
+				</article>
+			) : null}
+
+			{!isExpired && step === "resources" ? (
+				<article
+					className="border border-border-gray bg-white p-5 sm:p-7"
+					data-testid="student-case-resources-step"
+				>
+					<section>
+						<h2 className="text-base font-semibold">Lecture Text</h2>
+						<div
+							className="mt-4 whitespace-pre-wrap text-base leading-8 text-primary-text"
+							data-testid="student-case-lecture-text"
+						>
+							{caseRecord.lectureText}
+						</div>
+					</section>
+
+					{caseRecord.attachments.length > 0 ? (
+						<section
+							className="mt-8"
+							data-testid="student-case-pdf-attachments"
+						>
+							<h2 className="text-base font-semibold">Case Materials</h2>
+							<div className="mt-4 space-y-3">
+								{caseRecord.attachments.map((attachment) => (
+									<section
+										className="flex flex-col gap-3 border border-border-gray bg-white p-3 transition hover:border-brand-teal sm:flex-row sm:items-center sm:justify-between"
+										data-testid={`student-case-pdf-attachment-${attachment.attachmentId}`}
+										key={attachment.attachmentId}
+									>
+										<a
+											aria-label={`Open ${attachment.name} in a new tab`}
+											className="group flex min-h-14 flex-1 items-center gap-3 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal"
+											data-testid={`student-case-pdf-open-${attachment.attachmentId}`}
+											href={attachment.viewUrl}
+											rel="noopener noreferrer"
+											target="_blank"
+										>
+											<span className="flex h-11 w-11 shrink-0 items-center justify-center border border-border-gray bg-app-canvas text-primary-action transition group-hover:border-brand-teal group-hover:text-brand-teal">
+												<PdfFileIcon />
+											</span>
+											<span className="min-w-0">
+												<span className="block truncate text-sm font-semibold text-primary-text transition group-hover:text-brand-teal group-hover:underline group-hover:underline-offset-4">
+													{attachment.name}
+												</span>
+												<span className="mt-1 block text-xs text-muted-gray">
+													PDF | {formatPdfSize(attachment.size)}
+												</span>
+											</span>
+										</a>
+										<a
+											aria-label={`Download ${attachment.name}`}
+											className="inline-flex h-11 w-11 shrink-0 items-center justify-center border border-border-gray bg-white text-primary-text transition hover:border-primary-action hover:text-brand-teal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal"
+											data-testid={`student-case-pdf-download-${attachment.attachmentId}`}
+											download={attachment.name}
+											href={attachment.downloadUrl}
+										>
+											<DownloadIcon />
+										</a>
+									</section>
+								))}
+							</div>
+						</section>
+					) : null}
+
+					<div className="mt-7 flex justify-start">
+						<Button
+							className="w-full sm:w-auto"
+							data-testid="student-case-back-to-comparison"
+							onClick={returnToComparison}
+							type="button"
+							variant="secondary"
+						>
+							Previous
+						</Button>
+					</div>
 				</article>
 			) : null}
 		</section>
+	);
+}
+
+function formatPdfSize(size: number) {
+	if (size < 1_024) {
+		return `${size} B`;
+	}
+
+	if (size < 1_024 * 1_024) {
+		return `${Math.round(size / 1_024)} KB`;
+	}
+
+	return `${(size / 1_024 / 1_024).toFixed(1)} MB`;
+}
+
+function PdfFileIcon() {
+	return (
+		<svg
+			aria-hidden="true"
+			className="h-6 w-6"
+			focusable="false"
+			viewBox="0 0 24 24"
+		>
+			<path
+				d="M6 2.75h8.25L19 7.5v13.75H6V2.75Zm7.5 1.5v4h4l-4-4Zm-6 0v15.5h10V9.75H12v-5.5H7.5Z"
+				fill="currentColor"
+			/>
+			<path
+				d="M8.5 14.25h7v1.5h-7v-1.5Zm0 3h5v1.5h-5v-1.5Z"
+				fill="currentColor"
+			/>
+		</svg>
+	);
+}
+
+function DownloadIcon() {
+	return (
+		<svg
+			aria-hidden="true"
+			className="h-5 w-5"
+			focusable="false"
+			viewBox="0 0 24 24"
+		>
+			<path
+				d="M11.25 3.5h1.5v9.4l3.2-3.2 1.05 1.1-5 5-5-5 1.05-1.1 3.2 3.2V3.5Z"
+				fill="currentColor"
+			/>
+			<path
+				d="M5 18.75h14v1.5H5v-1.5Z"
+				fill="currentColor"
+			/>
+		</svg>
 	);
 }

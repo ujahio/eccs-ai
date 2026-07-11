@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { isActiveTeacherCase } from "@/features/teacher/cases/case-lifecycle";
@@ -9,14 +10,38 @@ import {
 	isE2EMode,
 } from "@/lib/e2e/in-memory-auth";
 
+export type StudentCaseAttachmentDisposition = "inline" | "attachment";
+
+export type StudentCaseResourceAttachment = {
+	attachmentId: string;
+	downloadUrl: string;
+	name: string;
+	size: number;
+	type: string;
+	viewUrl: string;
+};
+
+export type StudentCaseAttachmentFile = {
+	contentType: string;
+	name: string;
+	storageKey: string;
+};
+
 export type StudentCasePresentation = {
+	attachments: StudentCaseResourceAttachment[];
 	caseId: string;
 	deadlineAt: number;
+	lectureText: string;
 	modelAnswer: string;
 	presentation: string;
 };
 
 type StudentCaseRepository = {
+	getActiveCaseAttachment(
+		caseId: string,
+		attachmentId: string,
+		now: number,
+	): Promise<StudentCaseAttachmentFile | null>;
 	getActiveCasePresentation(
 		caseId: string,
 		now: number,
@@ -28,7 +53,9 @@ type StoredTeacherCaseRecord = {
 	deadlineAt: number;
 	description?: string;
 	draft?: {
+		attachments?: unknown;
 		description?: unknown;
+		lectureText?: unknown;
 		modelAnswer?: unknown;
 		presentation?: unknown;
 	};
@@ -36,8 +63,24 @@ type StoredTeacherCaseRecord = {
 	title: string;
 };
 
+const attachmentUrlTtlMilliseconds = 15 * 60 * 1_000;
+
 export async function getStudentActiveCasePresentation(caseId: string) {
 	return getStudentCaseRepository().getActiveCasePresentation(caseId, Date.now());
+}
+
+export async function getStudentCaseAttachment({
+	attachmentId,
+	caseId,
+}: {
+	attachmentId: string;
+	caseId: string;
+}) {
+	return getStudentCaseRepository().getActiveCaseAttachment(
+		caseId,
+		attachmentId,
+		Date.now(),
+	);
 }
 
 function getStudentCaseRepository(): StudentCaseRepository {
@@ -45,8 +88,11 @@ function getStudentCaseRepository(): StudentCaseRepository {
 		return new InMemoryStudentCaseRepository();
 	}
 
+	const resources = getSessionAuthResources();
+
 	return new DynamoStudentCaseRepository(
-		getSessionAuthResources().teacherCaseTableName,
+		resources.teacherCaseTableName,
+		undefined,
 	);
 }
 
@@ -60,6 +106,21 @@ export class InMemoryStudentCaseRepository implements StudentCaseRepository {
 			) ?? null;
 
 		return activePresentationFromRecord(record, now);
+	}
+
+	async getActiveCaseAttachment(
+		caseId: string,
+		attachmentId: string,
+		now: number,
+	) {
+		const record =
+			getE2ETeacherCaseStore().find(
+				(caseRecord) =>
+					isStoredTeacherCaseRecord(caseRecord) &&
+					caseRecord.caseId === caseId,
+			) ?? null;
+
+		return activeAttachmentFromRecord(record, attachmentId, now);
 	}
 }
 
@@ -83,9 +144,110 @@ export class DynamoStudentCaseRepository implements StudentCaseRepository {
 
 		return activePresentationFromRecord(response.Item ?? null, now);
 	}
+
+	async getActiveCaseAttachment(
+		caseId: string,
+		attachmentId: string,
+		now: number,
+	) {
+		const response = await this.documentClient.send(
+			new GetCommand({
+				TableName: this.teacherCaseTableName,
+				Key: { caseId },
+			}),
+		);
+
+		return activeAttachmentFromRecord(response.Item ?? null, attachmentId, now);
+	}
 }
 
-function activePresentationFromRecord(record: unknown, now: number) {
+export function createStudentCaseAttachmentAccessUrl({
+	attachmentId,
+	caseId,
+	disposition,
+}: {
+	attachmentId: string;
+	caseId: string;
+	disposition: StudentCaseAttachmentDisposition;
+}) {
+	const params = new URLSearchParams({ disposition });
+
+	return `/student/cases/${encodeURIComponent(
+		caseId,
+	)}/attachments/${encodeURIComponent(attachmentId)}?${params.toString()}`;
+}
+
+export function createStudentCaseAttachmentUrl({
+	attachmentId,
+	caseId,
+	disposition,
+	expiresAt,
+	secret,
+}: {
+	attachmentId: string;
+	caseId: string;
+	disposition: StudentCaseAttachmentDisposition;
+	expiresAt: number;
+	secret: string;
+}) {
+	const params = new URLSearchParams({
+		disposition,
+		expires: String(expiresAt),
+		signature: studentCaseAttachmentSignature({
+			attachmentId,
+			caseId,
+			disposition,
+			expiresAt,
+			secret,
+		}),
+	});
+
+	return `/student/cases/${encodeURIComponent(
+		caseId,
+	)}/attachments/${encodeURIComponent(attachmentId)}?${params.toString()}`;
+}
+
+export function isValidStudentCaseAttachmentUrl({
+	attachmentId,
+	caseId,
+	disposition,
+	expiresAt,
+	now,
+	secret,
+	signature,
+}: {
+	attachmentId: string;
+	caseId: string;
+	disposition: StudentCaseAttachmentDisposition;
+	expiresAt: number;
+	now: number;
+	secret?: string;
+	signature: string | null;
+}) {
+	if (!signature || !Number.isFinite(expiresAt) || expiresAt <= now) {
+		return false;
+	}
+
+	const expected = studentCaseAttachmentSignature({
+		attachmentId,
+		caseId,
+		disposition,
+		expiresAt,
+		secret: secret ?? getSessionAuthResources().betterAuthSecret,
+	});
+	const expectedBuffer = Buffer.from(expected);
+	const signatureBuffer = Buffer.from(signature);
+
+	return (
+		expectedBuffer.byteLength === signatureBuffer.byteLength &&
+		timingSafeEqual(expectedBuffer, signatureBuffer)
+	);
+}
+
+function activePresentationFromRecord(
+	record: unknown,
+	now: number,
+) {
 	if (!isStoredTeacherCaseRecord(record) || !isActiveTeacherCase(record, now)) {
 		return null;
 	}
@@ -98,17 +260,177 @@ function activePresentationFromRecord(record: unknown, now: number) {
 		typeof record.draft?.modelAnswer === "string"
 			? record.draft.modelAnswer.trim()
 			: "";
+	const lectureText =
+		typeof record.draft?.lectureText === "string"
+			? record.draft.lectureText.trim()
+			: "";
 
-	if (!presentation || !modelAnswer) {
+	if (!presentation || !modelAnswer || !lectureText) {
 		return null;
 	}
 
 	return {
+		attachments: resourceAttachmentsFromRecord(record),
 		caseId: record.caseId,
 		deadlineAt: record.deadlineAt,
+		lectureText,
 		modelAnswer,
 		presentation,
 	};
+}
+
+function activeAttachmentFromRecord(
+	record: unknown,
+	attachmentId: string,
+	now: number,
+) {
+	if (!isStoredTeacherCaseRecord(record) || !isActiveTeacherCase(record, now)) {
+		return null;
+	}
+
+	const attachments = Array.isArray(record.draft?.attachments)
+		? record.draft.attachments
+		: [];
+
+	for (const attachment of attachments) {
+		const parsed = attachmentFileFromUnknown(attachment);
+
+		if (parsed?.attachmentId === attachmentId) {
+			return {
+				contentType: parsed.contentType,
+				name: parsed.name,
+				storageKey: parsed.storageKey,
+			};
+		}
+	}
+
+	return null;
+}
+
+function resourceAttachmentsFromRecord(
+	record: StoredTeacherCaseRecord,
+) {
+	const attachments = Array.isArray(record.draft?.attachments)
+		? record.draft.attachments
+		: [];
+
+	return attachments.flatMap((attachment) => {
+		const metadata = attachmentMetadataFromUnknown(attachment);
+
+		if (!metadata) {
+			return [];
+		}
+
+		return [
+			{
+				...metadata,
+				downloadUrl: createStudentCaseAttachmentAccessUrl({
+					attachmentId: metadata.attachmentId,
+					caseId: record.caseId,
+					disposition: "attachment",
+				}),
+				viewUrl: createStudentCaseAttachmentAccessUrl({
+					attachmentId: metadata.attachmentId,
+					caseId: record.caseId,
+					disposition: "inline",
+				}),
+			},
+		];
+	});
+}
+
+function attachmentMetadataFromUnknown(
+	value: unknown,
+): Omit<StudentCaseResourceAttachment, "downloadUrl" | "viewUrl"> | null {
+	if (typeof value !== "object" || value === null) {
+		return null;
+	}
+
+	const candidate = value as Record<string, unknown>;
+	const attachmentId = stringFromUnknown(candidate.id).trim();
+	const name = stringFromUnknown(candidate.name).trim();
+	const size = numberFromUnknown(candidate.size);
+	const storageKey = stringFromUnknown(candidate.storageKey).trim();
+	const type = stringFromUnknown(candidate.type).trim() || "application/pdf";
+
+	if (
+		!attachmentId ||
+		!storageKey ||
+		!name ||
+		!Number.isFinite(size) ||
+		!isPdfAttachment({ name, type })
+	) {
+		return null;
+	}
+
+	return {
+		attachmentId,
+		name,
+		size,
+		type,
+	};
+}
+
+function attachmentFileFromUnknown(value: unknown) {
+	const metadata = attachmentMetadataFromUnknown(value);
+
+	if (!metadata || typeof value !== "object" || value === null) {
+		return null;
+	}
+
+	const storageKey = stringFromUnknown(
+		(value as Record<string, unknown>).storageKey,
+	).trim();
+
+	if (storageKey) {
+		return {
+			...metadata,
+			contentType: metadata.type,
+			storageKey,
+		};
+	}
+
+	return null;
+}
+
+function isPdfAttachment({
+	name,
+	type,
+}: {
+	name: string;
+	type: string;
+}) {
+	return type === "application/pdf" || name.toLowerCase().endsWith(".pdf");
+}
+
+function studentCaseAttachmentSignature({
+	attachmentId,
+	caseId,
+	disposition,
+	expiresAt,
+	secret,
+}: {
+	attachmentId: string;
+	caseId: string;
+	disposition: StudentCaseAttachmentDisposition;
+	expiresAt: number;
+	secret: string;
+}) {
+	return createHmac("sha256", secret)
+		.update(`${caseId}\n${attachmentId}\n${disposition}\n${expiresAt}`)
+		.digest("base64url");
+}
+
+function stringFromUnknown(value: unknown) {
+	return typeof value === "string" ? value : "";
+}
+
+function numberFromUnknown(value: unknown) {
+	return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+export function studentCaseAttachmentUrlExpiresAt(now: number) {
+	return now + attachmentUrlTtlMilliseconds;
 }
 
 function isStoredTeacherCaseRecord(

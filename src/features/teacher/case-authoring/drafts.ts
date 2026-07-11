@@ -9,6 +9,11 @@ import {
 	PutCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { teacherCaseRecordType } from "@/features/teacher/cases/case-lifecycle";
+import {
+	cleanupUploadedAttachments,
+	deleteStoredAttachments,
+	storeDraftAttachments,
+} from "@/features/case-materials/storage";
 import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import {
@@ -99,6 +104,7 @@ export class InMemoryTeacherCaseDraftRepository
 		}
 
 		deleteE2ETeacherCaseDraftRecord(teacherProfileId, caseId);
+		await deleteStoredAttachments({ attachments: record.draft.attachments });
 
 		return {
 			attachmentCount: record.draft.attachments.length,
@@ -129,17 +135,25 @@ export class InMemoryTeacherCaseDraftRepository
 		now: number;
 		teacherProfileId: string;
 	}) {
-		const storedDraft = draftForStorage(draft);
 		const existingRecord = caseId
 			? getE2ETeacherCaseDraftRecord(teacherProfileId, caseId)
 			: null;
+		const draftCaseId = existingRecord?.caseId ?? createTeacherCaseId();
 
 		if (caseId && !existingRecord) {
 			return null;
 		}
 
+		const storedAttachments = await storeDraftAttachments({
+			attachments: draft.attachments,
+			caseId: draftCaseId,
+		});
+		const storedDraft = draftForStorage({
+			...draft,
+			attachments: storedAttachments.attachments,
+		});
 		const record = {
-			caseId: existingRecord?.caseId ?? createTeacherCaseId(),
+			caseId: draftCaseId,
 			draft: storedDraft,
 			teacherProfileId,
 			title: storedDraft.title.trim() || "Untitled draft",
@@ -147,6 +161,10 @@ export class InMemoryTeacherCaseDraftRepository
 		};
 
 		saveE2ETeacherCaseDraftRecord(record);
+		await deleteReplacedAttachments({
+			nextAttachments: storedDraft.attachments,
+			previousAttachments: existingRecord?.draft.attachments ?? [],
+		});
 
 		return draftRecordForEditing(record);
 	}
@@ -186,6 +204,7 @@ export class DynamoTeacherCaseDraftRepository
 				Key: { caseId },
 			}),
 		);
+		await deleteStoredAttachments({ attachments: record.draft.attachments });
 
 		return {
 			attachmentCount: record.draft.attachments.length,
@@ -220,17 +239,26 @@ export class DynamoTeacherCaseDraftRepository
 		now: number;
 		teacherProfileId: string;
 	}) {
-		const storedDraft = draftForStorage(draft);
 		const existingRecord = caseId
 			? await this.getDraftRecordByCaseId(teacherProfileId, caseId)
 			: null;
+		const draftCaseId = existingRecord?.caseId ?? createTeacherCaseId();
 
 		if (caseId && !existingRecord) {
 			return null;
 		}
 
+		const storedAttachments = await storeDraftAttachments({
+			attachments: draft.attachments,
+			caseId: draftCaseId,
+		});
+		const storedDraft = draftForStorage({
+			...draft,
+			attachments: storedAttachments.attachments,
+		});
+
 		const record: TeacherCaseDraftRecord = {
-			caseId: existingRecord?.caseId ?? createTeacherCaseId(),
+			caseId: draftCaseId,
 			completionCount: 0,
 			deadlineAt: 0,
 			draft: storedDraft,
@@ -243,12 +271,23 @@ export class DynamoTeacherCaseDraftRepository
 			updatedAt: now,
 		};
 
-		await this.documentClient.send(
-			new PutCommand({
-				TableName: this.tableName,
-				Item: record,
-			}),
-		);
+		try {
+			await this.documentClient.send(
+				new PutCommand({
+					TableName: this.tableName,
+					Item: record,
+				}),
+			);
+		} catch (error) {
+			await cleanupUploadedAttachments({
+				storageKeys: storedAttachments.uploadedStorageKeys,
+			});
+			throw error;
+		}
+		await deleteReplacedAttachments({
+			nextAttachments: storedDraft.attachments,
+			previousAttachments: existingRecord?.draft.attachments ?? [],
+		});
 
 		return draftRecordForEditing(record);
 	}
@@ -345,4 +384,25 @@ function draftRecordListItem(
 		title: record.title,
 		updatedAt: record.updatedAt,
 	};
+}
+
+async function deleteReplacedAttachments({
+	nextAttachments,
+	previousAttachments,
+}: {
+	nextAttachments: CaseDraft["attachments"];
+	previousAttachments: CaseDraft["attachments"];
+}) {
+	const nextStorageKeys = new Set(
+		nextAttachments.flatMap((attachment) =>
+			attachment.storageKey ? [attachment.storageKey] : [],
+		),
+	);
+
+	await deleteStoredAttachments({
+		attachments: previousAttachments.filter(
+			(attachment) =>
+				attachment.storageKey && !nextStorageKeys.has(attachment.storageKey),
+		),
+	});
 }

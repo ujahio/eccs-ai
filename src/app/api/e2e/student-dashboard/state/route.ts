@@ -6,13 +6,19 @@ import {
 	seedE2ETeacherCases,
 	type E2EStudentCertificateRecord,
 } from "@/lib/e2e/in-memory-auth";
-import type { CaseDraft } from "@/features/teacher/case-authoring/schema";
+import type {
+	CaseDraft,
+	DraftAttachment,
+} from "@/features/teacher/case-authoring/schema";
+import { storeDraftAttachments } from "@/features/case-materials/storage";
 import { isActiveTeacherCase } from "@/features/teacher/cases/case-lifecycle";
 import { rejectNonE2EMode } from "@/lib/e2e/route-helpers";
 
 type E2EStudentDashboardActiveCase = {
+	attachments?: DraftAttachment[];
 	caseId?: string;
 	description: string;
+	lectureText?: string;
 	modelAnswer: string;
 	presentation: string;
 	title: string;
@@ -31,7 +37,9 @@ function parseActiveCase(value: unknown): E2EStudentDashboardActiveCase | null {
 
 	const input = value as Record<string, unknown>;
 	const caseId = String(input.caseId ?? "").trim();
+	const attachments = parseAttachments(input.attachments);
 	const description = String(input.description ?? "").trim();
+	const lectureText = String(input.lectureText ?? "").trim();
 	const modelAnswer = String(input.modelAnswer ?? "").trim();
 	const presentation = String(input.presentation ?? "").trim();
 	const title = String(input.title ?? "").trim();
@@ -44,9 +52,13 @@ function parseActiveCase(value: unknown): E2EStudentDashboardActiveCase | null {
 
 	return {
 		...(caseId ? { caseId } : {}),
+		attachments,
 		description:
 			description ||
 			"Review the active case presentation and begin your clinical reasoning.",
+		lectureText:
+			lectureText ||
+			"Teaching resources are provided by the teacher for this case study.",
 		modelAnswer:
 			modelAnswer ||
 			"The model answer is provided by the teacher for side-by-side comparison.",
@@ -57,6 +69,56 @@ function parseActiveCase(value: unknown): E2EStudentDashboardActiveCase | null {
 		publishedAt,
 		deadlineAt,
 	};
+}
+
+function parseAttachments(value: unknown): DraftAttachment[] {
+	if (value === null || value === undefined) {
+		return [];
+	}
+
+	if (!Array.isArray(value)) {
+		throw new Error("activeCase.attachments must be an array.");
+	}
+
+	return value.flatMap((attachment, index) => {
+		if (typeof attachment !== "object" || attachment === null) {
+			throw new Error(`activeCase.attachments[${index}] must be an object.`);
+		}
+
+		const input = attachment as Record<string, unknown>;
+		const dataUrl = String(input.dataUrl ?? "").trim();
+		const id = String(input.id ?? "").trim();
+		const name = String(input.name ?? "").trim();
+		const size = Number(input.size);
+		const storageKey = String(input.storageKey ?? "").trim();
+		const type = String(input.type ?? "").trim();
+		const lastModified = Number(input.lastModified);
+
+		if (
+			(!dataUrl && !storageKey) ||
+			!id ||
+			!name ||
+			!Number.isFinite(size) ||
+			!type ||
+			!Number.isFinite(lastModified)
+		) {
+			throw new Error(
+				`activeCase.attachments[${index}] is missing required fields.`,
+			);
+		}
+
+		return [
+			{
+				...(dataUrl ? { dataUrl } : {}),
+				id,
+				name,
+				size,
+				...(storageKey ? { storageKey } : {}),
+				type,
+				lastModified,
+			},
+		];
+	});
 }
 
 function parseCertificates(value: unknown): E2EStudentCertificateRecord[] {
@@ -134,9 +196,10 @@ export async function POST(request: Request) {
 	try {
 		const activeCase = parseActiveCase(body?.activeCase);
 		const certificates = parseCertificates(body?.certificates);
+		const draft = activeCase ? await activeCaseDraft(activeCase) : null;
 
 		seedE2ETeacherCases(
-			activeCase
+			activeCase && draft
 				? [
 						{
 							caseId:
@@ -145,7 +208,7 @@ export async function POST(request: Request) {
 							completionCount: 0,
 							feedbackCount: 0,
 							...activeCase,
-							draft: activeCaseDraft(activeCase),
+							draft,
 						},
 					]
 				: [],
@@ -174,15 +237,23 @@ export async function DELETE() {
 	return NextResponse.json({ reset: true });
 }
 
-function activeCaseDraft(activeCase: E2EStudentDashboardActiveCase): CaseDraft {
+async function activeCaseDraft(
+	activeCase: E2EStudentDashboardActiveCase,
+): Promise<CaseDraft> {
+	const storedAttachments = await storeDraftAttachments({
+		attachments: activeCase.attachments ?? [],
+		caseId: activeCase.caseId ?? "e2e-active-student-dashboard-case",
+	});
+
 	return {
 		title: activeCase.title,
 		description: activeCase.description,
 		presentation: activeCase.presentation,
 		modelAnswer: activeCase.modelAnswer,
 		lectureText:
-			"Teaching resources are provided by the teacher in the next case-flow slice.",
-		attachments: [],
+			activeCase.lectureText ??
+			"Teaching resources are provided by the teacher for this case study.",
+		attachments: storedAttachments.attachments,
 		cmeQuestions: [],
 		deadlineDate: "",
 	};
