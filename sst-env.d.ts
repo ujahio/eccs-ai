@@ -35,6 +35,10 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Dynamo"
     }
+    "StudentQuizAttemptTable": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
     "TeacherCaseTable": {
       "name": string
       "type": "sst.aws.Dynamo"

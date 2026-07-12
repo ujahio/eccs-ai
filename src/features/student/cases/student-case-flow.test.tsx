@@ -16,6 +16,10 @@ describe("StudentCaseFlow", () => {
 					message: "",
 					status: "idle",
 				})}
+				quizReviewAction={async () => ({
+					message: "",
+					status: "ready",
+				})}
 			/>,
 		);
 
@@ -43,6 +47,10 @@ describe("StudentCaseFlow", () => {
 					message: "",
 					status: "idle",
 				})}
+				quizReviewAction={async () => ({
+					message: "",
+					status: "ready",
+				})}
 			/>,
 		);
 
@@ -68,6 +76,10 @@ describe("StudentCaseFlow", () => {
 				quizAction={async () => ({
 					message: "",
 					status: "idle",
+				})}
+				quizReviewAction={async () => ({
+					message: "",
+					status: "ready",
 				})}
 			/>,
 		);

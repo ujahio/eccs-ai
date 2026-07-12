@@ -95,3 +95,15 @@ export const studentCertificateTable = new sst.aws.Dynamo(
 		}
 	}
 );
+
+export const studentQuizAttemptTable = new sst.aws.Dynamo(
+	"StudentQuizAttemptTable",
+	{
+		fields: {
+			attemptId: "string"
+		},
+		primaryIndex: {
+			hashKey: "attemptId"
+		}
+	}
+);

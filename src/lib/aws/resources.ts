@@ -10,6 +10,7 @@ export type LinkedResources = {
 	UserProfileTable: { name: string };
 	TeacherCaseTable: { name: string };
 	StudentCertificateTable: { name: string };
+	StudentQuizAttemptTable: { name: string };
 	ResendApiKey: { value: string };
 	BetterAuthSecret: { value: string };
 };
@@ -115,6 +116,12 @@ export function getSessionAuthResources() {
 			: required(
 					linkedValue(() => linkedResources.StudentCertificateTable?.name),
 					"StudentCertificateTable.name",
+				),
+		studentQuizAttemptTableName: e2eMode
+			? "e2e-student-quiz-attempt-table"
+			: required(
+					linkedValue(() => linkedResources.StudentQuizAttemptTable?.name),
+					"StudentQuizAttemptTable.name",
 				),
 		caseMaterialBucketName: e2eMode
 			? "e2e-case-material-bucket"

@@ -155,7 +155,11 @@ describe("InMemoryStudentCaseRepository", () => {
 				},
 			});
 
-			expect(failedResult).toEqual({ status: "failed" });
+			expect(failedResult).toEqual({
+				failuresSinceReview: 1,
+				reviewRequired: false,
+				status: "failed",
+			});
 
 			const passedResult = await completeStudentCaseQuiz({
 				caseId: "active-case",
@@ -184,6 +188,92 @@ describe("InMemoryStudentCaseRepository", () => {
 					},
 				}),
 			).rejects.toBeInstanceOf(DuplicateStudentCaseCertificateError);
+		} finally {
+			process.env.AUTH_E2E_MODE = previousMode;
+			vi.useRealTimers();
+		}
+	});
+
+	it("persists the third-failed-attempt review gate until review is completed", async () => {
+		const {
+			StudentCaseQuizReviewRequiredError,
+			completeStudentCaseQuiz,
+			completeStudentCaseQuizReview,
+		} = await import("./student-case");
+		const previousMode = process.env.AUTH_E2E_MODE;
+		process.env.AUTH_E2E_MODE = "memory";
+		vi.useFakeTimers();
+		vi.setSystemTime(2_000);
+		seedE2ETeacherCases([activeCase]);
+
+		const incorrectAnswers = {
+			"question-1": "q1-b",
+			"question-2": "q2-a",
+			"question-3": "q3-a",
+		};
+		const correctAnswers = {
+			"question-1": "q1-a",
+			"question-2": "q2-a",
+			"question-3": "q3-a",
+		};
+		const args = {
+			caseId: "active-case",
+			studentProfileId: "student-1",
+			studentDisplayName: "Jordan Adebayo",
+		};
+
+		try {
+			await expect(
+				completeStudentCaseQuiz({
+					...args,
+					answers: incorrectAnswers,
+				}),
+			).resolves.toMatchObject({
+				failuresSinceReview: 1,
+				reviewRequired: false,
+				status: "failed",
+			});
+			await expect(
+				completeStudentCaseQuiz({
+					...args,
+					answers: incorrectAnswers,
+				}),
+			).resolves.toMatchObject({
+				failuresSinceReview: 2,
+				reviewRequired: false,
+				status: "failed",
+			});
+			await expect(
+				completeStudentCaseQuiz({
+					...args,
+					answers: incorrectAnswers,
+				}),
+			).resolves.toMatchObject({
+				failuresSinceReview: 0,
+				reviewRequired: true,
+				status: "failed",
+			});
+			await expect(
+				completeStudentCaseQuiz({
+					...args,
+					answers: correctAnswers,
+				}),
+			).rejects.toBeInstanceOf(StudentCaseQuizReviewRequiredError);
+
+			await completeStudentCaseQuizReview({
+				caseId: "active-case",
+				studentProfileId: "student-1",
+			});
+
+			await expect(
+				completeStudentCaseQuiz({
+					...args,
+					answers: correctAnswers,
+				}),
+			).resolves.toMatchObject({
+				status: "passed",
+				certificateId: expect.stringMatching(/^cert_/),
+			});
 		} finally {
 			process.env.AUTH_E2E_MODE = previousMode;
 			vi.useRealTimers();
@@ -282,6 +372,7 @@ describe("DynamoStudentCaseRepository", () => {
 		const repository = new DynamoStudentCaseRepository(
 			"TeacherCaseTable",
 			"StudentCertificateTable",
+			"StudentQuizAttemptTable",
 			documentClient,
 		);
 
@@ -307,6 +398,7 @@ describe("DynamoStudentCaseRepository", () => {
 		const repository = new DynamoStudentCaseRepository(
 			"TeacherCaseTable",
 			"StudentCertificateTable",
+			"StudentQuizAttemptTable",
 			documentClient,
 		);
 
@@ -331,6 +423,7 @@ describe("DynamoStudentCaseRepository", () => {
 		const repository = new DynamoStudentCaseRepository(
 			"TeacherCaseTable",
 			"StudentCertificateTable",
+			"StudentQuizAttemptTable",
 			documentClient,
 		);
 

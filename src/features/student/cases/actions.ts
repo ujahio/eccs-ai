@@ -2,11 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import {
+	completeStudentCaseQuizReview,
 	completeStudentCaseQuiz,
 	DuplicateStudentCaseCertificateError,
 	StudentCaseExpiredError,
+	StudentCaseQuizReviewRequiredError,
 } from "@/features/student/cases/student-case";
-import type { StudentCaseQuizFormState } from "@/features/student/cases/state";
+import type {
+	StudentCaseQuizFormState,
+	StudentCaseQuizReviewFormState,
+} from "@/features/student/cases/state";
 import { requireStudentSession } from "@/lib/auth/session";
 
 export async function submitStudentCaseQuizForm(
@@ -35,9 +40,22 @@ export async function submitStudentCaseQuizForm(
 		});
 
 		if (result.status === "failed") {
+			if (result.reviewRequired) {
+				return {
+					failuresSinceReview: result.failuresSinceReview,
+					message:
+						"Quiz attempt submitted. Result: did not pass. Review the case presentation, model answer, and teaching resources before retrying.",
+					reviewRequired: true,
+					status: "review_required",
+					submittedAt: Date.now(),
+				};
+			}
+
 			return {
+				failuresSinceReview: result.failuresSinceReview,
 				message:
 					"Quiz attempt submitted. Result: did not pass. Review the material and try again.",
+				reviewRequired: false,
 				status: "failed",
 				submittedAt: Date.now(),
 			};
@@ -71,8 +89,61 @@ export async function submitStudentCaseQuizForm(
 			};
 		}
 
+		if (error instanceof StudentCaseQuizReviewRequiredError) {
+			return {
+				message:
+					"Review the case presentation, model answer, and teaching resources before retrying the CME quiz.",
+				reviewRequired: true,
+				status: "review_required",
+				submittedAt: Date.now(),
+			};
+		}
+
 		return {
 			message: "Unable to submit this quiz right now. Please try again.",
+			status: "error",
+			submittedAt: Date.now(),
+		};
+	}
+}
+
+export async function completeStudentCaseQuizReviewForm(
+	formData: FormData,
+): Promise<StudentCaseQuizReviewFormState> {
+	const { profile } = await requireStudentSession();
+	const caseId = stringFromFormData(formData.get("caseId"));
+
+	if (!caseId) {
+		return {
+			message: "Unable to continue to this quiz. Return to your dashboard and retry.",
+			status: "error",
+			submittedAt: Date.now(),
+		};
+	}
+
+	try {
+		await completeStudentCaseQuizReview({
+			caseId,
+			studentProfileId: profile.profileId,
+		});
+
+		return {
+			message: "",
+			status: "ready",
+			submittedAt: Date.now(),
+		};
+	} catch (error) {
+		if (error instanceof StudentCaseExpiredError) {
+			return {
+				message:
+					"This case is no longer active. Return to your dashboard for the current case status.",
+				status: "expired",
+				submittedAt: Date.now(),
+			};
+		}
+
+		return {
+			message: "Unable to continue to this quiz right now. Please try again.",
 			status: "error",
 			submittedAt: Date.now(),
 		};

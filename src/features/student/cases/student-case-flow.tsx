@@ -19,12 +19,14 @@ import { quizOptionLabel, shuffleStudentCaseQuizQuestions } from "./quiz";
 import {
 	initialStudentCaseQuizFormState,
 	type StudentCaseQuizAction,
+	type StudentCaseQuizReviewAction,
 } from "./state";
 import type { StudentCasePresentation } from "./student-case";
 
 type StudentCaseFlowProps = {
 	caseRecord: StudentCasePresentation;
 	quizAction: StudentCaseQuizAction;
+	quizReviewAction: StudentCaseQuizReviewAction;
 };
 
 type CaseFlowStep =
@@ -96,6 +98,7 @@ const deadlineReminderWindowMilliseconds = 2 * 24 * 60 * 60 * 1_000;
 export function StudentCaseFlow({
 	caseRecord,
 	quizAction,
+	quizReviewAction,
 }: StudentCaseFlowProps) {
 	const [step, setStep] = useState<CaseFlowStep>("presentation");
 	const [analysisText, setAnalysisText] = useState("");
@@ -103,7 +106,6 @@ export function StudentCaseFlow({
 	const [analysisReviewMode, setAnalysisReviewMode] =
 		useState<AnalysisReviewMode>("both");
 	const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
-	const [quizFailuresSinceReview, setQuizFailuresSinceReview] = useState(0);
 	const [showLeaveQuizDialog, setShowLeaveQuizDialog] = useState(false);
 	const [reviewRequired, setReviewRequired] = useState(false);
 	const [message, setMessage] = useState("");
@@ -112,6 +114,7 @@ export function StudentCaseFlow({
 	);
 	const [quizState, setQuizState] = useState(initialStudentCaseQuizFormState);
 	const [isQuizPending, startQuizSubmission] = useTransition();
+	const [isReviewPending, startReviewCompletion] = useTransition();
 	const wordCount = useMemo(
 		() => countAnalysisWords(analysisText),
 		[analysisText],
@@ -283,9 +286,27 @@ export function StudentCaseFlow({
 			return;
 		}
 
-		setReviewRequired(false);
-		setMessage("");
-		setStep("quiz");
+		const formData = new FormData();
+		formData.set("caseId", caseRecord.caseId);
+
+		startReviewCompletion(async () => {
+			const result = await quizReviewAction(formData);
+
+			if (result.status === "expired") {
+				setIsExpired(true);
+				setMessage(result.message);
+				return;
+			}
+
+			if (result.status === "error") {
+				setMessage(result.message);
+				return;
+			}
+
+			setReviewRequired(false);
+			setMessage("");
+			setStep("quiz");
+		});
 	}
 
 	function reviewLectureText() {
@@ -347,23 +368,17 @@ export function StudentCaseFlow({
 		}
 
 		if (result.status === "failed") {
-			const nextFailureCount = quizFailuresSinceReview + 1;
-
 			setQuizAnswers({});
-
-			if (nextFailureCount >= 3) {
-				setQuizFailuresSinceReview(0);
-				setReviewRequired(true);
-				setAnalysisReviewMode("both");
-				setStep("presentation");
-				setMessage(
-					"Quiz attempt submitted. Result: did not pass. Review the case presentation, model answer, and teaching resources before retrying.",
-				);
-				return;
-			}
-
-			setQuizFailuresSinceReview(nextFailureCount);
 			setMessage("");
+			return;
+		}
+
+		if (result.status === "review_required") {
+			setQuizAnswers({});
+			setReviewRequired(true);
+			setAnalysisReviewMode("both");
+			setStep("presentation");
+			setMessage(result.message);
 			return;
 		}
 
@@ -713,10 +728,11 @@ export function StudentCaseFlow({
 						<Button
 							className="w-full sm:w-auto"
 							data-testid="student-case-continue-to-quiz"
+							disabled={isReviewPending}
 							onClick={continueToQuiz}
 							type="button"
 						>
-							Continue
+							{isReviewPending ? "Continuing" : "Continue"}
 						</Button>
 					</div>
 				</article>

@@ -114,6 +114,7 @@ type E2EAuthStoreShape = {
 	registrations: Map<string, PendingRegistrationRecord>;
 	profiles: Map<string, AppProfileRecord>;
 	studentCertificates: Map<string, E2EStudentCertificateRecord>;
+	studentQuizAttempts: Map<string, E2EStudentQuizAttemptRecord>;
 	teacherCases: Map<string, E2ETeacherCaseRecord>;
 	teacherCaseDrafts: Map<string, E2ETeacherCaseDraftRecord>;
 	users: Map<
@@ -168,6 +169,15 @@ export type E2EStudentCertificateRecord = {
 	studentProfileId: string;
 };
 
+export type E2EStudentQuizAttemptRecord = {
+	attemptId: string;
+	caseId: string;
+	failuresSinceReview: number;
+	reviewRequired: boolean;
+	studentProfileId: string;
+	updatedAt: number;
+};
+
 const GLOBAL_KEY = "__E2E_AUTH_STORE__";
 const EMAIL_STORE_PATH =
 	process.env.ECCS_E2E_EMAIL_STORE_PATH ??
@@ -182,6 +192,7 @@ function getStore(): E2EAuthStoreShape {
 			registrations: new Map(),
 			profiles: new Map(),
 			studentCertificates: new Map(),
+			studentQuizAttempts: new Map(),
 			teacherCases: new Map(),
 			teacherCaseDrafts: new Map(),
 			users: new Map(),
@@ -203,6 +214,7 @@ export function resetE2EAuthStore() {
 	store.caseMaterials.clear();
 	store.profiles.clear();
 	store.studentCertificates.clear();
+	store.studentQuizAttempts.clear();
 	store.teacherCases.clear();
 	store.teacherCaseDrafts.clear();
 	store.users.clear();

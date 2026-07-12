@@ -1,5 +1,8 @@
 import { notFound } from "next/navigation";
-import { submitStudentCaseQuizForm } from "@/features/student/cases/actions";
+import {
+	completeStudentCaseQuizReviewForm,
+	submitStudentCaseQuizForm,
+} from "@/features/student/cases/actions";
 import { StudentCaseFlow } from "@/features/student/cases/student-case-flow";
 import { getStudentActiveCasePresentation } from "@/features/student/cases/student-case";
 import { requireStudentSession } from "@/lib/auth/session";
@@ -24,6 +27,7 @@ export default async function StudentCasePage({ params }: StudentCasePageProps) 
 		<StudentCaseFlow
 			caseRecord={caseRecord}
 			quizAction={submitStudentCaseQuizForm}
+			quizReviewAction={completeStudentCaseQuizReviewForm}
 		/>
 	);
 }

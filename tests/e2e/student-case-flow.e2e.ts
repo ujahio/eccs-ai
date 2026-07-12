@@ -492,6 +492,9 @@ test.describe("Student case presentation and analysis flow", () => {
 			}
 		}
 
+		await page.reload();
+		await expect(page.getByTestId("student-case-flow-root")).toBeVisible();
+		await reachStudentCaseQuiz(page);
 		await answerQuiz(page, incorrectQuizAnswers());
 		await page.getByTestId("student-case-submit-quiz").click();
 		await expect(page.getByTestId("student-case-flow-message")).toContainText(
