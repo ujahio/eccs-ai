@@ -8,6 +8,7 @@ import {
 } from "@/lib/e2e/in-memory-auth";
 import type {
 	CaseDraft,
+	CmeQuestionDraft,
 	DraftAttachment,
 } from "@/features/teacher/case-authoring/schema";
 import { storeDraftAttachments } from "@/features/case-materials/storage";
@@ -17,6 +18,7 @@ import { rejectNonE2EMode } from "@/lib/e2e/route-helpers";
 type E2EStudentDashboardActiveCase = {
 	attachments?: DraftAttachment[];
 	caseId?: string;
+	cmeQuestions?: CmeQuestionDraft[];
 	description: string;
 	lectureText?: string;
 	modelAnswer: string;
@@ -38,6 +40,7 @@ function parseActiveCase(value: unknown): E2EStudentDashboardActiveCase | null {
 	const input = value as Record<string, unknown>;
 	const caseId = String(input.caseId ?? "").trim();
 	const attachments = parseAttachments(input.attachments);
+	const cmeQuestions = parseCmeQuestions(input.cmeQuestions);
 	const description = String(input.description ?? "").trim();
 	const lectureText = String(input.lectureText ?? "").trim();
 	const modelAnswer = String(input.modelAnswer ?? "").trim();
@@ -53,6 +56,7 @@ function parseActiveCase(value: unknown): E2EStudentDashboardActiveCase | null {
 	return {
 		...(caseId ? { caseId } : {}),
 		attachments,
+		cmeQuestions,
 		description:
 			description ||
 			"Review the active case presentation and begin your clinical reasoning.",
@@ -69,6 +73,80 @@ function parseActiveCase(value: unknown): E2EStudentDashboardActiveCase | null {
 		publishedAt,
 		deadlineAt,
 	};
+}
+
+function parseCmeQuestions(value: unknown): CmeQuestionDraft[] {
+	if (value === null || value === undefined) {
+		return defaultCmeQuestions();
+	}
+
+	if (!Array.isArray(value)) {
+		throw new Error("activeCase.cmeQuestions must be an array.");
+	}
+
+	return value.map((question, questionIndex) => {
+		if (typeof question !== "object" || question === null) {
+			throw new Error(
+				`activeCase.cmeQuestions[${questionIndex}] must be an object.`,
+			);
+		}
+
+		const input = question as Record<string, unknown>;
+		const id = String(input.id ?? "").trim();
+		const prompt = String(input.prompt ?? "").trim();
+		const correctOptionId = String(input.correctOptionId ?? "").trim();
+		const options = parseCmeOptions(input.options, questionIndex);
+
+		if (
+			!id ||
+			!prompt ||
+			options.length < 2 ||
+			options.length > 5 ||
+			!options.some((option) => option.id === correctOptionId)
+		) {
+			throw new Error(
+				`activeCase.cmeQuestions[${questionIndex}] is missing required fields.`,
+			);
+		}
+
+		return {
+			id,
+			prompt,
+			options,
+			correctOptionId,
+		};
+	});
+}
+
+function parseCmeOptions(value: unknown, questionIndex: number) {
+	if (!Array.isArray(value)) {
+		throw new Error(
+			`activeCase.cmeQuestions[${questionIndex}].options must be an array.`,
+		);
+	}
+
+	return value.map((option, optionIndex) => {
+		if (typeof option !== "object" || option === null) {
+			throw new Error(
+				`activeCase.cmeQuestions[${questionIndex}].options[${optionIndex}] must be an object.`,
+			);
+		}
+
+		const input = option as Record<string, unknown>;
+		const id = String(input.id ?? "").trim();
+		const text = String(input.text ?? "").trim();
+
+		if (!id || !text) {
+			throw new Error(
+				`activeCase.cmeQuestions[${questionIndex}].options[${optionIndex}] is missing required fields.`,
+			);
+		}
+
+		return {
+			id,
+			text,
+		};
+	});
 }
 
 function parseAttachments(value: unknown): DraftAttachment[] {
@@ -254,7 +332,39 @@ async function activeCaseDraft(
 			activeCase.lectureText ??
 			"Teaching resources are provided by the teacher for this case study.",
 		attachments: storedAttachments.attachments,
-		cmeQuestions: [],
+		cmeQuestions: activeCase.cmeQuestions ?? defaultCmeQuestions(),
 		deadlineDate: "",
 	};
+}
+
+function defaultCmeQuestions(): CmeQuestionDraft[] {
+	return [
+		{
+			id: "question-1",
+			prompt: "Which finding best supports the working diagnosis?",
+			options: [
+				{ id: "question-1-a", text: "Persistent fever with focal findings" },
+				{ id: "question-1-b", text: "Resolved symptoms without treatment" },
+			],
+			correctOptionId: "question-1-a",
+		},
+		{
+			id: "question-2",
+			prompt: "Which next step is most appropriate for this case?",
+			options: [
+				{ id: "question-2-a", text: "Review the available investigation results" },
+				{ id: "question-2-b", text: "Ignore the presenting history" },
+			],
+			correctOptionId: "question-2-a",
+		},
+		{
+			id: "question-3",
+			prompt: "Which teaching point should be prioritized?",
+			options: [
+				{ id: "question-3-a", text: "Use the case evidence to justify management" },
+				{ id: "question-3-b", text: "Delay all clinical reasoning" },
+			],
+			correctOptionId: "question-3-a",
+		},
+	];
 }

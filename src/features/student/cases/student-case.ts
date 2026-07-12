@@ -1,13 +1,20 @@
 import "server-only";
 
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
+import {
+	DynamoDBDocumentClient,
+	GetCommand,
+	TransactWriteCommand,
+	UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
 import { isActiveTeacherCase } from "@/features/teacher/cases/case-lifecycle";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import {
+	getE2EAuthStore,
 	getE2ETeacherCaseStore,
 	isE2EMode,
+	saveE2EStudentCertificate,
 } from "@/lib/e2e/in-memory-auth";
 
 export type StudentCaseAttachmentDisposition = "inline" | "attachment";
@@ -30,13 +37,69 @@ export type StudentCaseAttachmentFile = {
 export type StudentCasePresentation = {
 	attachments: StudentCaseResourceAttachment[];
 	caseId: string;
+	cmeQuestions: StudentCaseQuizQuestion[];
 	deadlineAt: number;
 	lectureText: string;
 	modelAnswer: string;
 	presentation: string;
+	title: string;
+};
+
+export type StudentCaseQuizOption = {
+	optionId: string;
+	text: string;
+};
+
+export type StudentCaseQuizQuestion = {
+	options: StudentCaseQuizOption[];
+	prompt: string;
+	questionId: string;
+};
+
+export type CompleteStudentCaseQuizArgs = {
+	answers: Record<string, string>;
+	caseId: string;
+	studentDisplayName: string;
+	studentProfileId: string;
+};
+
+export type CompleteStudentCaseQuizResult =
+	| {
+			certificateId: string;
+			status: "passed";
+	  }
+	| {
+			failuresSinceReview: number;
+			reviewRequired: boolean;
+			status: "failed";
+	  };
+
+export type CompleteStudentCaseQuizReviewArgs = {
+	caseId: string;
+	studentProfileId: string;
+};
+
+export type StudentCaseCertificateRecord = {
+	certificateId: string;
+	caseId: string;
+	caseTitle: string;
+	completedAt: number;
+	studentDisplayName: string;
+	studentProfileId: string;
 };
 
 type StudentCaseRepository = {
+	completeStudentCaseQuizReview(
+		args: CompleteStudentCaseQuizReviewArgs,
+		now: number,
+	): Promise<void>;
+	createStudentCaseCertificate(
+		record: StudentCaseCertificateRecord,
+		now: number,
+	): Promise<void>;
+	getStudentCaseQuizAttempt(
+		args: CompleteStudentCaseQuizReviewArgs,
+	): Promise<StudentCaseQuizAttemptState>;
 	getActiveCaseAttachment(
 		caseId: string,
 		attachmentId: string,
@@ -46,6 +109,14 @@ type StudentCaseRepository = {
 		caseId: string,
 		now: number,
 	): Promise<StudentCasePresentation | null>;
+	getActiveCaseQuiz(
+		caseId: string,
+		now: number,
+	): Promise<StudentCaseQuizCase | null>;
+	recordFailedStudentCaseQuizAttempt(
+		args: CompleteStudentCaseQuizReviewArgs,
+		now: number,
+	): Promise<StudentCaseQuizAttemptState>;
 };
 
 type StoredTeacherCaseRecord = {
@@ -54,6 +125,7 @@ type StoredTeacherCaseRecord = {
 	description?: string;
 	draft?: {
 		attachments?: unknown;
+		cmeQuestions?: unknown;
 		description?: unknown;
 		lectureText?: unknown;
 		modelAnswer?: unknown;
@@ -63,10 +135,106 @@ type StoredTeacherCaseRecord = {
 	title: string;
 };
 
+type StoredStudentCaseQuizQuestion = StudentCaseQuizQuestion & {
+	correctOptionId: string;
+};
+
+type StudentCaseQuizCase = {
+	caseId: string;
+	deadlineAt: number;
+	questions: StoredStudentCaseQuizQuestion[];
+	title: string;
+};
+
+type StudentCaseQuizAttemptState = {
+	failuresSinceReview: number;
+	reviewRequired: boolean;
+};
+
 const attachmentUrlTtlMilliseconds = 15 * 60 * 1_000;
 
 export async function getStudentActiveCasePresentation(caseId: string) {
 	return getStudentCaseRepository().getActiveCasePresentation(caseId, Date.now());
+}
+
+export async function completeStudentCaseQuiz({
+	answers,
+	caseId,
+	studentDisplayName,
+	studentProfileId,
+}: CompleteStudentCaseQuizArgs): Promise<CompleteStudentCaseQuizResult> {
+	const repository = getStudentCaseRepository();
+	const now = Date.now();
+	const caseRecord = await repository.getActiveCaseQuiz(caseId, now);
+
+	if (!caseRecord) {
+		throw new StudentCaseExpiredError();
+	}
+
+	const attemptState = await repository.getStudentCaseQuizAttempt({
+		caseId,
+		studentProfileId,
+	});
+
+	if (attemptState.reviewRequired) {
+		throw new StudentCaseQuizReviewRequiredError();
+	}
+
+	if (!isPassingStudentCaseQuiz(caseRecord.questions, answers)) {
+		return {
+			status: "failed",
+			...(await repository.recordFailedStudentCaseQuizAttempt(
+				{
+					caseId,
+					studentProfileId,
+				},
+				now,
+			)),
+		};
+	}
+
+	const certificateId = studentCaseCertificateId({
+		caseId,
+		studentProfileId,
+	});
+
+	await repository.createStudentCaseCertificate(
+		{
+			certificateId,
+			caseId,
+			caseTitle: caseRecord.title,
+			completedAt: now,
+			studentDisplayName,
+			studentProfileId,
+		},
+		now,
+	);
+
+	return {
+		certificateId,
+		status: "passed",
+	};
+}
+
+export async function completeStudentCaseQuizReview({
+	caseId,
+	studentProfileId,
+}: CompleteStudentCaseQuizReviewArgs) {
+	const repository = getStudentCaseRepository();
+	const now = Date.now();
+	const caseRecord = await repository.getActiveCaseQuiz(caseId, now);
+
+	if (!caseRecord) {
+		throw new StudentCaseExpiredError();
+	}
+
+	await repository.completeStudentCaseQuizReview(
+		{
+			caseId,
+			studentProfileId,
+		},
+		now,
+	);
 }
 
 export async function getStudentCaseAttachment({
@@ -92,11 +260,71 @@ function getStudentCaseRepository(): StudentCaseRepository {
 
 	return new DynamoStudentCaseRepository(
 		resources.teacherCaseTableName,
-		undefined,
+		resources.studentCertificateTableName,
+		resources.studentQuizAttemptTableName,
 	);
 }
 
 export class InMemoryStudentCaseRepository implements StudentCaseRepository {
+	async completeStudentCaseQuizReview(
+		args: CompleteStudentCaseQuizReviewArgs,
+		now: number,
+	) {
+		const store = getE2EAuthStore();
+		const attemptId = studentCaseQuizAttemptId(args);
+		const record = store.studentQuizAttempts.get(attemptId);
+
+		if (!record?.reviewRequired) {
+			return;
+		}
+
+		store.studentQuizAttempts.set(attemptId, {
+			...record,
+			failuresSinceReview: 0,
+			reviewRequired: false,
+			updatedAt: now,
+		});
+	}
+
+	async createStudentCaseCertificate(
+		record: StudentCaseCertificateRecord,
+		now: number,
+	) {
+		const store = getE2EAuthStore();
+		const caseRecord = store.teacherCases.get(record.caseId);
+
+		if (store.studentCertificates.has(record.certificateId)) {
+			throw new DuplicateStudentCaseCertificateError();
+		}
+
+		if (!caseRecord || !isActiveTeacherCase(caseRecord, now)) {
+			throw new StudentCaseExpiredError();
+		}
+
+		const attemptState = quizAttemptStateFromRecord(
+			store.studentQuizAttempts.get(studentCaseQuizAttemptId(record)) ?? null,
+		);
+
+		if (attemptState.reviewRequired) {
+			throw new StudentCaseQuizReviewRequiredError();
+		}
+
+		saveE2EStudentCertificate(record);
+		store.studentQuizAttempts.delete(studentCaseQuizAttemptId(record));
+		store.teacherCases.set(record.caseId, {
+			...caseRecord,
+			completionCount: caseRecord.completionCount + 1,
+		});
+	}
+
+	async getStudentCaseQuizAttempt(args: CompleteStudentCaseQuizReviewArgs) {
+		return quizAttemptStateFromRecord(
+			getE2EAuthStore().studentQuizAttempts.get(
+				studentCaseQuizAttemptId(args),
+			) ?? null,
+		);
+	}
+
 	async getActiveCasePresentation(caseId: string, now: number) {
 		const record =
 			getE2ETeacherCaseStore().find(
@@ -106,6 +334,50 @@ export class InMemoryStudentCaseRepository implements StudentCaseRepository {
 			) ?? null;
 
 		return activePresentationFromRecord(record, now);
+	}
+
+	async getActiveCaseQuiz(caseId: string, now: number) {
+		const record =
+			getE2ETeacherCaseStore().find(
+				(caseRecord) =>
+					isStoredTeacherCaseRecord(caseRecord) &&
+					caseRecord.caseId === caseId,
+			) ?? null;
+
+		return activeQuizCaseFromRecord(record, now);
+	}
+
+	async recordFailedStudentCaseQuizAttempt(
+		args: CompleteStudentCaseQuizReviewArgs,
+		now: number,
+	) {
+		const store = getE2EAuthStore();
+		const attemptId = studentCaseQuizAttemptId(args);
+		const currentState = quizAttemptStateFromRecord(
+			store.studentQuizAttempts.get(attemptId) ?? null,
+		);
+
+		if (currentState.reviewRequired) {
+			throw new StudentCaseQuizReviewRequiredError();
+		}
+
+		const nextFailuresSinceReview = currentState.failuresSinceReview + 1;
+		const reviewRequired = nextFailuresSinceReview >= 3;
+		const nextState = {
+			attemptId,
+			caseId: args.caseId,
+			failuresSinceReview: reviewRequired ? 0 : nextFailuresSinceReview,
+			reviewRequired,
+			studentProfileId: args.studentProfileId,
+			updatedAt: now,
+		};
+
+		store.studentQuizAttempts.set(attemptId, nextState);
+
+		return {
+			failuresSinceReview: nextState.failuresSinceReview,
+			reviewRequired,
+		};
 	}
 
 	async getActiveCaseAttachment(
@@ -126,12 +398,121 @@ export class InMemoryStudentCaseRepository implements StudentCaseRepository {
 
 export class DynamoStudentCaseRepository implements StudentCaseRepository {
 	private readonly documentClient: DynamoDBDocumentClient;
+	private readonly studentCertificateTableName: string;
+	private readonly studentQuizAttemptTableName: string;
 
 	constructor(
 		private readonly teacherCaseTableName: string,
+		studentCertificateTableName: string,
+		studentQuizAttemptTableName: string,
 		documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({})),
 	) {
+		this.studentCertificateTableName = studentCertificateTableName;
+		this.studentQuizAttemptTableName = studentQuizAttemptTableName;
 		this.documentClient = documentClient;
+	}
+
+	async completeStudentCaseQuizReview(
+		args: CompleteStudentCaseQuizReviewArgs,
+		now: number,
+	) {
+		try {
+			await this.documentClient.send(
+				new UpdateCommand({
+					TableName: this.studentQuizAttemptTableName,
+					Key: { attemptId: studentCaseQuizAttemptId(args) },
+					UpdateExpression:
+						"SET failuresSinceReview = :zero, reviewRequired = :false, updatedAt = :now",
+					ConditionExpression: "reviewRequired = :true",
+					ExpressionAttributeValues: {
+						":false": false,
+						":now": now,
+						":true": true,
+						":zero": 0,
+					},
+				}),
+			);
+		} catch (error) {
+			if (!isConditionalWriteFailure(error)) {
+				throw error;
+			}
+		}
+	}
+
+	async createStudentCaseCertificate(
+		record: StudentCaseCertificateRecord,
+		now: number,
+	) {
+		try {
+			await this.documentClient.send(
+				new TransactWriteCommand({
+					TransactItems: [
+						{
+							Put: {
+								TableName: this.studentCertificateTableName,
+								Item: record,
+								ConditionExpression: "attribute_not_exists(certificateId)",
+							},
+						},
+						{
+							Update: {
+								TableName: this.teacherCaseTableName,
+								Key: { caseId: record.caseId },
+								UpdateExpression:
+									"SET completionCount = if_not_exists(completionCount, :zero) + :one",
+								ConditionExpression:
+									"attribute_exists(caseId) AND #lifecycle = :published AND deadlineAt >= :now",
+								ExpressionAttributeNames: {
+									"#lifecycle": "lifecycle",
+								},
+								ExpressionAttributeValues: {
+									":now": now,
+									":one": 1,
+									":published": "published",
+									":zero": 0,
+								},
+							},
+						},
+						{
+							Delete: {
+								TableName: this.studentQuizAttemptTableName,
+								Key: { attemptId: studentCaseQuizAttemptId(record) },
+								ConditionExpression:
+									"attribute_not_exists(attemptId) OR reviewRequired = :false",
+								ExpressionAttributeValues: {
+									":false": false,
+								},
+							},
+						},
+					],
+				}),
+			);
+		} catch (error) {
+			if (!isConditionalWriteFailure(error)) {
+				throw error;
+			}
+
+			if (await this.hasCertificate(record.certificateId)) {
+				throw new DuplicateStudentCaseCertificateError();
+			}
+
+			if (await this.hasQuizReviewRequired(record)) {
+				throw new StudentCaseQuizReviewRequiredError();
+			}
+
+			throw new StudentCaseExpiredError();
+		}
+	}
+
+	async getStudentCaseQuizAttempt(args: CompleteStudentCaseQuizReviewArgs) {
+		const response = await this.documentClient.send(
+			new GetCommand({
+				TableName: this.studentQuizAttemptTableName,
+				Key: { attemptId: studentCaseQuizAttemptId(args) },
+			}),
+		);
+
+		return quizAttemptStateFromRecord(response.Item ?? null);
 	}
 
 	async getActiveCasePresentation(caseId: string, now: number) {
@@ -143,6 +524,86 @@ export class DynamoStudentCaseRepository implements StudentCaseRepository {
 		);
 
 		return activePresentationFromRecord(response.Item ?? null, now);
+	}
+
+	async getActiveCaseQuiz(caseId: string, now: number) {
+		const response = await this.documentClient.send(
+			new GetCommand({
+				TableName: this.teacherCaseTableName,
+				Key: { caseId },
+			}),
+		);
+
+		return activeQuizCaseFromRecord(response.Item ?? null, now);
+	}
+
+	async recordFailedStudentCaseQuizAttempt(
+		args: CompleteStudentCaseQuizReviewArgs,
+		now: number,
+	) {
+		for (let attempt = 0; attempt < 3; attempt += 1) {
+			const response = await this.documentClient.send(
+				new GetCommand({
+					TableName: this.studentQuizAttemptTableName,
+					Key: { attemptId: studentCaseQuizAttemptId(args) },
+				}),
+			);
+			const currentRecord = response.Item ?? null;
+			const currentState = quizAttemptStateFromRecord(currentRecord);
+
+			if (currentState.reviewRequired) {
+				throw new StudentCaseQuizReviewRequiredError();
+			}
+
+			const nextFailuresSinceReview = currentState.failuresSinceReview + 1;
+			const nextState = {
+				failuresSinceReview:
+					nextFailuresSinceReview >= 3 ? 0 : nextFailuresSinceReview,
+				reviewRequired: nextFailuresSinceReview >= 3,
+			};
+			const conditionExpression =
+				currentRecord === null
+					? "attribute_not_exists(attemptId)"
+					: "reviewRequired = :false AND failuresSinceReview = :currentFailuresSinceReview";
+			const conditionValues =
+				currentRecord === null
+					? {}
+					: {
+							":currentFailuresSinceReview":
+								currentState.failuresSinceReview,
+							":false": false,
+						};
+
+			try {
+				await this.documentClient.send(
+					new UpdateCommand({
+						TableName: this.studentQuizAttemptTableName,
+						Key: { attemptId: studentCaseQuizAttemptId(args) },
+						UpdateExpression:
+							"SET caseId = :caseId, studentProfileId = :studentProfileId, updatedAt = :now, failuresSinceReview = :failuresSinceReview, reviewRequired = :reviewRequired",
+						ConditionExpression: conditionExpression,
+						ExpressionAttributeValues: {
+							":caseId": args.caseId,
+							":failuresSinceReview": nextState.failuresSinceReview,
+							":now": now,
+							":reviewRequired": nextState.reviewRequired,
+							":studentProfileId": args.studentProfileId,
+							...conditionValues,
+						},
+					}),
+				);
+
+				return nextState;
+			} catch (error) {
+				if (isConditionalWriteFailure(error)) {
+					continue;
+				}
+
+				throw error;
+			}
+		}
+
+		throw new StudentCaseQuizReviewRequiredError();
 	}
 
 	async getActiveCaseAttachment(
@@ -158,6 +619,49 @@ export class DynamoStudentCaseRepository implements StudentCaseRepository {
 		);
 
 		return activeAttachmentFromRecord(response.Item ?? null, attachmentId, now);
+	}
+
+	private async hasCertificate(certificateId: string) {
+		const response = await this.documentClient.send(
+			new GetCommand({
+				TableName: this.studentCertificateTableName,
+				Key: { certificateId },
+			}),
+		);
+
+		return Boolean(response.Item);
+	}
+
+	private async hasQuizReviewRequired(args: CompleteStudentCaseQuizReviewArgs) {
+		const response = await this.documentClient.send(
+			new GetCommand({
+				TableName: this.studentQuizAttemptTableName,
+				Key: { attemptId: studentCaseQuizAttemptId(args) },
+			}),
+		);
+
+		return quizAttemptStateFromRecord(response.Item ?? null).reviewRequired;
+	}
+}
+
+export class StudentCaseExpiredError extends Error {
+	constructor() {
+		super("This case is no longer active.");
+		this.name = "StudentCaseExpiredError";
+	}
+}
+
+export class DuplicateStudentCaseCertificateError extends Error {
+	constructor() {
+		super("A certificate has already been earned for this case.");
+		this.name = "DuplicateStudentCaseCertificateError";
+	}
+}
+
+export class StudentCaseQuizReviewRequiredError extends Error {
+	constructor() {
+		super("Review required before retrying this quiz.");
+		this.name = "StudentCaseQuizReviewRequiredError";
 	}
 }
 
@@ -269,13 +773,43 @@ function activePresentationFromRecord(
 		return null;
 	}
 
+	const cmeQuestions = studentQuizQuestionsFromRecord(record);
+
+	if (cmeQuestions.length < 3 || cmeQuestions.length > 5) {
+		return null;
+	}
+
 	return {
 		attachments: resourceAttachmentsFromRecord(record),
 		caseId: record.caseId,
+		cmeQuestions,
 		deadlineAt: record.deadlineAt,
 		lectureText,
 		modelAnswer,
 		presentation,
+		title: record.title,
+	};
+}
+
+function activeQuizCaseFromRecord(
+	record: unknown,
+	now: number,
+): StudentCaseQuizCase | null {
+	if (!isStoredTeacherCaseRecord(record) || !isActiveTeacherCase(record, now)) {
+		return null;
+	}
+
+	const questions = storedQuizQuestionsFromRecord(record);
+
+	if (questions.length < 3 || questions.length > 5) {
+		return null;
+	}
+
+	return {
+		caseId: record.caseId,
+		deadlineAt: record.deadlineAt,
+		questions,
+		title: record.title,
 	};
 }
 
@@ -419,6 +953,181 @@ function studentCaseAttachmentSignature({
 	return createHmac("sha256", secret)
 		.update(`${caseId}\n${attachmentId}\n${disposition}\n${expiresAt}`)
 		.digest("base64url");
+}
+
+function studentQuizQuestionsFromRecord(
+	record: StoredTeacherCaseRecord,
+): StudentCaseQuizQuestion[] {
+	return storedQuizQuestionsFromRecord(record).map((question) => ({
+		options: question.options,
+		prompt: question.prompt,
+		questionId: question.questionId,
+	}));
+}
+
+function storedQuizQuestionsFromRecord(
+	record: StoredTeacherCaseRecord,
+): StoredStudentCaseQuizQuestion[] {
+	const questions = Array.isArray(record.draft?.cmeQuestions)
+		? record.draft.cmeQuestions
+		: [];
+
+	return questions.flatMap((question) => {
+		const parsed = quizQuestionFromUnknown(question);
+
+		return parsed ? [parsed] : [];
+	});
+}
+
+function quizQuestionFromUnknown(
+	value: unknown,
+): StoredStudentCaseQuizQuestion | null {
+	if (typeof value !== "object" || value === null) {
+		return null;
+	}
+
+	const candidate = value as Record<string, unknown>;
+	const questionId = stringFromUnknown(candidate.id).trim();
+	const prompt = stringFromUnknown(candidate.prompt).trim();
+	const correctOptionId = stringFromUnknown(candidate.correctOptionId).trim();
+	const options = Array.isArray(candidate.options)
+		? candidate.options.flatMap((option) => {
+				const parsed = quizOptionFromUnknown(option);
+
+				return parsed ? [parsed] : [];
+			})
+		: [];
+
+	if (
+		!questionId ||
+		!prompt ||
+		options.length < 2 ||
+		options.length > 5 ||
+		!options.some((option) => option.optionId === correctOptionId)
+	) {
+		return null;
+	}
+
+	return {
+		correctOptionId,
+		options,
+		prompt,
+		questionId,
+	};
+}
+
+function quizOptionFromUnknown(value: unknown): StudentCaseQuizOption | null {
+	if (typeof value !== "object" || value === null) {
+		return null;
+	}
+
+	const candidate = value as Record<string, unknown>;
+	const optionId = stringFromUnknown(candidate.id).trim();
+	const text = stringFromUnknown(candidate.text).trim();
+
+	if (!optionId || !text) {
+		return null;
+	}
+
+	return {
+		optionId,
+		text,
+	};
+}
+
+function isPassingStudentCaseQuiz(
+	questions: StoredStudentCaseQuizQuestion[],
+	answers: Record<string, string>,
+) {
+	return questions.every(
+		(question) => answers[question.questionId] === question.correctOptionId,
+	);
+}
+
+function studentCaseCertificateId({
+	caseId,
+	studentProfileId,
+}: {
+	caseId: string;
+	studentProfileId: string;
+}) {
+	const digest = createHash("sha256")
+		.update(`${studentProfileId}\n${caseId}`)
+		.digest("base64url")
+		.slice(0, 32);
+
+	return `cert_${digest}`;
+}
+
+function studentCaseQuizAttemptId({
+	caseId,
+	studentProfileId,
+}: {
+	caseId: string;
+	studentProfileId: string;
+}) {
+	const digest = createHash("sha256")
+		.update(`${studentProfileId}\n${caseId}`)
+		.digest("base64url")
+		.slice(0, 32);
+
+	return `quiz_attempt_${digest}`;
+}
+
+function quizAttemptStateFromRecord(
+	record: unknown,
+): StudentCaseQuizAttemptState {
+	if (typeof record !== "object" || record === null) {
+		return {
+			failuresSinceReview: 0,
+			reviewRequired: false,
+		};
+	}
+
+	const candidate = record as Partial<StudentCaseQuizAttemptState>;
+	const failuresSinceReview = numberFromUnknown(candidate.failuresSinceReview);
+
+	return {
+		failuresSinceReview:
+			failuresSinceReview > 0 && Number.isFinite(failuresSinceReview)
+				? failuresSinceReview
+				: 0,
+		reviewRequired: candidate.reviewRequired === true,
+	};
+}
+
+function isConditionalWriteFailure(error: unknown) {
+	if (typeof error !== "object" || error === null) {
+		return false;
+	}
+
+	const errorName =
+		"name" in error && typeof error.name === "string" ? error.name : null;
+
+	if (errorName === "ConditionalCheckFailedException") {
+		return true;
+	}
+
+	if (errorName !== "TransactionCanceledException") {
+		return false;
+	}
+
+	if (!("CancellationReasons" in error)) {
+		return true;
+	}
+
+	const reasons = error.CancellationReasons;
+
+	return (
+		Array.isArray(reasons) &&
+		reasons.some(
+			(reason) =>
+				typeof reason === "object" &&
+				reason !== null &&
+				"Code" in reason &&
+				reason.Code === "ConditionalCheckFailed",
+		)
+	);
 }
 
 function stringFromUnknown(value: unknown) {

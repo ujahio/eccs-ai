@@ -38,6 +38,10 @@ Core product areas visible in the grid:
 | Success Mint    | `#40DDB5`                   | Success check icons, completed states, positive confirmations |
 | Success Soft    | `#DDFBF3`                   | Success notification backgrounds and selected chips           |
 | Error Red       | `#D85B5B`                   | Validation errors, destructive/error copy                     |
+| Error Soft      | `#FFF5F5`                   | Failed quiz and error alert backgrounds                       |
+| Urgency Soft    | `#FFF7F7`                   | Due-soon reminder chip background                             |
+| Urgency Border  | `#F4C7C7`                   | Due-soon reminder chip border                                 |
+| Urgency Text    | `#B94747`                   | Due-soon reminder chip text                                   |
 | Warning Gold    | `#F3B64B`                   | Payment/attention hints where needed                          |
 | Overlay Slate   | `#2F4050` at 70-80% opacity | Modal scrims and dimmed background states                     |
 | Chip Background | `#F4F7F9`                   | Count chips, filters, quiet status labels                     |
@@ -77,6 +81,7 @@ Typography rules:
 **Buttons**
 
 - Primary buttons: dark slate background, white uppercase label, 3-4px radius, no heavy shadow. Use for `GET STARTED`, `VIEW CASE STUDY`, `SAVE`, `NEXT`, `SUBMIT`, `DOWNLOAD CERTIFICATE`, and final workflow actions.
+- Inverse primary buttons: white background, primary slate text, thin white border, and subtle shadow. Use only when a primary CTA sits on a dark photo or dark image panel where the standard dark slate button loses contrast, such as student dashboard `VIEW CASE STUDY`.
 - Secondary buttons: white background, slate text, thin border. Use for `LOG IN`, `PREVIOUS`, `CANCEL`, and alternate choices.
 - Disabled buttons: pale gray background or reduced opacity, muted text, no shadow.
 - Mobile primary actions often sit full-width or near full-width at the bottom of the screen.
@@ -116,7 +121,10 @@ Typography rules:
 
 - Success states use a centered mint check icon, short confirmation text, and a dark primary action.
 - Empty/loading states are sparse: centered logo, loader, or small icon with minimal copy.
-- Feedback/CME selection states use mint fills or outlines to indicate selected answers.
+- Teacher-authored or non-quiz feedback selection states can use mint fills or outlines to indicate selected answers.
+- Student CME quiz selection before submission must stay neutral: use slate border/text and soft section fill only. Do not use green, teal, mint, red, checkmarks, correctness icons, or correct/incorrect wording for selected answers before grading.
+- Failed student CME quiz attempts before the review gate should use a restrained yellow warning banner with `Warning Gold` and a soft yellow background. The third failed attempt or review-required state should use the stronger red status banner with `Error Red` and `Error Soft`. These indicators only apply at the attempt level; do not mark individual answers correct or incorrect, and do not expose the answer key through UI text, per-option color, or icons.
+- Student case deadlines inside the two-day reminder window may show a compact `Due Soon` chip beside the deadline using `Urgency Soft`, `Urgency Border`, and `Urgency Text`. Keep the deadline date itself in normal primary text, do not use a countdown timer, and do not restyle the date as an error.
 - Rating feedback can use small stars or compact choice rows, but should stay low-contrast until selected.
 
 **Onboarding**

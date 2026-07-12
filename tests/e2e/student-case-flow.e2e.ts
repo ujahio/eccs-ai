@@ -1,4 +1,10 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import {
+	expect,
+	test,
+	type APIRequestContext,
+	type Page,
+	type Response,
+} from "@playwright/test";
 import { deadlineAtFromDubaiDate } from "@/features/teacher/case-authoring/schema";
 
 const dayInMilliseconds = 24 * 60 * 60 * 1000;
@@ -59,6 +65,12 @@ async function seedStudentCase(
 			lastModified: number;
 		}>;
 		caseId?: string;
+		cmeQuestions?: Array<{
+			id: string;
+			prompt: string;
+			options: Array<{ id: string; text: string }>;
+			correctOptionId: string;
+		}>;
 		deadlineAt?: number;
 		lectureText?: string;
 		modelAnswer?: string;
@@ -80,6 +92,7 @@ async function seedStudentCase(
 					data?.lectureText ??
 					"Teaching resources summarize the clinical evidence, common diagnostic pitfalls, and next-step management priorities.",
 				attachments: data?.attachments ?? [],
+				cmeQuestions: data?.cmeQuestions,
 				presentation:
 					data?.presentation ??
 					"Patient history, presenting symptoms, laboratory findings, and the clinical decision context are described with enough detail for learners to reason carefully.",
@@ -108,10 +121,120 @@ async function startStudentCaseFlow(page: Page) {
 	await expect(page.getByTestId("student-case-flow-root")).toBeVisible();
 }
 
+async function openStudentCaseFlow(page: Page, caseId: string) {
+	const response = await page.goto(`/student/cases/${caseId}`);
+
+	expect(response?.ok()).toBe(true);
+	await expect(page.getByTestId("student-case-flow-root")).toBeVisible();
+}
+
 async function expireBrowserClock(page: Page, deadlineAt: number) {
 	await page.evaluate((expiresAt) => {
 		Date.now = () => expiresAt + 1;
 	}, deadlineAt);
+}
+
+async function reachStudentCaseQuiz(page: Page) {
+	await page.getByTestId("student-case-continue").click();
+	await page.getByTestId("student-case-analysis").fill(validAnalysis());
+	await page.getByTestId("student-case-submit-analysis").click();
+	await page.getByTestId("student-case-continue-to-resources").click();
+	await page.getByTestId("student-case-continue-to-quiz").click();
+	await expect(page.getByTestId("student-case-quiz-form")).toBeVisible();
+}
+
+async function answerQuiz(
+	page: Page,
+	answers: Record<string, string> = correctQuizAnswers(),
+) {
+	for (const [questionId, optionId] of Object.entries(answers)) {
+		await page
+			.getByTestId(`student-case-quiz-option-${questionId}-${optionId}`)
+			.click();
+	}
+}
+
+function correctQuizAnswers() {
+	return {
+		"question-1": "question-1-a",
+		"question-2": "question-2-a",
+		"question-3": "question-3-a",
+	};
+}
+
+function incorrectQuizAnswers() {
+	return {
+		...correctQuizAnswers(),
+		"question-1": "question-1-b",
+	};
+}
+
+async function waitForStudentCaseResponseReads(
+	bodies: string[],
+	reads: Array<Promise<void>>,
+) {
+	let readCount = -1;
+
+	while (readCount !== reads.length) {
+		readCount = reads.length;
+		await Promise.all(reads);
+	}
+
+	return bodies.join("\n");
+}
+
+function captureInspectableStudentCaseResponses(page: Page, caseId: string) {
+	const bodies: string[] = [];
+	const reads: Array<Promise<void>> = [];
+
+	page.on("response", (response) => {
+		if (!isInspectableStudentCaseResponse(response, caseId)) {
+			return;
+		}
+
+		const read = response
+			.text()
+			.then((body) => {
+				bodies.push(body);
+			})
+			.catch(() => {
+				// Redirects and aborted responses do not expose a readable body.
+			});
+
+		reads.push(read);
+	});
+
+	return {
+		async count() {
+			await waitForStudentCaseResponseReads(bodies, reads);
+
+			return bodies.length;
+		},
+		async text() {
+			return waitForStudentCaseResponseReads(bodies, reads);
+		},
+	};
+}
+
+function isInspectableStudentCaseResponse(response: Response, caseId: string) {
+	if (!["GET", "POST"].includes(response.request().method())) {
+		return false;
+	}
+
+	const url = new URL(response.url());
+
+	if (url.pathname !== `/student/cases/${caseId}`) {
+		return false;
+	}
+
+	const contentType = response.headers()["content-type"] ?? "";
+
+	return [
+		"application/json",
+		"text/html",
+		"text/plain",
+		"text/x-component",
+	].some((inspectableType) => contentType.includes(inspectableType));
 }
 
 test.describe("Student case presentation and analysis flow", () => {
@@ -286,6 +409,253 @@ test.describe("Student case presentation and analysis flow", () => {
 		await expect(
 			page.getByTestId("student-case-pdf-download-attachment-1"),
 		).toHaveAttribute("aria-label", "Download teaching-resource.pdf");
+	});
+
+	test("passes the CME quiz only when all answers are correct", async ({
+		page,
+		request,
+	}) => {
+		const email = uniqueEmail("student-case-quiz-pass");
+
+		await seedStudentCase(request);
+		await bootstrapVerifiedStudent(request, email);
+		await loginStudent(page, email);
+		await startStudentCaseFlow(page);
+		await reachStudentCaseQuiz(page);
+
+		await expect(page.getByTestId("student-case-flow-heading")).toHaveText(
+			"CME Quiz",
+		);
+		await answerQuiz(page);
+		await expect(
+			page.getByTestId("student-case-quiz-option-question-1-question-1-a"),
+		).toHaveAttribute("aria-checked", "true");
+		await expect(page.getByTestId("student-case-quiz-progress")).toHaveText(
+			"3 of 3 answered",
+		);
+		await page.getByTestId("student-case-quiz-back-to-resources").click();
+		await expect(page.getByTestId("student-case-leave-quiz-dialog")).toBeVisible();
+		await page.getByTestId("student-case-stay-on-quiz").click();
+		await expect(page.getByTestId("student-case-leave-quiz-dialog")).toHaveCount(
+			0,
+		);
+		await page.getByTestId("student-case-submit-quiz").click();
+
+		await expect(page.getByTestId("student-case-certificate-step")).toBeVisible();
+		await expect(page.getByTestId("student-case-flow-heading")).toHaveText(
+			"Certificate",
+		);
+		await expect(
+			page.getByTestId("student-case-certificate-download"),
+		).toHaveAttribute("href", /\/student\/certificates\/cert_.*\/download/);
+	});
+
+	test("shows failed quiz attempts without per-question correctness and forces review on the third failure", async ({
+		page,
+		request,
+	}) => {
+		const email = uniqueEmail("student-case-quiz-fail");
+
+		await seedStudentCase(request);
+		await bootstrapVerifiedStudent(request, email);
+		await loginStudent(page, email);
+		await startStudentCaseFlow(page);
+		await reachStudentCaseQuiz(page);
+
+		for (let attempt = 1; attempt <= 2; attempt += 1) {
+			await answerQuiz(page, incorrectQuizAnswers());
+			await page.getByTestId("student-case-submit-quiz").click();
+			const quizStatus = page.getByTestId("student-case-quiz-status");
+
+			await expect(quizStatus).toContainText("did not pass");
+			await expect(quizStatus).toHaveClass(/border-warning-gold/);
+			await expect(quizStatus).toHaveClass(/bg-\[#fff8e8\]/);
+			await expect(
+				page.getByTestId("student-case-review-lecture-text"),
+			).toBeVisible();
+			await expect(page.getByTestId("student-case-quiz-form")).not.toContainText(
+				"Incorrect",
+			);
+			await expect(page.getByTestId("student-case-quiz-progress")).toHaveText(
+				"0 of 3 answered",
+			);
+			await expect(page.getByTestId("student-case-submit-quiz")).toBeDisabled();
+
+			if (attempt === 1) {
+				await page.getByTestId("student-case-review-lecture-text").click();
+				await expect(page.getByTestId("student-case-resources-step")).toBeVisible();
+				await expect(page.getByTestId("student-case-lecture-text")).toContainText(
+					"Teaching resources summarize",
+				);
+				await page.getByTestId("student-case-continue-to-quiz").click();
+				await expect(page.getByTestId("student-case-quiz-form")).toBeVisible();
+			}
+		}
+
+		await page.reload();
+		await expect(page.getByTestId("student-case-flow-root")).toBeVisible();
+		await reachStudentCaseQuiz(page);
+		await answerQuiz(page, incorrectQuizAnswers());
+		await page.getByTestId("student-case-submit-quiz").click();
+		await expect(page.getByTestId("student-case-flow-heading")).toHaveText(
+			"CME Quiz",
+		);
+		const thirdAttemptStatus = page.getByTestId("student-case-quiz-status");
+		await expect(thirdAttemptStatus).toContainText("did not pass");
+		await expect(thirdAttemptStatus).toHaveClass(/border-error-red/);
+		await expect(thirdAttemptStatus).toHaveClass(/bg-\[#fff5f5\]/);
+		await expect(thirdAttemptStatus).not.toContainText(
+			"Review the case presentation",
+		);
+		await expect(page.getByTestId("student-case-submit-quiz")).toBeDisabled();
+
+		await page.getByTestId("student-case-review-lecture-text").click();
+		await expect(page.getByTestId("student-case-resources-step")).toBeVisible();
+		await page.getByTestId("student-case-continue-to-quiz").click();
+		await expect(page.getByTestId("student-case-flow-heading")).toHaveText(
+			"CME Quiz",
+		);
+
+		await answerQuiz(page);
+		await page.getByTestId("student-case-submit-quiz").click();
+		await expect(page.getByTestId("student-case-certificate-step")).toBeVisible();
+	});
+
+	test("does not expose the CME answer key in student case network payloads", async ({
+		page,
+		request,
+	}) => {
+		const email = uniqueEmail("student-case-quiz-answer-key");
+		const caseId = "e2e-student-answer-key-boundary-case";
+		const capturedResponses = captureInspectableStudentCaseResponses(
+			page,
+			caseId,
+		);
+
+		await seedStudentCase(request, {
+			caseId,
+			cmeQuestions: [
+				{
+					id: "network-question-1",
+					prompt: "Which finding should guide the next decision?",
+					options: [
+						{ id: "network-option-1-a", text: "Escalating focal symptoms" },
+						{ id: "network-option-1-b", text: "Resolved symptoms alone" },
+					],
+					correctOptionId: "network-option-1-a",
+				},
+				{
+					id: "network-question-2",
+					prompt: "Which action is most appropriate?",
+					options: [
+						{ id: "network-option-2-a", text: "Review available results" },
+						{ id: "network-option-2-b", text: "Ignore the case context" },
+					],
+					correctOptionId: "network-option-2-a",
+				},
+				{
+					id: "network-question-3",
+					prompt: "Which teaching point should be emphasized?",
+					options: [
+						{ id: "network-option-3-a", text: "Justify decisions with evidence" },
+						{ id: "network-option-3-b", text: "Avoid explaining the reasoning" },
+					],
+					correctOptionId: "network-option-3-a",
+				},
+			],
+		});
+		await bootstrapVerifiedStudent(request, email);
+		await loginStudent(page, email);
+		await openStudentCaseFlow(page, caseId);
+		await reachStudentCaseQuiz(page);
+		await answerQuiz(page, {
+			"network-question-1": "network-option-1-b",
+			"network-question-2": "network-option-2-a",
+			"network-question-3": "network-option-3-a",
+		});
+
+		const failedSubmission = page.waitForResponse(
+			(response) =>
+				response.request().method() === "POST" &&
+				isInspectableStudentCaseResponse(response, caseId),
+		);
+
+		await page.getByTestId("student-case-submit-quiz").click();
+		await failedSubmission;
+		await expect(page.getByTestId("student-case-quiz-status")).toContainText(
+			"did not pass",
+		);
+
+		expect(await capturedResponses.count()).toBeGreaterThan(0);
+		const networkPayload = await capturedResponses.text();
+		const studentVisiblePayload = [
+			networkPayload,
+			await page.content(),
+		].join("\n");
+
+		expect(studentVisiblePayload).not.toContain("correctOptionId");
+		expect(studentVisiblePayload).not.toContain("correctAnswer");
+		expect(studentVisiblePayload).not.toContain("isCorrect");
+		await expect(page.getByTestId("student-case-quiz-form")).not.toContainText(
+			"Incorrect",
+		);
+	});
+
+	test("rejects quiz submission when the deadline passes before submit", async ({
+		page,
+		request,
+	}) => {
+		const email = uniqueEmail("student-case-quiz-cutoff");
+
+		await seedStudentCase(request);
+		await bootstrapVerifiedStudent(request, email);
+		await loginStudent(page, email);
+		await startStudentCaseFlow(page);
+		await reachStudentCaseQuiz(page);
+		await answerQuiz(page);
+		await seedStudentCase(request, {
+			deadlineAt: Date.now() - dayInMilliseconds,
+		});
+		await page.getByTestId("student-case-submit-quiz").click();
+
+		await expect(page.getByTestId("student-case-flow-message")).toContainText(
+			"This case is no longer active.",
+		);
+		await expect(page.getByTestId("student-case-expired")).toBeVisible();
+		await expect(page.getByTestId("student-case-quiz-form")).toHaveCount(0);
+	});
+
+	test("rejects duplicate certificate creation from a second tab", async ({
+		page,
+		request,
+	}) => {
+		const email = uniqueEmail("student-case-quiz-duplicate");
+
+		await seedStudentCase(request);
+		await bootstrapVerifiedStudent(request, email);
+		await loginStudent(page, email);
+		await startStudentCaseFlow(page);
+		await reachStudentCaseQuiz(page);
+		await answerQuiz(page);
+
+		const secondPage = await page.context().newPage();
+		await secondPage.goto("/student/cases/e2e-student-flow-case");
+		await reachStudentCaseQuiz(secondPage);
+		await answerQuiz(secondPage);
+
+		await page.getByTestId("student-case-submit-quiz").click();
+		await expect(page.getByTestId("student-case-certificate-step")).toBeVisible();
+
+		await secondPage.getByTestId("student-case-submit-quiz").click();
+		await expect(
+			secondPage.getByTestId("student-case-quiz-status"),
+		).toContainText("already been earned");
+
+		await page.goto("/student/certificates");
+		await expect(page.getByTestId("student-certificate-history-card")).toHaveCount(
+			1,
+		);
+		await secondPage.close();
 	});
 
 	test("blocks direct access after the case deadline", async ({

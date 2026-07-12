@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ComponentPropsWithoutRef } from "react";
 
-type ButtonVariant = "primary" | "secondary" | "ghost";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "inverse";
 type ButtonSize = "sm" | "md";
 
 type ButtonStyleProps = {
@@ -18,7 +18,9 @@ const variantClasses: Record<ButtonVariant, string> = {
     "bg-primary-action !text-white hover:bg-success-mint hover:!text-white",
   secondary:
     "border border-border-gray bg-white text-primary-text hover:border-primary-action",
-  ghost: "bg-transparent text-primary-text hover:text-brand-teal"
+  ghost: "bg-transparent text-primary-text hover:text-brand-teal",
+  inverse:
+    "border border-white bg-white !text-primary-action shadow-sm hover:bg-app-canvas hover:!text-primary-action"
 };
 
 const sizeClasses: Record<ButtonSize, string> = {

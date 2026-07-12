@@ -9,6 +9,36 @@ vi.mock("server-only", () => ({}));
 
 const attachmentSigningSecret = "student-case-test-secret";
 
+const cmeQuestions = [
+	{
+		id: "question-1",
+		prompt: "Which finding best supports diagnosis 1?",
+		options: [
+			{ id: "q1-a", text: "Correct finding" },
+			{ id: "q1-b", text: "Distractor finding" },
+		],
+		correctOptionId: "q1-a",
+	},
+	{
+		id: "question-2",
+		prompt: "Which finding best supports diagnosis 2?",
+		options: [
+			{ id: "q2-a", text: "Correct management" },
+			{ id: "q2-b", text: "Distractor management" },
+		],
+		correctOptionId: "q2-a",
+	},
+	{
+		id: "question-3",
+		prompt: "Which finding best supports diagnosis 3?",
+		options: [
+			{ id: "q3-a", text: "Correct teaching point" },
+			{ id: "q3-b", text: "Distractor teaching point" },
+		],
+		correctOptionId: "q3-a",
+	},
+];
+
 const activeCase = {
 	caseId: "active-case",
 	title: "Acute endocrine review",
@@ -35,7 +65,7 @@ const activeCase = {
 				lastModified: 1,
 			},
 		],
-		cmeQuestions: [],
+		cmeQuestions,
 		deadlineDate: "2026-07-31",
 	},
 };
@@ -56,6 +86,30 @@ describe("InMemoryStudentCaseRepository", () => {
 			repository.getActiveCasePresentation("active-case", now),
 		).resolves.toMatchObject({
 			caseId: "active-case",
+			cmeQuestions: [
+				{
+					questionId: "question-1",
+					prompt: "Which finding best supports diagnosis 1?",
+					options: [
+						{ optionId: "q1-a", text: "Correct finding" },
+						{ optionId: "q1-b", text: "Distractor finding" },
+					],
+				},
+				{
+					questionId: "question-2",
+					options: [
+						{ optionId: "q2-a", text: "Correct management" },
+						{ optionId: "q2-b", text: "Distractor management" },
+					],
+				},
+				{
+					questionId: "question-3",
+					options: [
+						{ optionId: "q3-a", text: "Correct teaching point" },
+						{ optionId: "q3-b", text: "Distractor teaching point" },
+					],
+				},
+			],
 			deadlineAt: 5_000,
 			lectureText: "Lecture text placeholder.",
 			modelAnswer: "Model answer placeholder.",
@@ -75,6 +129,155 @@ describe("InMemoryStudentCaseRepository", () => {
 		});
 		expect(attachment?.viewUrl).not.toContain("signature=");
 		expect(attachment?.downloadUrl).not.toContain("signature=");
+		expect(JSON.stringify(result?.cmeQuestions)).not.toContain("correctOptionId");
+	});
+
+	it("creates one certificate only when all quiz answers are correct", async () => {
+		const {
+			DuplicateStudentCaseCertificateError,
+			completeStudentCaseQuiz,
+		} = await import("./student-case");
+		const previousMode = process.env.AUTH_E2E_MODE;
+		process.env.AUTH_E2E_MODE = "memory";
+		vi.useFakeTimers();
+		vi.setSystemTime(2_000);
+		seedE2ETeacherCases([activeCase]);
+
+		try {
+			const failedResult = await completeStudentCaseQuiz({
+				caseId: "active-case",
+				studentProfileId: "student-1",
+				studentDisplayName: "Jordan Adebayo",
+				answers: {
+					"question-1": "q1-b",
+					"question-2": "q2-a",
+					"question-3": "q3-a",
+				},
+			});
+
+			expect(failedResult).toEqual({
+				failuresSinceReview: 1,
+				reviewRequired: false,
+				status: "failed",
+			});
+
+			const passedResult = await completeStudentCaseQuiz({
+				caseId: "active-case",
+				studentProfileId: "student-1",
+				studentDisplayName: "Jordan Adebayo",
+				answers: {
+					"question-1": "q1-a",
+					"question-2": "q2-a",
+					"question-3": "q3-a",
+				},
+			});
+
+			expect(passedResult).toMatchObject({
+				status: "passed",
+				certificateId: expect.stringMatching(/^cert_/),
+			});
+			await expect(
+				completeStudentCaseQuiz({
+					caseId: "active-case",
+					studentProfileId: "student-1",
+					studentDisplayName: "Jordan Adebayo",
+					answers: {
+						"question-1": "q1-a",
+						"question-2": "q2-a",
+						"question-3": "q3-a",
+					},
+				}),
+			).rejects.toBeInstanceOf(DuplicateStudentCaseCertificateError);
+		} finally {
+			process.env.AUTH_E2E_MODE = previousMode;
+			vi.useRealTimers();
+		}
+	});
+
+	it("persists the third-failed-attempt review gate until review is completed", async () => {
+		const {
+			StudentCaseQuizReviewRequiredError,
+			completeStudentCaseQuiz,
+			completeStudentCaseQuizReview,
+		} = await import("./student-case");
+		const previousMode = process.env.AUTH_E2E_MODE;
+		process.env.AUTH_E2E_MODE = "memory";
+		vi.useFakeTimers();
+		vi.setSystemTime(2_000);
+		seedE2ETeacherCases([activeCase]);
+
+		const incorrectAnswers = {
+			"question-1": "q1-b",
+			"question-2": "q2-a",
+			"question-3": "q3-a",
+		};
+		const correctAnswers = {
+			"question-1": "q1-a",
+			"question-2": "q2-a",
+			"question-3": "q3-a",
+		};
+		const args = {
+			caseId: "active-case",
+			studentProfileId: "student-1",
+			studentDisplayName: "Jordan Adebayo",
+		};
+
+		try {
+			await expect(
+				completeStudentCaseQuiz({
+					...args,
+					answers: incorrectAnswers,
+				}),
+			).resolves.toMatchObject({
+				failuresSinceReview: 1,
+				reviewRequired: false,
+				status: "failed",
+			});
+			await expect(
+				completeStudentCaseQuiz({
+					...args,
+					answers: incorrectAnswers,
+				}),
+			).resolves.toMatchObject({
+				failuresSinceReview: 2,
+				reviewRequired: false,
+				status: "failed",
+			});
+			await expect(
+				completeStudentCaseQuiz({
+					...args,
+					answers: incorrectAnswers,
+				}),
+			).resolves.toMatchObject({
+				failuresSinceReview: 0,
+				reviewRequired: true,
+				status: "failed",
+			});
+			await expect(
+				completeStudentCaseQuiz({
+					...args,
+					answers: correctAnswers,
+				}),
+			).rejects.toBeInstanceOf(StudentCaseQuizReviewRequiredError);
+
+			await completeStudentCaseQuizReview({
+				caseId: "active-case",
+				studentProfileId: "student-1",
+			});
+
+			await expect(
+				completeStudentCaseQuiz({
+					...args,
+					answers: correctAnswers,
+				}),
+			).resolves.toMatchObject({
+				status: "passed",
+				certificateId: expect.stringMatching(/^cert_/),
+			});
+		} finally {
+			process.env.AUTH_E2E_MODE = previousMode;
+			vi.useRealTimers();
+		}
 	});
 
 	it("returns active PDF attachment storage references only before the deadline", async () => {
@@ -168,6 +371,8 @@ describe("DynamoStudentCaseRepository", () => {
 		} as unknown as DynamoDBDocumentClient;
 		const repository = new DynamoStudentCaseRepository(
 			"TeacherCaseTable",
+			"StudentCertificateTable",
+			"StudentQuizAttemptTable",
 			documentClient,
 		);
 
@@ -192,6 +397,8 @@ describe("DynamoStudentCaseRepository", () => {
 		} as unknown as DynamoDBDocumentClient;
 		const repository = new DynamoStudentCaseRepository(
 			"TeacherCaseTable",
+			"StudentCertificateTable",
+			"StudentQuizAttemptTable",
 			documentClient,
 		);
 
@@ -205,6 +412,84 @@ describe("DynamoStudentCaseRepository", () => {
 		expect(attachment?.name).toBe("teaching-resource.pdf");
 		expect(attachment?.storageKey).toBe(
 			"case-materials/active-case/attachment-1.pdf",
+		);
+	});
+
+	it("uses a transactional certificate write with duplicate protection", async () => {
+		const { DynamoStudentCaseRepository } = await import("./student-case");
+		const documentClient = {
+			send: vi.fn(async () => ({})),
+		} as unknown as DynamoDBDocumentClient;
+		const repository = new DynamoStudentCaseRepository(
+			"TeacherCaseTable",
+			"StudentCertificateTable",
+			"StudentQuizAttemptTable",
+			documentClient,
+		);
+
+		await repository.createStudentCaseCertificate(
+			{
+				certificateId: "certificate-1",
+				caseId: "active-case",
+				caseTitle: "Acute endocrine review",
+				completedAt: 2_000,
+				studentDisplayName: "Jordan Adebayo",
+				studentProfileId: "student-1",
+			},
+			2_000,
+		);
+
+		const command = vi.mocked(documentClient.send).mock.calls[0]?.[0] as {
+			input?: {
+				TransactItems?: Array<{
+					Put?: { ConditionExpression?: string };
+					Update?: { ConditionExpression?: string };
+				}>;
+			};
+		};
+
+		expect(command.input?.TransactItems?.[0]?.Put?.ConditionExpression).toBe(
+			"attribute_not_exists(certificateId)",
+		);
+		expect(command.input?.TransactItems?.[1]?.Update?.ConditionExpression).toBe(
+			"attribute_exists(caseId) AND #lifecycle = :published AND deadlineAt >= :now",
+		);
+	});
+
+	it("records a failed quiz attempt without updating the attempt primary key", async () => {
+		const { DynamoStudentCaseRepository } = await import("./student-case");
+		const documentClient = {
+			send: vi.fn(async () => ({})),
+		} as unknown as DynamoDBDocumentClient;
+		const repository = new DynamoStudentCaseRepository(
+			"TeacherCaseTable",
+			"StudentCertificateTable",
+			"StudentQuizAttemptTable",
+			documentClient,
+		);
+
+		await repository.recordFailedStudentCaseQuizAttempt(
+			{
+				caseId: "active-case",
+				studentProfileId: "student-1",
+			},
+			2_000,
+		);
+
+		const command = vi.mocked(documentClient.send).mock.calls[1]?.[0] as {
+			input?: {
+				ExpressionAttributeValues?: Record<string, unknown>;
+				Key?: { attemptId?: string };
+				UpdateExpression?: string;
+			};
+		};
+
+		expect(command.input?.Key?.attemptId).toEqual(
+			expect.stringMatching(/^quiz_attempt_/),
+		);
+		expect(command.input?.UpdateExpression).not.toContain("attemptId");
+		expect(command.input?.ExpressionAttributeValues).not.toHaveProperty(
+			":attemptId",
 		);
 	});
 });
