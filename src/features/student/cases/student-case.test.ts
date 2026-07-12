@@ -455,4 +455,41 @@ describe("DynamoStudentCaseRepository", () => {
 			"attribute_exists(caseId) AND #lifecycle = :published AND deadlineAt >= :now",
 		);
 	});
+
+	it("records a failed quiz attempt without updating the attempt primary key", async () => {
+		const { DynamoStudentCaseRepository } = await import("./student-case");
+		const documentClient = {
+			send: vi.fn(async () => ({})),
+		} as unknown as DynamoDBDocumentClient;
+		const repository = new DynamoStudentCaseRepository(
+			"TeacherCaseTable",
+			"StudentCertificateTable",
+			"StudentQuizAttemptTable",
+			documentClient,
+		);
+
+		await repository.recordFailedStudentCaseQuizAttempt(
+			{
+				caseId: "active-case",
+				studentProfileId: "student-1",
+			},
+			2_000,
+		);
+
+		const command = vi.mocked(documentClient.send).mock.calls[1]?.[0] as {
+			input?: {
+				ExpressionAttributeValues?: Record<string, unknown>;
+				Key?: { attemptId?: string };
+				UpdateExpression?: string;
+			};
+		};
+
+		expect(command.input?.Key?.attemptId).toEqual(
+			expect.stringMatching(/^quiz_attempt_/),
+		);
+		expect(command.input?.UpdateExpression).not.toContain("attemptId");
+		expect(command.input?.ExpressionAttributeValues).not.toHaveProperty(
+			":attemptId",
+		);
+	});
 });

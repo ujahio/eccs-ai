@@ -43,8 +43,7 @@ export async function submitStudentCaseQuizForm(
 			if (result.reviewRequired) {
 				return {
 					failuresSinceReview: result.failuresSinceReview,
-					message:
-						"Quiz attempt submitted. Result: did not pass. Review the case presentation, model answer, and teaching resources before retrying.",
+					message: "Quiz attempt submitted. Result: did not pass.",
 					reviewRequired: true,
 					status: "review_required",
 					submittedAt: Date.now(),
@@ -53,8 +52,7 @@ export async function submitStudentCaseQuizForm(
 
 			return {
 				failuresSinceReview: result.failuresSinceReview,
-				message:
-					"Quiz attempt submitted. Result: did not pass. Review the material and try again.",
+				message: "Quiz attempt submitted. Result: did not pass.",
 				reviewRequired: false,
 				status: "failed",
 				submittedAt: Date.now(),
@@ -91,8 +89,7 @@ export async function submitStudentCaseQuizForm(
 
 		if (error instanceof StudentCaseQuizReviewRequiredError) {
 			return {
-				message:
-					"Review the case presentation, model answer, and teaching resources before retrying the CME quiz.",
+				message: "Quiz attempt submitted. Result: did not pass.",
 				reviewRequired: true,
 				status: "review_required",
 				submittedAt: Date.now(),

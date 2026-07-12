@@ -137,6 +137,9 @@ export function StudentCaseFlow({
 		quizQuestions.length > 0 &&
 		quizQuestions.every((question) => Boolean(quizAnswers[question.questionId]));
 	const hasPassedQuiz = quizState.status === "passed";
+	const showQuizFailureNotification =
+		quizState.status === "failed" || quizState.status === "review_required";
+	const showQuizReviewGateNotification = quizState.status === "review_required";
 	const shouldWarnBeforeLeavingQuiz = step === "quiz" && !hasPassedQuiz;
 	const isDeadlineInReminderWindow = isDeadlineWithinReminderWindow(
 		caseRecord.deadlineAt,
@@ -376,9 +379,7 @@ export function StudentCaseFlow({
 		if (result.status === "review_required") {
 			setQuizAnswers({});
 			setReviewRequired(true);
-			setAnalysisReviewMode("both");
-			setStep("presentation");
-			setMessage(result.message);
+			setMessage("");
 			return;
 		}
 
@@ -761,21 +762,23 @@ export function StudentCaseFlow({
 						</p>
 					</div>
 
-					{quizState.status === "failed" ||
+					{showQuizFailureNotification ||
 					quizState.status === "duplicate" ||
 					quizState.status === "error" ? (
 						<div
 							className={[
 								"mb-5 flex flex-col gap-3 border bg-white p-3 text-sm font-medium sm:flex-row sm:items-center sm:justify-between",
-								quizState.status === "failed"
+								showQuizReviewGateNotification
 									? "border-error-red bg-[#fff5f5] text-primary-text"
+									: showQuizFailureNotification
+										? "border-warning-gold bg-[#fff8e8] text-primary-text"
 									: "border-error-red text-error-red",
 							].join(" ")}
 							data-testid="student-case-quiz-status"
 							role="status"
 						>
 							<span>{quizState.message}</span>
-							{quizState.status === "failed" ? (
+							{showQuizFailureNotification ? (
 								<Button
 									className="w-full shrink-0 sm:w-auto"
 									data-testid="student-case-review-lecture-text"
@@ -874,7 +877,7 @@ export function StudentCaseFlow({
 						<Button
 							className="w-full sm:w-auto"
 							data-testid="student-case-submit-quiz"
-							disabled={!hasAllQuizAnswers || isQuizPending}
+							disabled={!hasAllQuizAnswers || isQuizPending || reviewRequired}
 							type="submit"
 						>
 							{isQuizPending ? "Submitting" : "Submit"}

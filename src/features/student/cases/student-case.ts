@@ -580,10 +580,9 @@ export class DynamoStudentCaseRepository implements StudentCaseRepository {
 						TableName: this.studentQuizAttemptTableName,
 						Key: { attemptId: studentCaseQuizAttemptId(args) },
 						UpdateExpression:
-							"SET attemptId = :attemptId, caseId = :caseId, studentProfileId = :studentProfileId, updatedAt = :now, failuresSinceReview = :failuresSinceReview, reviewRequired = :reviewRequired",
+							"SET caseId = :caseId, studentProfileId = :studentProfileId, updatedAt = :now, failuresSinceReview = :failuresSinceReview, reviewRequired = :reviewRequired",
 						ConditionExpression: conditionExpression,
 						ExpressionAttributeValues: {
-							":attemptId": studentCaseQuizAttemptId(args),
 							":caseId": args.caseId,
 							":failuresSinceReview": nextState.failuresSinceReview,
 							":now": now,

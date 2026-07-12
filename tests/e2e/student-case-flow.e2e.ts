@@ -468,8 +468,8 @@ test.describe("Student case presentation and analysis flow", () => {
 			const quizStatus = page.getByTestId("student-case-quiz-status");
 
 			await expect(quizStatus).toContainText("did not pass");
-			await expect(quizStatus).toHaveClass(/border-error-red/);
-			await expect(quizStatus).toHaveClass(/bg-\[#fff5f5\]/);
+			await expect(quizStatus).toHaveClass(/border-warning-gold/);
+			await expect(quizStatus).toHaveClass(/bg-\[#fff8e8\]/);
 			await expect(
 				page.getByTestId("student-case-review-lecture-text"),
 			).toBeVisible();
@@ -497,18 +497,20 @@ test.describe("Student case presentation and analysis flow", () => {
 		await reachStudentCaseQuiz(page);
 		await answerQuiz(page, incorrectQuizAnswers());
 		await page.getByTestId("student-case-submit-quiz").click();
-		await expect(page.getByTestId("student-case-flow-message")).toContainText(
+		await expect(page.getByTestId("student-case-flow-heading")).toHaveText(
+			"CME Quiz",
+		);
+		const thirdAttemptStatus = page.getByTestId("student-case-quiz-status");
+		await expect(thirdAttemptStatus).toContainText("did not pass");
+		await expect(thirdAttemptStatus).toHaveClass(/border-error-red/);
+		await expect(thirdAttemptStatus).toHaveClass(/bg-\[#fff5f5\]/);
+		await expect(thirdAttemptStatus).not.toContainText(
 			"Review the case presentation",
 		);
-		await expect(page.getByTestId("student-case-flow-heading")).toHaveText(
-			"Case Presentation",
-		);
+		await expect(page.getByTestId("student-case-submit-quiz")).toBeDisabled();
 
-		await page.getByTestId("student-case-continue").click();
-		await expect(page.getByTestId("student-case-flow-heading")).toHaveText(
-			"Analysis Review",
-		);
-		await page.getByTestId("student-case-continue-to-resources").click();
+		await page.getByTestId("student-case-review-lecture-text").click();
+		await expect(page.getByTestId("student-case-resources-step")).toBeVisible();
 		await page.getByTestId("student-case-continue-to-quiz").click();
 		await expect(page.getByTestId("student-case-flow-heading")).toHaveText(
 			"CME Quiz",

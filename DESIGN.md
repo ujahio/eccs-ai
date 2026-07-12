@@ -123,7 +123,7 @@ Typography rules:
 - Empty/loading states are sparse: centered logo, loader, or small icon with minimal copy.
 - Teacher-authored or non-quiz feedback selection states can use mint fills or outlines to indicate selected answers.
 - Student CME quiz selection before submission must stay neutral: use slate border/text and soft section fill only. Do not use green, teal, mint, red, checkmarks, correctness icons, or correct/incorrect wording for selected answers before grading.
-- Failed student CME quiz attempts may use a restrained red status banner with `Error Red` and `Error Soft`, but only at the attempt level. Do not mark individual answers correct or incorrect, and do not expose the answer key through UI text, per-option color, or icons.
+- Failed student CME quiz attempts before the review gate should use a restrained yellow warning banner with `Warning Gold` and a soft yellow background. The third failed attempt or review-required state should use the stronger red status banner with `Error Red` and `Error Soft`. These indicators only apply at the attempt level; do not mark individual answers correct or incorrect, and do not expose the answer key through UI text, per-option color, or icons.
 - Student case deadlines inside the two-day reminder window may show a compact `Due Soon` chip beside the deadline using `Urgency Soft`, `Urgency Border`, and `Urgency Text`. Keep the deadline date itself in normal primary text, do not use a countdown timer, and do not restyle the date as an error.
 - Rating feedback can use small stars or compact choice rows, but should stay low-contrast until selected.
 
