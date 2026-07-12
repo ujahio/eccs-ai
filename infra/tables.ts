@@ -96,6 +96,33 @@ export const studentCertificateTable = new sst.aws.Dynamo(
 	}
 );
 
+export const studentCaseCompletionTable = new sst.aws.Dynamo(
+	"StudentCaseCompletionTable",
+	{
+		fields: {
+			completionId: "string",
+			caseId: "string",
+			studentProfileId: "string",
+			completedAt: "number"
+		},
+		primaryIndex: {
+			hashKey: "completionId"
+		},
+		globalIndexes: {
+			CaseCompletedAtIndex: {
+				hashKey: "caseId",
+				rangeKey: "completedAt",
+				projection: "all"
+			},
+			StudentCompletedAtIndex: {
+				hashKey: "studentProfileId",
+				rangeKey: "completedAt",
+				projection: "all"
+			}
+		}
+	}
+);
+
 export const studentQuizAttemptTable = new sst.aws.Dynamo(
 	"StudentQuizAttemptTable",
 	{

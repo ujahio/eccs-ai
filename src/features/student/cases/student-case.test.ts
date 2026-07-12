@@ -1,6 +1,7 @@
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+	getE2EAuthStore,
 	resetE2EAuthStore,
 	seedE2ETeacherCases,
 } from "@/lib/e2e/in-memory-auth";
@@ -8,6 +9,10 @@ import {
 vi.mock("server-only", () => ({}));
 
 const attachmentSigningSecret = "student-case-test-secret";
+const finalPersonalAnalysis = Array.from(
+	{ length: 150 },
+	(_, index) => `analysis-${index + 1}`,
+).join(" ");
 
 const cmeQuestions = [
 	{
@@ -127,8 +132,10 @@ describe("InMemoryStudentCaseRepository", () => {
 			type: "application/pdf",
 			viewUrl: expect.stringContaining("disposition=inline"),
 		});
-		expect(attachment?.viewUrl).not.toContain("signature=");
-		expect(attachment?.downloadUrl).not.toContain("signature=");
+		expect(String(attachment?.viewUrl ?? "").includes("signature=")).toBe(false);
+		expect(String(attachment?.downloadUrl ?? "").includes("signature=")).toBe(
+			false,
+		);
 		expect(JSON.stringify(result?.cmeQuestions)).not.toContain("correctOptionId");
 	});
 
@@ -139,8 +146,7 @@ describe("InMemoryStudentCaseRepository", () => {
 		} = await import("./student-case");
 		const previousMode = process.env.AUTH_E2E_MODE;
 		process.env.AUTH_E2E_MODE = "memory";
-		vi.useFakeTimers();
-		vi.setSystemTime(2_000);
+		const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(2_000);
 		seedE2ETeacherCases([activeCase]);
 
 		try {
@@ -148,6 +154,7 @@ describe("InMemoryStudentCaseRepository", () => {
 				caseId: "active-case",
 				studentProfileId: "student-1",
 				studentDisplayName: "Jordan Adebayo",
+				personalAnalysis: finalPersonalAnalysis,
 				answers: {
 					"question-1": "q1-b",
 					"question-2": "q2-a",
@@ -165,6 +172,7 @@ describe("InMemoryStudentCaseRepository", () => {
 				caseId: "active-case",
 				studentProfileId: "student-1",
 				studentDisplayName: "Jordan Adebayo",
+				personalAnalysis: finalPersonalAnalysis,
 				answers: {
 					"question-1": "q1-a",
 					"question-2": "q2-a",
@@ -175,12 +183,67 @@ describe("InMemoryStudentCaseRepository", () => {
 			expect(passedResult).toMatchObject({
 				status: "passed",
 				certificateId: expect.stringMatching(/^cert_/),
+				certificate: {
+					certificateBranding: {
+						organizationName: "E-Clinical Case Solutions",
+						shortName: "ECCS",
+					},
+					caseTitle: "Acute endocrine review",
+					completedAt: 2_000,
+					studentDisplayName: "Jordan Adebayo",
+				},
 			});
+			if (passedResult.status !== "passed") {
+				throw new Error("Expected quiz pass to create a certificate.");
+			}
+
+			const store = getE2EAuthStore();
+			const certificates = Array.from(
+				store.studentCertificates.values(),
+			) as unknown as Array<Record<string, unknown>>;
+			const completionRecords = Array.from(
+				store.studentCaseCompletions.values(),
+			).filter(
+				(record) =>
+					(record as unknown as Record<string, unknown>).recordType ===
+					"studentCaseCompletion",
+			) as unknown as Array<Record<string, unknown>>;
+
+			expect(certificates).toHaveLength(1);
+			expect(certificates[0]).toMatchObject({
+				caseId: "active-case",
+				caseTitle: "Acute endocrine review",
+				certificateBranding: {
+					organizationName: "E-Clinical Case Solutions",
+					shortName: "ECCS",
+				},
+				certificateId: passedResult.certificateId,
+				completedAt: 2_000,
+				recordType: "studentCaseCertificate",
+				studentDisplayName: "Jordan Adebayo",
+				studentProfileId: "student-1",
+			});
+			expect(certificates[0]).not.toHaveProperty("personalAnalysis");
+			expect(completionRecords).toEqual([
+				expect.objectContaining({
+					analysisLockedAt: 2_000,
+					caseId: "active-case",
+					certificateId: passedResult.certificateId,
+					completedAt: 2_000,
+					completionId: expect.stringMatching(/^case_completion_/),
+					personalAnalysis: finalPersonalAnalysis,
+					recordType: "studentCaseCompletion",
+					studentDisplayName: "Jordan Adebayo",
+					studentProfileId: "student-1",
+				}),
+			]);
+
 			await expect(
 				completeStudentCaseQuiz({
 					caseId: "active-case",
 					studentProfileId: "student-1",
 					studentDisplayName: "Jordan Adebayo",
+					personalAnalysis: `${finalPersonalAnalysis} edited`,
 					answers: {
 						"question-1": "q1-a",
 						"question-2": "q2-a",
@@ -188,9 +251,10 @@ describe("InMemoryStudentCaseRepository", () => {
 					},
 				}),
 			).rejects.toBeInstanceOf(DuplicateStudentCaseCertificateError);
+			expect(store.studentCertificates.size).toBe(1);
 		} finally {
+			dateNowSpy.mockRestore();
 			process.env.AUTH_E2E_MODE = previousMode;
-			vi.useRealTimers();
 		}
 	});
 
@@ -202,8 +266,7 @@ describe("InMemoryStudentCaseRepository", () => {
 		} = await import("./student-case");
 		const previousMode = process.env.AUTH_E2E_MODE;
 		process.env.AUTH_E2E_MODE = "memory";
-		vi.useFakeTimers();
-		vi.setSystemTime(2_000);
+		const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(2_000);
 		seedE2ETeacherCases([activeCase]);
 
 		const incorrectAnswers = {
@@ -218,6 +281,7 @@ describe("InMemoryStudentCaseRepository", () => {
 		};
 		const args = {
 			caseId: "active-case",
+			personalAnalysis: finalPersonalAnalysis,
 			studentProfileId: "student-1",
 			studentDisplayName: "Jordan Adebayo",
 		};
@@ -273,10 +337,19 @@ describe("InMemoryStudentCaseRepository", () => {
 			).resolves.toMatchObject({
 				status: "passed",
 				certificateId: expect.stringMatching(/^cert_/),
+				certificate: {
+					certificateBranding: {
+						organizationName: "E-Clinical Case Solutions",
+						shortName: "ECCS",
+					},
+					caseTitle: "Acute endocrine review",
+					completedAt: 2_000,
+					studentDisplayName: "Jordan Adebayo",
+				},
 			});
 		} finally {
+			dateNowSpy.mockRestore();
 			process.env.AUTH_E2E_MODE = previousMode;
-			vi.useRealTimers();
 		}
 	});
 
@@ -372,6 +445,7 @@ describe("DynamoStudentCaseRepository", () => {
 		const repository = new DynamoStudentCaseRepository(
 			"TeacherCaseTable",
 			"StudentCertificateTable",
+			"StudentCaseCompletionTable",
 			"StudentQuizAttemptTable",
 			documentClient,
 		);
@@ -398,6 +472,7 @@ describe("DynamoStudentCaseRepository", () => {
 		const repository = new DynamoStudentCaseRepository(
 			"TeacherCaseTable",
 			"StudentCertificateTable",
+			"StudentCaseCompletionTable",
 			"StudentQuizAttemptTable",
 			documentClient,
 		);
@@ -423,26 +498,48 @@ describe("DynamoStudentCaseRepository", () => {
 		const repository = new DynamoStudentCaseRepository(
 			"TeacherCaseTable",
 			"StudentCertificateTable",
+			"StudentCaseCompletionTable",
 			"StudentQuizAttemptTable",
 			documentClient,
 		);
 
 		await repository.createStudentCaseCertificate(
 			{
+				certificateBranding: {
+					organizationName: "E-Clinical Case Solutions",
+					shortName: "ECCS",
+				},
 				certificateId: "certificate-1",
 				caseId: "active-case",
 				caseTitle: "Acute endocrine review",
 				completedAt: 2_000,
+				recordType: "studentCaseCertificate",
+				studentDisplayName: "Jordan Adebayo",
+				studentProfileId: "student-1",
+			},
+			{
+				analysisLockedAt: 2_000,
+				analysisSubmittedAt: 2_000,
+				caseId: "active-case",
+				certificateId: "certificate-1",
+				completedAt: 2_000,
+				completionId: "case_completion_1",
+				personalAnalysis: finalPersonalAnalysis,
+				recordType: "studentCaseCompletion",
 				studentDisplayName: "Jordan Adebayo",
 				studentProfileId: "student-1",
 			},
 			2_000,
 		);
 
-		const command = vi.mocked(documentClient.send).mock.calls[0]?.[0] as {
+		const command = mockCalls(documentClient.send)[0]?.[0] as {
 			input?: {
 				TransactItems?: Array<{
-					Put?: { ConditionExpression?: string };
+					Put?: {
+						ConditionExpression?: string;
+						Item?: Record<string, unknown>;
+						TableName?: string;
+					};
 					Update?: { ConditionExpression?: string };
 				}>;
 			};
@@ -451,7 +548,29 @@ describe("DynamoStudentCaseRepository", () => {
 		expect(command.input?.TransactItems?.[0]?.Put?.ConditionExpression).toBe(
 			"attribute_not_exists(certificateId)",
 		);
-		expect(command.input?.TransactItems?.[1]?.Update?.ConditionExpression).toBe(
+		expect(command.input?.TransactItems?.[0]?.Put?.Item).toMatchObject({
+			certificateBranding: {
+				organizationName: "E-Clinical Case Solutions",
+				shortName: "ECCS",
+			},
+			recordType: "studentCaseCertificate",
+		});
+		expect(command.input?.TransactItems?.[0]?.Put?.Item).not.toHaveProperty(
+			"personalAnalysis",
+		);
+		expect(command.input?.TransactItems?.[1]?.Put).toMatchObject({
+			ConditionExpression: "attribute_not_exists(completionId)",
+			TableName: "StudentCaseCompletionTable",
+		});
+		expect(command.input?.TransactItems?.[1]?.Put?.Item).toMatchObject({
+			analysisLockedAt: 2_000,
+			analysisSubmittedAt: 2_000,
+			certificateId: "certificate-1",
+			completionId: "case_completion_1",
+			personalAnalysis: finalPersonalAnalysis,
+			recordType: "studentCaseCompletion",
+		});
+		expect(command.input?.TransactItems?.[2]?.Update?.ConditionExpression).toBe(
 			"attribute_exists(caseId) AND #lifecycle = :published AND deadlineAt >= :now",
 		);
 	});
@@ -464,6 +583,7 @@ describe("DynamoStudentCaseRepository", () => {
 		const repository = new DynamoStudentCaseRepository(
 			"TeacherCaseTable",
 			"StudentCertificateTable",
+			"StudentCaseCompletionTable",
 			"StudentQuizAttemptTable",
 			documentClient,
 		);
@@ -476,7 +596,7 @@ describe("DynamoStudentCaseRepository", () => {
 			2_000,
 		);
 
-		const command = vi.mocked(documentClient.send).mock.calls[1]?.[0] as {
+		const command = mockCalls(documentClient.send)[1]?.[0] as {
 			input?: {
 				ExpressionAttributeValues?: Record<string, unknown>;
 				Key?: { attemptId?: string };
@@ -493,3 +613,7 @@ describe("DynamoStudentCaseRepository", () => {
 		);
 	});
 });
+
+function mockCalls(value: unknown) {
+	return (value as { mock: { calls: unknown[][] } }).mock.calls;
+}

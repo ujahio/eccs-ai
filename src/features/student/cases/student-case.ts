@@ -14,8 +14,10 @@ import {
 	getE2EAuthStore,
 	getE2ETeacherCaseStore,
 	isE2EMode,
+	saveE2EStudentCaseCompletion,
 	saveE2EStudentCertificate,
 } from "@/lib/e2e/in-memory-auth";
+import { validateAnalysisWordCount } from "./analysis";
 
 export type StudentCaseAttachmentDisposition = "inline" | "attachment";
 
@@ -59,12 +61,19 @@ export type StudentCaseQuizQuestion = {
 export type CompleteStudentCaseQuizArgs = {
 	answers: Record<string, string>;
 	caseId: string;
+	personalAnalysis: string;
 	studentDisplayName: string;
 	studentProfileId: string;
 };
 
 export type CompleteStudentCaseQuizResult =
 	| {
+			certificate: {
+				certificateBranding: StudentCaseCertificateBranding;
+				caseTitle: string;
+				completedAt: number;
+				studentDisplayName: string;
+			};
 			certificateId: string;
 			status: "passed";
 	  }
@@ -80,10 +89,30 @@ export type CompleteStudentCaseQuizReviewArgs = {
 };
 
 export type StudentCaseCertificateRecord = {
+	certificateBranding: StudentCaseCertificateBranding;
 	certificateId: string;
 	caseId: string;
 	caseTitle: string;
 	completedAt: number;
+	recordType: typeof studentCaseCertificateRecordType;
+	studentDisplayName: string;
+	studentProfileId: string;
+};
+
+export type StudentCaseCertificateBranding = {
+	organizationName: "E-Clinical Case Solutions";
+	shortName: "ECCS";
+};
+
+export type StudentCaseCompletionRecord = {
+	analysisLockedAt: number;
+	analysisSubmittedAt: number;
+	caseId: string;
+	certificateId: string;
+	completedAt: number;
+	completionId: string;
+	personalAnalysis: string;
+	recordType: typeof studentCaseCompletionRecordType;
 	studentDisplayName: string;
 	studentProfileId: string;
 };
@@ -95,6 +124,7 @@ type StudentCaseRepository = {
 	): Promise<void>;
 	createStudentCaseCertificate(
 		record: StudentCaseCertificateRecord,
+		completionRecord: StudentCaseCompletionRecord,
 		now: number,
 	): Promise<void>;
 	getStudentCaseQuizAttempt(
@@ -152,6 +182,12 @@ type StudentCaseQuizAttemptState = {
 };
 
 const attachmentUrlTtlMilliseconds = 15 * 60 * 1_000;
+const studentCaseCertificateRecordType = "studentCaseCertificate";
+const studentCaseCompletionRecordType = "studentCaseCompletion";
+const eccsCertificateBranding: StudentCaseCertificateBranding = {
+	organizationName: "E-Clinical Case Solutions",
+	shortName: "ECCS",
+};
 
 export async function getStudentActiveCasePresentation(caseId: string) {
 	return getStudentCaseRepository().getActiveCasePresentation(caseId, Date.now());
@@ -160,6 +196,7 @@ export async function getStudentActiveCasePresentation(caseId: string) {
 export async function completeStudentCaseQuiz({
 	answers,
 	caseId,
+	personalAnalysis,
 	studentDisplayName,
 	studentProfileId,
 }: CompleteStudentCaseQuizArgs): Promise<CompleteStudentCaseQuizResult> {
@@ -193,17 +230,36 @@ export async function completeStudentCaseQuiz({
 		};
 	}
 
+	const lockedPersonalAnalysis = personalAnalysisForCompletion(personalAnalysis);
 	const certificateId = studentCaseCertificateId({
+		caseId,
+		studentProfileId,
+	});
+	const completionId = studentCaseCompletionId({
 		caseId,
 		studentProfileId,
 	});
 
 	await repository.createStudentCaseCertificate(
 		{
+			certificateBranding: eccsCertificateBranding,
 			certificateId,
 			caseId,
 			caseTitle: caseRecord.title,
 			completedAt: now,
+			recordType: studentCaseCertificateRecordType,
+			studentDisplayName,
+			studentProfileId,
+		},
+		{
+			analysisLockedAt: now,
+			analysisSubmittedAt: now,
+			caseId,
+			certificateId,
+			completedAt: now,
+			completionId,
+			personalAnalysis: lockedPersonalAnalysis,
+			recordType: studentCaseCompletionRecordType,
 			studentDisplayName,
 			studentProfileId,
 		},
@@ -211,6 +267,12 @@ export async function completeStudentCaseQuiz({
 	);
 
 	return {
+		certificate: {
+			certificateBranding: eccsCertificateBranding,
+			caseTitle: caseRecord.title,
+			completedAt: now,
+			studentDisplayName,
+		},
 		certificateId,
 		status: "passed",
 	};
@@ -261,6 +323,7 @@ function getStudentCaseRepository(): StudentCaseRepository {
 	return new DynamoStudentCaseRepository(
 		resources.teacherCaseTableName,
 		resources.studentCertificateTableName,
+		resources.studentCaseCompletionTableName,
 		resources.studentQuizAttemptTableName,
 	);
 }
@@ -288,6 +351,7 @@ export class InMemoryStudentCaseRepository implements StudentCaseRepository {
 
 	async createStudentCaseCertificate(
 		record: StudentCaseCertificateRecord,
+		completionRecord: StudentCaseCompletionRecord,
 		now: number,
 	) {
 		const store = getE2EAuthStore();
@@ -310,6 +374,7 @@ export class InMemoryStudentCaseRepository implements StudentCaseRepository {
 		}
 
 		saveE2EStudentCertificate(record);
+		saveE2EStudentCaseCompletion(completionRecord);
 		store.studentQuizAttempts.delete(studentCaseQuizAttemptId(record));
 		store.teacherCases.set(record.caseId, {
 			...caseRecord,
@@ -398,15 +463,18 @@ export class InMemoryStudentCaseRepository implements StudentCaseRepository {
 
 export class DynamoStudentCaseRepository implements StudentCaseRepository {
 	private readonly documentClient: DynamoDBDocumentClient;
+	private readonly studentCaseCompletionTableName: string;
 	private readonly studentCertificateTableName: string;
 	private readonly studentQuizAttemptTableName: string;
 
 	constructor(
 		private readonly teacherCaseTableName: string,
 		studentCertificateTableName: string,
+		studentCaseCompletionTableName: string,
 		studentQuizAttemptTableName: string,
 		documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({})),
 	) {
+		this.studentCaseCompletionTableName = studentCaseCompletionTableName;
 		this.studentCertificateTableName = studentCertificateTableName;
 		this.studentQuizAttemptTableName = studentQuizAttemptTableName;
 		this.documentClient = documentClient;
@@ -441,6 +509,7 @@ export class DynamoStudentCaseRepository implements StudentCaseRepository {
 
 	async createStudentCaseCertificate(
 		record: StudentCaseCertificateRecord,
+		completionRecord: StudentCaseCompletionRecord,
 		now: number,
 	) {
 		try {
@@ -452,6 +521,13 @@ export class DynamoStudentCaseRepository implements StudentCaseRepository {
 								TableName: this.studentCertificateTableName,
 								Item: record,
 								ConditionExpression: "attribute_not_exists(certificateId)",
+							},
+						},
+						{
+							Put: {
+								TableName: this.studentCaseCompletionTableName,
+								Item: completionRecord,
+								ConditionExpression: "attribute_not_exists(completionId)",
 							},
 						},
 						{
@@ -662,6 +738,13 @@ export class StudentCaseQuizReviewRequiredError extends Error {
 	constructor() {
 		super("Review required before retrying this quiz.");
 		this.name = "StudentCaseQuizReviewRequiredError";
+	}
+}
+
+export class StudentCaseAnalysisRequiredError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "StudentCaseAnalysisRequiredError";
 	}
 }
 
@@ -1044,6 +1127,17 @@ function isPassingStudentCaseQuiz(
 	);
 }
 
+function personalAnalysisForCompletion(personalAnalysis: string) {
+	const trimmedAnalysis = personalAnalysis.trim();
+	const validation = validateAnalysisWordCount(trimmedAnalysis);
+
+	if (!validation.valid) {
+		throw new StudentCaseAnalysisRequiredError(validation.message);
+	}
+
+	return trimmedAnalysis;
+}
+
 function studentCaseCertificateId({
 	caseId,
 	studentProfileId,
@@ -1051,12 +1145,25 @@ function studentCaseCertificateId({
 	caseId: string;
 	studentProfileId: string;
 }) {
-	const digest = createHash("sha256")
-		.update(`${studentProfileId}\n${caseId}`)
-		.digest("base64url")
-		.slice(0, 32);
+	return studentCaseScopedId({
+		caseId,
+		prefix: "cert",
+		studentProfileId,
+	});
+}
 
-	return `cert_${digest}`;
+function studentCaseCompletionId({
+	caseId,
+	studentProfileId,
+}: {
+	caseId: string;
+	studentProfileId: string;
+}) {
+	return studentCaseScopedId({
+		caseId,
+		prefix: "case_completion",
+		studentProfileId,
+	});
 }
 
 function studentCaseQuizAttemptId({
@@ -1066,12 +1173,28 @@ function studentCaseQuizAttemptId({
 	caseId: string;
 	studentProfileId: string;
 }) {
+	return studentCaseScopedId({
+		caseId,
+		prefix: "quiz_attempt",
+		studentProfileId,
+	});
+}
+
+function studentCaseScopedId({
+	caseId,
+	prefix,
+	studentProfileId,
+}: {
+	caseId: string;
+	prefix: "case_completion" | "cert" | "quiz_attempt";
+	studentProfileId: string;
+}) {
 	const digest = createHash("sha256")
 		.update(`${studentProfileId}\n${caseId}`)
 		.digest("base64url")
 		.slice(0, 32);
 
-	return `quiz_attempt_${digest}`;
+	return `${prefix}_${digest}`;
 }
 
 function quizAttemptStateFromRecord(

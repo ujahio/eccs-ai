@@ -24,6 +24,7 @@ export const client = new sst.aws.Nextjs("eccsfeweb", {
 		tables.userProfileTable,
 		tables.teacherCaseTable,
 		tables.studentCertificateTable,
+		tables.studentCaseCompletionTable,
 		tables.studentQuizAttemptTable,
 	],
 	dev: {

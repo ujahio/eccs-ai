@@ -448,6 +448,19 @@ test.describe("Student case presentation and analysis flow", () => {
 		await expect(
 			page.getByTestId("student-case-certificate-download"),
 		).toHaveAttribute("href", /\/student\/certificates\/cert_.*\/download/);
+		const certificatePreview = page.getByTestId("student-certificate-preview");
+
+		await expect(certificatePreview).toBeVisible();
+		await expect(certificatePreview).toContainText("E-Clinical Case Solutions");
+		await expect(certificatePreview).toContainText("Jordan Adebayo");
+		await expect(certificatePreview).toContainText(
+			"Acute endocrine case review",
+		);
+		await expect(certificatePreview).toContainText("Completed");
+		await expect(certificatePreview).not.toContainText("Certificate ID");
+		await expect(certificatePreview).not.toContainText("Credits");
+		await expect(certificatePreview).not.toContainText("Partner");
+		await expect(certificatePreview).not.toContainText("Issuing");
 	});
 
 	test("shows failed quiz attempts without per-question correctness and forces review on the third failure", async ({
