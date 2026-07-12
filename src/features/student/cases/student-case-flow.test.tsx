@@ -1,11 +1,26 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { StudentCaseFlow } from "./student-case-flow";
+import { describe, expect, it, vi } from "vitest";
+import {
+	isStudentCaseDeadlineStep,
+	StudentCaseFlow,
+	type CaseFlowStep,
+} from "./student-case-flow";
 import type { StudentCasePresentation } from "./student-case";
 
 describe("StudentCaseFlow", () => {
-	afterEach(() => {
-		vi.useRealTimers();
+	it("treats the certificate step as post-deadline-display", () => {
+		const deadlineSteps: CaseFlowStep[] = [
+			"presentation",
+			"analysis",
+			"comparison",
+			"resources",
+			"quiz",
+		];
+
+		for (const step of deadlineSteps) {
+			expect(isStudentCaseDeadlineStep(step)).toBe(true);
+		}
+		expect(isStudentCaseDeadlineStep("certificate")).toBe(false);
 	});
 
 	it("renders active case presentation content", () => {
@@ -35,24 +50,30 @@ describe("StudentCaseFlow", () => {
 	});
 
 	it("shows a due-soon deadline indicator inside the two-day reminder window", () => {
-		vi.useFakeTimers();
-		vi.setSystemTime(Date.UTC(2026, 6, 29, 12));
+		const dateNowSpy = vi
+			.spyOn(Date, "now")
+			.mockReturnValue(Date.UTC(2026, 6, 29, 12));
 
-		const markup = renderToStaticMarkup(
-			<StudentCaseFlow
-				caseRecord={caseRecordFixture({
-					deadlineAt: Date.UTC(2026, 6, 31, 11),
-				})}
-				quizAction={async () => ({
-					message: "",
-					status: "idle",
-				})}
-				quizReviewAction={async () => ({
-					message: "",
-					status: "ready",
-				})}
-			/>,
-		);
+		let markup = "";
+		try {
+			markup = renderToStaticMarkup(
+				<StudentCaseFlow
+					caseRecord={caseRecordFixture({
+						deadlineAt: Date.UTC(2026, 6, 31, 11),
+					})}
+					quizAction={async () => ({
+						message: "",
+						status: "idle",
+					})}
+					quizReviewAction={async () => ({
+						message: "",
+						status: "ready",
+					})}
+				/>,
+			);
+		} finally {
+			dateNowSpy.mockRestore();
+		}
 
 		expect(markup).toContain('data-testid="student-case-deadline-date"');
 		expect(markup).toContain('data-testid="student-case-deadline-reminder"');
@@ -65,24 +86,30 @@ describe("StudentCaseFlow", () => {
 	});
 
 	it("does not show the due-soon indicator outside the two-day reminder window", () => {
-		vi.useFakeTimers();
-		vi.setSystemTime(Date.UTC(2026, 6, 20, 12));
+		const dateNowSpy = vi
+			.spyOn(Date, "now")
+			.mockReturnValue(Date.UTC(2026, 6, 20, 12));
 
-		const markup = renderToStaticMarkup(
-			<StudentCaseFlow
-				caseRecord={caseRecordFixture({
-					deadlineAt: Date.UTC(2026, 6, 31, 11),
-				})}
-				quizAction={async () => ({
-					message: "",
-					status: "idle",
-				})}
-				quizReviewAction={async () => ({
-					message: "",
-					status: "ready",
-				})}
-			/>,
-		);
+		let markup = "";
+		try {
+			markup = renderToStaticMarkup(
+				<StudentCaseFlow
+					caseRecord={caseRecordFixture({
+						deadlineAt: Date.UTC(2026, 6, 31, 11),
+					})}
+					quizAction={async () => ({
+						message: "",
+						status: "idle",
+					})}
+					quizReviewAction={async () => ({
+						message: "",
+						status: "ready",
+					})}
+				/>,
+			);
+		} finally {
+			dateNowSpy.mockRestore();
+		}
 
 		expect(markup).toContain('data-testid="student-case-deadline-date"');
 		expect(markup).not.toContain('data-testid="student-case-deadline-reminder"');

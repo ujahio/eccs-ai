@@ -7,7 +7,18 @@ export type StudentCaseQuizFormStatus =
 	| "duplicate"
 	| "error";
 
+export type StudentCaseQuizCertificateState = {
+	certificateBranding: {
+		organizationName: string;
+		shortName: string;
+	};
+	caseTitle: string;
+	completedAt: number;
+	studentDisplayName: string;
+};
+
 export type StudentCaseQuizFormState = {
+	certificate?: StudentCaseQuizCertificateState;
 	certificateId?: string;
 	failuresSinceReview?: number;
 	message: string;

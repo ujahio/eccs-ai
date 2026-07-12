@@ -1,5 +1,9 @@
 import { buttonVariants } from "@/components/ui/button";
-import { getStudentCertificateHistory } from "@/features/student/dashboard/summary";
+import { StudentCertificatePreview } from "@/features/student/certificates/certificate-preview";
+import {
+	getStudentCertificateHistory,
+	type StudentDashboardCertificate,
+} from "@/features/student/dashboard/summary";
 import { formatDubaiDate } from "@/lib/date-format";
 import { requireStudentSession } from "@/lib/auth/session";
 
@@ -9,61 +13,22 @@ export default async function StudentCertificatesPage() {
 
 	return (
 		<section
-			className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10"
+			className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-10"
 			data-testid="student-certificates-root"
 		>
 			<div className="mb-6">
-				<p className="text-sm font-semibold uppercase text-brand-teal">
-					Certificates
-				</p>
-				<h1 className="mt-3 text-2xl font-semibold">Certificate history</h1>
+				<h1 className="text-sm font-semibold uppercase text-brand-teal">
+					Certificate History
+				</h1>
 			</div>
 
 			{certificates.length > 0 ? (
-				<div className="grid gap-4 sm:grid-cols-2">
+				<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 					{certificates.map((certificate) => (
-						<article
-							className="border border-primary-action bg-white p-5"
-							data-testid="student-certificate-history-card"
-							id={`certificate-${certificate.certificateId}`}
+						<CertificateHistoryCard
+							certificate={certificate}
 							key={certificate.certificateId}
-						>
-							<p className="text-xs font-semibold uppercase text-brand-teal">
-								Certificate
-							</p>
-							<h2 className="mt-3 text-base font-semibold">
-								{certificate.caseTitle}
-							</h2>
-							<dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
-								<div>
-									<dt className="text-xs font-semibold uppercase text-muted-gray">
-										Earned
-									</dt>
-									<dd className="mt-1 font-semibold">
-										{formatDubaiDate(certificate.completedAt)}
-									</dd>
-								</div>
-								<div>
-									<dt className="text-xs font-semibold uppercase text-muted-gray">
-										Name on certificate
-									</dt>
-									<dd className="mt-1 font-semibold">
-										{certificate.studentDisplayName}
-									</dd>
-								</div>
-							</dl>
-							<a
-								className={buttonVariants({
-									className: "mt-5",
-									size: "sm",
-								})}
-								data-testid="student-certificate-history-download-link"
-								download
-								href={`/student/certificates/${certificate.certificateId}/download`}
-							>
-								Download
-							</a>
-						</article>
+						/>
 					))}
 				</div>
 			) : (
@@ -78,5 +43,55 @@ export default async function StudentCertificatesPage() {
 				</div>
 			)}
 		</section>
+	);
+}
+
+function CertificateHistoryCard({
+	certificate,
+}: {
+	certificate: StudentDashboardCertificate;
+}) {
+	const completedDate = formatDubaiDate(certificate.completedAt);
+
+	return (
+		<article
+			aria-labelledby={`certificate-title-${certificate.certificateId}`}
+			className="border border-border-gray bg-white p-3 sm:p-4"
+			data-testid="student-certificate-history-card"
+			id={`certificate-${certificate.certificateId}`}
+		>
+			<StudentCertificatePreview
+				certificate={certificate}
+				density="compact"
+			/>
+			<div className="mt-4">
+				<h2
+					className="text-base font-semibold"
+					id={`certificate-title-${certificate.certificateId}`}
+				>
+					{certificate.caseTitle}
+				</h2>
+				<dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+					<div>
+						<dt className="text-xs font-semibold uppercase text-muted-gray">
+							Earned
+						</dt>
+						<dd className="mt-1 font-semibold">{completedDate}</dd>
+					</div>
+				</dl>
+				<a
+					aria-label={`Download certificate for ${certificate.caseTitle}`}
+					className={buttonVariants({
+						className: "mt-5",
+						size: "sm",
+					})}
+					data-testid="student-certificate-history-download-link"
+					download
+					href={`/student/certificates/${certificate.certificateId}/download`}
+				>
+					Download
+				</a>
+			</div>
+		</article>
 	);
 }

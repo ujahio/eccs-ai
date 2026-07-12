@@ -1,8 +1,13 @@
+import { readFile } from "node:fs/promises";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { formatDubaiDate } from "@/lib/date-format";
 
 const dayInMilliseconds = 24 * 60 * 60 * 1000;
 const password = "casework1";
+const certificateBranding = {
+	organizationName: "E-Clinical Case Solutions",
+	shortName: "ECCS",
+};
 
 function uniqueEmail(prefix: string) {
 	return `e2e-${prefix}-${Date.now()}-${Math.random()
@@ -54,6 +59,10 @@ async function seedStudentDashboard(
 			deadlineAt: number;
 		} | null;
 		certificates?: Array<{
+			certificateBranding: {
+				organizationName: string;
+				shortName: string;
+			};
 			certificateId: string;
 			caseId: string;
 			caseTitle: string;
@@ -102,6 +111,7 @@ test.describe("Student dashboard", () => {
 			},
 			certificates: [
 				{
+					certificateBranding,
 					certificateId: "certificate-newest",
 					caseId: "case-newest",
 					caseTitle: "Cardiac rehabilitation follow-up",
@@ -110,6 +120,7 @@ test.describe("Student dashboard", () => {
 					studentProfileId: profileId,
 				},
 				{
+					certificateBranding,
 					certificateId: "certificate-middle",
 					caseId: "case-middle",
 					caseTitle: "Respiratory complications review",
@@ -118,6 +129,7 @@ test.describe("Student dashboard", () => {
 					studentProfileId: profileId,
 				},
 				{
+					certificateBranding,
 					certificateId: "certificate-third",
 					caseId: "case-third",
 					caseTitle: "Metabolic emergency discussion",
@@ -126,6 +138,7 @@ test.describe("Student dashboard", () => {
 					studentProfileId: profileId,
 				},
 				{
+					certificateBranding,
 					certificateId: "certificate-oldest",
 					caseId: "case-oldest",
 					caseTitle: "Older hidden certificate",
@@ -134,6 +147,7 @@ test.describe("Student dashboard", () => {
 					studentProfileId: profileId,
 				},
 				{
+					certificateBranding,
 					certificateId: "other-student-certificate",
 					caseId: "case-other",
 					caseTitle: "Other student certificate",
@@ -182,12 +196,45 @@ test.describe("Student dashboard", () => {
 			page.getByTestId("student-certificate-download-link").first().click(),
 		]);
 		expect(download[0].suggestedFilename()).toMatch(/^certificate-.*\.pdf$/);
+		const downloadPath = await download[0].path();
+		if (!downloadPath) {
+			throw new Error("Expected certificate PDF download to have a local path.");
+		}
+		const pdfContents = await readFile(downloadPath, "utf8");
+		expect(pdfContents).toContain("E-Clinical Case Solutions");
+		expect(pdfContents).toContain("Jordan Adebayo");
+		expect(pdfContents).toContain("Cardiac rehabilitation follow-up");
+		expect(pdfContents).not.toContain("Certificate ID");
+		expect(pdfContents).not.toContain("certificate-newest");
 
 		await page.getByTestId("student-view-all-certificates-link").click();
 		await expect(page).toHaveURL(/\/student\/certificates$/);
 		await expect(
 			page.getByTestId("student-certificate-history-card"),
 		).toHaveCount(4);
+		await expect(page.getByTestId("student-certificate-preview")).toHaveCount(4);
+		const newestCertificateCard = page
+			.getByTestId("student-certificate-history-card")
+			.first();
+
+		await expect(
+			newestCertificateCard,
+		).toContainText("E-Clinical Case Solutions");
+		await expect(
+			newestCertificateCard,
+		).toContainText("Jordan Adebayo");
+		await expect(
+			newestCertificateCard,
+		).toContainText("Cardiac rehabilitation follow-up");
+		await expect(
+			newestCertificateCard,
+		).toContainText(formatDubaiDate(publishedAt));
+		await expect(
+			newestCertificateCard,
+		).not.toContainText("Certificate ID");
+		await expect(
+			newestCertificateCard,
+		).not.toContainText("certificate-newest");
 		await expect(
 			page.getByTestId("student-certificate-history-download-link"),
 		).toHaveCount(4);

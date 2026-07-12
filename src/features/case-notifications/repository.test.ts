@@ -22,6 +22,10 @@ import {
 vi.mock("server-only", () => ({}));
 
 const now = Date.UTC(2026, 6, 9, 8);
+const certificateBranding = {
+	organizationName: "E-Clinical Case Solutions",
+	shortName: "ECCS",
+};
 
 describe("InMemoryCaseLifecycleNotificationRepository", () => {
 	beforeEach(() => {
@@ -146,6 +150,7 @@ describe("InMemoryCaseLifecycleNotificationRepository", () => {
 	it("checks whether a student has earned the active case certificate", async () => {
 		seedE2EStudentCertificates([
 			{
+				certificateBranding,
 				certificateId: "certificate-1",
 				caseId: "case-1",
 				caseTitle: "Acute endocrine review",
@@ -196,6 +201,7 @@ describe("InMemoryCaseLifecycleNotificationRepository", () => {
 		]);
 		seedE2EStudentCertificates([
 			{
+				certificateBranding,
 				certificateId: "certificate-1",
 				caseId: "case-1",
 				caseTitle: "Acute endocrine review",

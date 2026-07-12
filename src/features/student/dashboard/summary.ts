@@ -23,11 +23,17 @@ export type StudentDashboardActiveCase = {
 };
 
 export type StudentDashboardCertificate = {
+	certificateBranding: StudentDashboardCertificateBranding;
 	certificateId: string;
 	caseId: string;
 	caseTitle: string;
 	completedAt: number;
 	studentDisplayName: string;
+};
+
+export type StudentDashboardCertificateBranding = {
+	organizationName: string;
+	shortName: string;
 };
 
 export type StudentDashboardSummary = {
@@ -263,12 +269,13 @@ function certificatesFromRecords(records: unknown[], limit?: number) {
 	const certificates = records
 		.filter(isStoredStudentCertificateRecord)
 		.sort((first, second) => second.completedAt - first.completedAt)
-		.map(({ certificateId, caseId, caseTitle, completedAt, studentDisplayName }) => ({
-			certificateId,
-			caseId,
-			caseTitle,
-			completedAt,
-			studentDisplayName,
+		.map((record) => ({
+			certificateBranding: record.certificateBranding,
+			certificateId: record.certificateId,
+			caseId: record.caseId,
+			caseTitle: record.caseTitle,
+			completedAt: record.completedAt,
+			studentDisplayName: record.studentDisplayName,
 		}));
 
 	return typeof limit === "number" ? certificates.slice(0, limit) : certificates;
@@ -303,11 +310,29 @@ function isStoredStudentCertificateRecord(
 	const candidate = record as Partial<StoredStudentCertificateRecord>;
 
 	return (
+		isCertificateBranding(candidate.certificateBranding) &&
 		typeof candidate.certificateId === "string" &&
 		typeof candidate.caseId === "string" &&
 		typeof candidate.caseTitle === "string" &&
 		typeof candidate.completedAt === "number" &&
 		typeof candidate.studentDisplayName === "string" &&
 		typeof candidate.studentProfileId === "string"
+	);
+}
+
+function isCertificateBranding(
+	value: unknown,
+): value is StudentDashboardCertificateBranding {
+	if (typeof value !== "object" || value === null) {
+		return false;
+	}
+
+	const candidate = value as Partial<StudentDashboardCertificateBranding>;
+
+	return (
+		typeof candidate.organizationName === "string" &&
+		candidate.organizationName.trim().length > 0 &&
+		typeof candidate.shortName === "string" &&
+		candidate.shortName.trim().length > 0
 	);
 }
