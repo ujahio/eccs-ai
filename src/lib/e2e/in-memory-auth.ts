@@ -113,6 +113,7 @@ type E2EAuthStoreShape = {
 	>;
 	registrations: Map<string, PendingRegistrationRecord>;
 	profiles: Map<string, AppProfileRecord>;
+	studentCaseCompletions: Map<string, E2EStudentCaseCompletionRecord>;
 	studentCertificates: Map<string, E2EStudentCertificateRecord>;
 	studentQuizAttempts: Map<string, E2EStudentQuizAttemptRecord>;
 	teacherCases: Map<string, E2ETeacherCaseRecord>;
@@ -161,10 +162,26 @@ type E2ETeacherCaseRecord = {
 };
 
 export type E2EStudentCertificateRecord = {
+	certificateBranding: {
+		organizationName: string;
+		shortName: string;
+	};
 	certificateId: string;
 	caseId: string;
 	caseTitle: string;
 	completedAt: number;
+	studentDisplayName: string;
+	studentProfileId: string;
+};
+
+export type E2EStudentCaseCompletionRecord = {
+	analysisLockedAt: number;
+	analysisSubmittedAt: number;
+	caseId: string;
+	certificateId: string;
+	completedAt: number;
+	completionId: string;
+	personalAnalysis: string;
 	studentDisplayName: string;
 	studentProfileId: string;
 };
@@ -191,6 +208,7 @@ function getStore(): E2EAuthStoreShape {
 			caseMaterials: new Map(),
 			registrations: new Map(),
 			profiles: new Map(),
+			studentCaseCompletions: new Map(),
 			studentCertificates: new Map(),
 			studentQuizAttempts: new Map(),
 			teacherCases: new Map(),
@@ -213,6 +231,7 @@ export function resetE2EAuthStore() {
 	store.registrations.clear();
 	store.caseMaterials.clear();
 	store.profiles.clear();
+	store.studentCaseCompletions.clear();
 	store.studentCertificates.clear();
 	store.studentQuizAttempts.clear();
 	store.teacherCases.clear();
@@ -256,6 +275,12 @@ export function getE2EStudentCertificateStore(studentProfileId: string) {
 	);
 }
 
+export function getE2EStudentCaseCompletionStore(studentProfileId: string) {
+	return Array.from(getStore().studentCaseCompletions.values()).filter(
+		(completion) => completion.studentProfileId === studentProfileId,
+	);
+}
+
 export function seedE2EStudentCertificates(
 	certificates: E2EStudentCertificateRecord[],
 ) {
@@ -272,6 +297,12 @@ export function saveE2EStudentCertificate(
 	certificate: E2EStudentCertificateRecord,
 ) {
 	getStore().studentCertificates.set(certificate.certificateId, certificate);
+}
+
+export function saveE2EStudentCaseCompletion(
+	completion: E2EStudentCaseCompletionRecord,
+) {
+	getStore().studentCaseCompletions.set(completion.completionId, completion);
 }
 
 export function seedE2ETeacherCases(

@@ -214,6 +214,10 @@ function parseCertificates(value: unknown): E2EStudentCertificateRecord[] {
 		}
 
 		const input = certificate as Record<string, unknown>;
+		const certificateBranding = parseCertificateBranding(
+			input.certificateBranding,
+			index,
+		);
 		const certificateId = String(input.certificateId ?? "").trim();
 		const caseId = String(input.caseId ?? "").trim();
 		const caseTitle = String(input.caseTitle ?? "").trim();
@@ -233,6 +237,7 @@ function parseCertificates(value: unknown): E2EStudentCertificateRecord[] {
 		}
 
 		return {
+			certificateBranding,
 			certificateId,
 			caseId,
 			caseTitle,
@@ -241,6 +246,27 @@ function parseCertificates(value: unknown): E2EStudentCertificateRecord[] {
 			studentProfileId,
 		};
 	});
+}
+
+function parseCertificateBranding(value: unknown, index: number) {
+	if (typeof value !== "object" || value === null) {
+		throw new Error(`certificates[${index}].certificateBranding is required.`);
+	}
+
+	const input = value as Record<string, unknown>;
+	const organizationName = String(input.organizationName ?? "").trim();
+	const shortName = String(input.shortName ?? "").trim();
+
+	if (!organizationName || !shortName) {
+		throw new Error(
+			`certificates[${index}].certificateBranding is missing required fields.`,
+		);
+	}
+
+	return {
+		organizationName,
+		shortName,
+	};
 }
 
 export async function GET(request: Request) {

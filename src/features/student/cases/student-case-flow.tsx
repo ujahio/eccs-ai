@@ -7,7 +7,8 @@ import {
 	useState,
 	useTransition,
 } from "react";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button, ButtonLink, buttonVariants } from "@/components/ui/button";
+import { StudentCertificatePreview } from "@/features/student/certificates/certificate-preview";
 import { formatDubaiDate } from "@/lib/date-format";
 import {
 	countAnalysisWords,
@@ -29,7 +30,7 @@ type StudentCaseFlowProps = {
 	quizReviewAction: StudentCaseQuizReviewAction;
 };
 
-type CaseFlowStep =
+export type CaseFlowStep =
 	| "presentation"
 	| "analysis"
 	| "comparison"
@@ -94,6 +95,13 @@ const stepCopy: Record<
 const expiredMessage =
 	"This case is no longer active. Return to your dashboard for the current case status.";
 const deadlineReminderWindowMilliseconds = 2 * 24 * 60 * 60 * 1_000;
+const deadlineEnforcedSteps = new Set<CaseFlowStep>([
+	"presentation",
+	"analysis",
+	"comparison",
+	"resources",
+	"quiz",
+]);
 
 export function StudentCaseFlow({
 	caseRecord,
@@ -130,7 +138,11 @@ export function StudentCaseFlow({
 	const validation = validateAnalysisWordCount(analysisText);
 	const isAnalysisValid = validation.valid;
 	const currentStepCopy = stepCopy[step];
-	const visibleMessage = isExpired ? expiredMessage : message;
+	const shouldEnforceDeadline = isStudentCaseDeadlineStep(step);
+	const isCurrentStepBlockedByDeadline = shouldEnforceDeadline && isExpired;
+	const visibleMessage = isCurrentStepBlockedByDeadline
+		? expiredMessage
+		: message;
 	const showPersonalAnalysis = analysisReviewMode !== "modelAnswer";
 	const showModelAnswer = analysisReviewMode !== "personalAnalysis";
 	const hasAllQuizAnswers =
@@ -143,11 +155,11 @@ export function StudentCaseFlow({
 	const shouldWarnBeforeLeavingQuiz = step === "quiz" && !hasPassedQuiz;
 	const isDeadlineInReminderWindow = isDeadlineWithinReminderWindow(
 		caseRecord.deadlineAt,
-		isExpired,
+		isCurrentStepBlockedByDeadline,
 	);
 
 	useEffect(() => {
-		if (isExpired) {
+		if (!shouldEnforceDeadline || isExpired) {
 			return;
 		}
 
@@ -172,7 +184,7 @@ export function StudentCaseFlow({
 			window.clearTimeout(timeoutId);
 			window.clearInterval(intervalId);
 		};
-	}, [caseRecord.deadlineAt, isExpired]);
+	}, [caseRecord.deadlineAt, isExpired, shouldEnforceDeadline]);
 
 	useEffect(() => {
 		if (!shouldWarnBeforeLeavingQuiz) {
@@ -192,7 +204,10 @@ export function StudentCaseFlow({
 	}, [shouldWarnBeforeLeavingQuiz]);
 
 	function isDeadlineExpired() {
-		return isExpired || Date.now() > caseRecord.deadlineAt;
+		return (
+			shouldEnforceDeadline &&
+			(isExpired || Date.now() > caseRecord.deadlineAt)
+		);
 	}
 
 	function guardActiveCase() {
@@ -404,31 +419,33 @@ export function StudentCaseFlow({
 					<p className="text-xs font-semibold uppercase text-brand-teal">
 						Case Study
 					</p>
-					<p
-						className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-primary-text sm:justify-end"
-						data-testid="student-case-deadline"
-					>
-						<span>Deadline: </span>
-						<span
-							className="text-primary-text"
-							data-testid="student-case-deadline-date"
+					{shouldEnforceDeadline ? (
+						<p
+							className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-primary-text sm:justify-end"
+							data-testid="student-case-deadline"
 						>
-							{formatDubaiDate(caseRecord.deadlineAt)}
-						</span>
-						<span> UAE</span>
-						{isDeadlineInReminderWindow ? (
+							<span>Deadline: </span>
 							<span
-								className="inline-flex min-h-7 items-center gap-2 border border-[#f4c7c7] bg-[#fff7f7] px-2.5 text-xs font-bold uppercase text-[#b94747]"
-								data-testid="student-case-deadline-reminder"
+								className="text-primary-text"
+								data-testid="student-case-deadline-date"
 							>
-								<span
-									aria-hidden="true"
-									className="h-1.5 w-1.5 rounded-full bg-[#d85b5b]"
-								/>
-								Due Soon
+								{formatDubaiDate(caseRecord.deadlineAt)}
 							</span>
-						) : null}
-					</p>
+							<span> UAE</span>
+							{isDeadlineInReminderWindow ? (
+								<span
+									className="inline-flex min-h-7 items-center gap-2 border border-[#f4c7c7] bg-[#fff7f7] px-2.5 text-xs font-bold uppercase text-[#b94747]"
+									data-testid="student-case-deadline-reminder"
+								>
+									<span
+										aria-hidden="true"
+										className="h-1.5 w-1.5 rounded-full bg-[#d85b5b]"
+									/>
+									Due Soon
+								</span>
+							) : null}
+						</p>
+					) : null}
 				</div>
 				<h1
 					className="mt-3 text-xl font-semibold leading-tight sm:text-2xl"
@@ -451,7 +468,7 @@ export function StudentCaseFlow({
 				</p>
 			) : null}
 
-			{isExpired ? (
+			{isCurrentStepBlockedByDeadline ? (
 				<article
 					className="border border-border-gray bg-white p-5 sm:p-7"
 					data-testid="student-case-expired"
@@ -463,7 +480,7 @@ export function StudentCaseFlow({
 				</article>
 			) : null}
 
-			{!isExpired && step === "presentation" ? (
+			{!isCurrentStepBlockedByDeadline && step === "presentation" ? (
 				<article
 					className="border border-border-gray bg-white p-5 sm:p-7"
 					data-testid="student-case-presentation-step"
@@ -487,7 +504,7 @@ export function StudentCaseFlow({
 				</article>
 			) : null}
 
-			{!isExpired && step === "analysis" ? (
+			{!isCurrentStepBlockedByDeadline && step === "analysis" ? (
 				<form
 					className="border border-border-gray bg-white p-5 sm:p-7"
 					data-testid="student-case-analysis-form"
@@ -560,7 +577,7 @@ export function StudentCaseFlow({
 				</form>
 			) : null}
 
-			{!isExpired && step === "comparison" ? (
+			{!isCurrentStepBlockedByDeadline && step === "comparison" ? (
 				<article
 					className="border border-border-gray bg-white p-5 sm:p-7"
 					data-testid="student-case-comparison-step"
@@ -653,7 +670,7 @@ export function StudentCaseFlow({
 				</article>
 			) : null}
 
-			{!isExpired && step === "resources" ? (
+			{!isCurrentStepBlockedByDeadline && step === "resources" ? (
 				<article
 					className="border border-border-gray bg-white p-5 sm:p-7"
 					data-testid="student-case-resources-step"
@@ -739,7 +756,7 @@ export function StudentCaseFlow({
 				</article>
 			) : null}
 
-			{!isExpired && step === "quiz" ? (
+			{!isCurrentStepBlockedByDeadline && step === "quiz" ? (
 				<form
 					className="border border-border-gray bg-white p-5 sm:p-7"
 					data-testid="student-case-quiz-form"
@@ -749,6 +766,11 @@ export function StudentCaseFlow({
 						name="caseId"
 						type="hidden"
 						value={caseRecord.caseId}
+					/>
+					<input
+						name="personalAnalysis"
+						type="hidden"
+						value={submittedAnalysis}
 					/>
 					<div className="mb-5 flex flex-col gap-2 border-b border-border-gray pb-4 sm:flex-row sm:items-center sm:justify-between">
 						<p
@@ -886,29 +908,20 @@ export function StudentCaseFlow({
 				</form>
 			) : null}
 
-			{!isExpired && step === "certificate" ? (
+			{step === "certificate" ? (
 				<article
 					className="border border-border-gray bg-white p-5 sm:p-7"
 					data-testid="student-case-certificate-step"
 				>
-					<div className="mx-auto max-w-2xl text-center">
-						<div className="mx-auto flex h-14 w-14 items-center justify-center border border-success-mint bg-success-soft text-primary-action">
-							<CheckIcon />
-						</div>
-						<h2 className="mt-5 text-xl font-semibold text-primary-text">
-							Certificate Earned
-						</h2>
-						<p
-							className="mt-3 text-sm leading-6 text-muted-gray"
-							data-testid="student-case-certificate-message"
-						>
-							You passed the CME quiz and earned your certificate for{" "}
-							{caseRecord.title}.
-						</p>
+					<div className="mx-auto max-w-5xl">
+						{quizState.certificate ? (
+							<StudentCertificatePreview certificate={quizState.certificate} />
+						) : null}
+
 						<div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
 							{quizState.certificateId ? (
 								<a
-									className="inline-flex h-11 items-center justify-center rounded bg-primary-action px-6 text-sm font-bold uppercase text-white transition hover:bg-success-mint focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal"
+									className={buttonVariants()}
 									data-testid="student-case-certificate-download"
 									download
 									href={`/student/certificates/${quizState.certificateId}/download`}
@@ -965,6 +978,10 @@ export function StudentCaseFlow({
 			) : null}
 		</section>
 	);
+}
+
+export function isStudentCaseDeadlineStep(step: CaseFlowStep) {
+	return deadlineEnforcedSteps.has(step);
 }
 
 function formatPdfSize(size: number) {
@@ -1026,22 +1043,6 @@ function DownloadIcon() {
 			/>
 			<path
 				d="M5 18.75h14v1.5H5v-1.5Z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
-}
-
-function CheckIcon() {
-	return (
-		<svg
-			aria-hidden="true"
-			className="h-7 w-7"
-			focusable="false"
-			viewBox="0 0 24 24"
-		>
-			<path
-				d="m9.25 16.35-4.1-4.1 1.1-1.1 3 3 8.5-8.5 1.1 1.1-9.6 9.6Z"
 				fill="currentColor"
 			/>
 		</svg>

@@ -16,6 +16,10 @@ describe("StudentDashboard", () => {
 				}}
 				recentCertificates={[
 					{
+						certificateBranding: {
+							organizationName: "E-Clinical Case Solutions",
+							shortName: "ECCS",
+						},
 						certificateId: "certificate-1",
 						caseId: "case-1",
 						caseTitle: "Respiratory complications review",

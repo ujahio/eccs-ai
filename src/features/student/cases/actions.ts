@@ -5,6 +5,7 @@ import {
 	completeStudentCaseQuizReview,
 	completeStudentCaseQuiz,
 	DuplicateStudentCaseCertificateError,
+	StudentCaseAnalysisRequiredError,
 	StudentCaseExpiredError,
 	StudentCaseQuizReviewRequiredError,
 } from "@/features/student/cases/student-case";
@@ -35,6 +36,7 @@ export async function submitStudentCaseQuizForm(
 		const result = await completeStudentCaseQuiz({
 			answers,
 			caseId,
+			personalAnalysis: personalAnalysisFromFormData(formData),
 			studentDisplayName: profile.fullName,
 			studentProfileId: profile.profileId,
 		});
@@ -63,6 +65,7 @@ export async function submitStudentCaseQuizForm(
 		revalidatePath("/student/certificates");
 
 		return {
+			certificate: result.certificate,
 			certificateId: result.certificateId,
 			message: "Quiz passed. Your certificate is ready.",
 			status: "passed",
@@ -92,6 +95,14 @@ export async function submitStudentCaseQuizForm(
 				message: "Quiz attempt submitted. Result: did not pass.",
 				reviewRequired: true,
 				status: "review_required",
+				submittedAt: Date.now(),
+			};
+		}
+
+		if (error instanceof StudentCaseAnalysisRequiredError) {
+			return {
+				message: error.message,
+				status: "error",
 				submittedAt: Date.now(),
 			};
 		}
@@ -164,6 +175,10 @@ function quizAnswersFromFormData(formData: FormData) {
 	}
 
 	return answers;
+}
+
+function personalAnalysisFromFormData(formData: FormData) {
+	return stringFromFormData(formData.get("personalAnalysis"));
 }
 
 function stringFromFormData(value: FormDataEntryValue | null) {

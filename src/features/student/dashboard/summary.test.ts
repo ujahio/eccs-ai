@@ -24,6 +24,11 @@ beforeEach(() => {
 	resetE2EAuthStore();
 });
 
+const certificateBranding = {
+	organizationName: "E-Clinical Case Solutions",
+	shortName: "ECCS",
+};
+
 describe("InMemoryStudentDashboardRepository", () => {
 	it("returns the active case and newest three student certificates", async () => {
 		const now = Date.UTC(2026, 6, 7);
@@ -51,6 +56,7 @@ describe("InMemoryStudentDashboardRepository", () => {
 		]);
 		seedE2EStudentCertificates([
 			{
+				certificateBranding,
 				certificateId: "certificate-oldest",
 				caseId: "case-oldest",
 				caseTitle: "Older hidden certificate",
@@ -59,6 +65,7 @@ describe("InMemoryStudentDashboardRepository", () => {
 				studentProfileId: "student-1",
 			},
 			{
+				certificateBranding,
 				certificateId: "certificate-newest",
 				caseId: "case-newest",
 				caseTitle: "Latest certificate",
@@ -67,6 +74,7 @@ describe("InMemoryStudentDashboardRepository", () => {
 				studentProfileId: "student-1",
 			},
 			{
+				certificateBranding,
 				certificateId: "certificate-middle",
 				caseId: "case-middle",
 				caseTitle: "Middle certificate",
@@ -75,6 +83,7 @@ describe("InMemoryStudentDashboardRepository", () => {
 				studentProfileId: "student-1",
 			},
 			{
+				certificateBranding,
 				certificateId: "certificate-third",
 				caseId: "case-third",
 				caseTitle: "Third certificate",
@@ -83,6 +92,7 @@ describe("InMemoryStudentDashboardRepository", () => {
 				studentProfileId: "student-1",
 			},
 			{
+				certificateBranding,
 				certificateId: "other-student-certificate",
 				caseId: "case-other",
 				caseTitle: "Other student certificate",
@@ -104,6 +114,9 @@ describe("InMemoryStudentDashboardRepository", () => {
 		expect(
 			summary.recentCertificates.map((certificate) => certificate.certificateId),
 		).toEqual(["certificate-newest", "certificate-middle", "certificate-third"]);
+		expect(summary.recentCertificates[0]?.certificateBranding).toEqual(
+			certificateBranding,
+		);
 		expect(summary.recentCertificates).not.toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({ certificateId: "other-student-certificate" }),
@@ -115,6 +128,7 @@ describe("InMemoryStudentDashboardRepository", () => {
 		const now = Date.UTC(2026, 6, 7);
 		seedE2EStudentCertificates([
 			{
+				certificateBranding,
 				certificateId: "certificate-oldest",
 				caseId: "case-oldest",
 				caseTitle: "Older certificate",
@@ -123,6 +137,7 @@ describe("InMemoryStudentDashboardRepository", () => {
 				studentProfileId: "student-1",
 			},
 			{
+				certificateBranding,
 				certificateId: "certificate-newest",
 				caseId: "case-newest",
 				caseTitle: "Latest certificate",
@@ -131,6 +146,7 @@ describe("InMemoryStudentDashboardRepository", () => {
 				studentProfileId: "student-1",
 			},
 			{
+				certificateBranding,
 				certificateId: "other-student-certificate",
 				caseId: "case-other",
 				caseTitle: "Other student certificate",
@@ -180,6 +196,7 @@ describe("DynamoStudentDashboardRepository", () => {
 				return {
 					Items: [
 						{
+							certificateBranding,
 							certificateId: "certificate-newest",
 							caseId: "case-newest",
 							caseTitle: "Latest certificate",
