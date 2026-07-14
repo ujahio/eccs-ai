@@ -536,12 +536,14 @@ export function StudentCaseFlow({
 					className="border border-border-gray bg-white p-5 sm:p-7"
 					data-testid="student-case-presentation-step"
 				>
-					<div
-						className="whitespace-pre-wrap text-base leading-8 text-primary-text"
-						data-testid="student-case-presentation"
-					>
-						{caseRecord.presentation}
-					</div>
+					<section className="border border-border-gray bg-app-canvas p-8 sm:p-10">
+						<div
+							className="whitespace-pre-wrap break-words text-base leading-7 text-primary-text"
+							data-testid="student-case-presentation"
+						>
+							{caseRecord.presentation}
+						</div>
+					</section>
 					<div className="mt-7 flex justify-end">
 						<Button
 							className="w-full sm:w-auto"
@@ -726,10 +728,9 @@ export function StudentCaseFlow({
 					className="border border-border-gray bg-white p-5 sm:p-7"
 					data-testid="student-case-resources-step"
 				>
-					<section>
-						<h2 className="text-base font-semibold">Lecture Text</h2>
+					<section className="border border-border-gray bg-app-canvas p-8 sm:p-10">
 						<div
-							className="mt-4 whitespace-pre-wrap text-base leading-8 text-primary-text"
+							className="whitespace-pre-wrap break-words text-base leading-7 text-primary-text"
 							data-testid="student-case-lecture-text"
 						>
 							{caseRecord.lectureText}
@@ -738,11 +739,11 @@ export function StudentCaseFlow({
 
 					{caseRecord.attachments.length > 0 ? (
 						<section
-							className="mt-8"
+							className="mt-5 border border-border-gray bg-white p-4 sm:p-5"
 							data-testid="student-case-pdf-attachments"
 						>
 							<h2 className="text-base font-semibold">Case Materials</h2>
-							<div className="mt-4 space-y-3">
+							<div className="mt-4 max-w-3xl space-y-3">
 								{caseRecord.attachments.map((attachment) => (
 									<section
 										className="flex flex-col gap-3 border border-border-gray bg-white p-3 transition hover:border-brand-teal sm:flex-row sm:items-center sm:justify-between"
