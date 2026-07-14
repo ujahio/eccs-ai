@@ -8,6 +8,11 @@ import {
 	useTransition,
 } from "react";
 import { Button, ButtonLink, buttonVariants } from "@/components/ui/button";
+import {
+	studentCaseFeedbackRatingQuestions,
+	studentCaseFeedbackSuggestionsQuestion,
+	type StudentCaseFeedbackRatingKey,
+} from "@/features/case-feedback/feedback";
 import { StudentCertificatePreview } from "@/features/student/certificates/certificate-preview";
 import { formatDubaiDate } from "@/lib/date-format";
 import {
@@ -18,7 +23,9 @@ import {
 } from "./analysis";
 import { quizOptionLabel, shuffleStudentCaseQuizQuestions } from "./quiz";
 import {
+	initialStudentCaseFeedbackFormState,
 	initialStudentCaseQuizFormState,
+	type StudentCaseFeedbackAction,
 	type StudentCaseQuizAction,
 	type StudentCaseQuizReviewAction,
 } from "./state";
@@ -26,6 +33,7 @@ import type { StudentCasePresentation } from "./student-case";
 
 type StudentCaseFlowProps = {
 	caseRecord: StudentCasePresentation;
+	feedbackAction: StudentCaseFeedbackAction;
 	quizAction: StudentCaseQuizAction;
 	quizReviewAction: StudentCaseQuizReviewAction;
 };
@@ -36,6 +44,7 @@ export type CaseFlowStep =
 	| "comparison"
 	| "resources"
 	| "quiz"
+	| "feedback"
 	| "certificate";
 type AnalysisReviewMode = "both" | "personalAnalysis" | "modelAnswer";
 
@@ -56,6 +65,7 @@ const analysisReviewOptions: Array<{
 		testId: "student-case-review-mode-model-answer",
 	},
 ];
+const feedbackScores = [1, 2, 3, 4, 5] as const;
 
 const stepCopy: Record<
 	CaseFlowStep,
@@ -86,6 +96,11 @@ const stepCopy: Record<
 		heading: "CME Quiz",
 		description: "Answer every question correctly to earn your certificate.",
 	},
+	feedback: {
+		heading: "Case Feedback",
+		description:
+			"Your feedback helps improve future case topics and the learning experience.",
+	},
 	certificate: {
 		heading: "Certificate",
 		description: "Your certificate is ready for download.",
@@ -105,6 +120,7 @@ const deadlineEnforcedSteps = new Set<CaseFlowStep>([
 
 export function StudentCaseFlow({
 	caseRecord,
+	feedbackAction,
 	quizAction,
 	quizReviewAction,
 }: StudentCaseFlowProps) {
@@ -117,12 +133,20 @@ export function StudentCaseFlow({
 	const [showLeaveQuizDialog, setShowLeaveQuizDialog] = useState(false);
 	const [reviewRequired, setReviewRequired] = useState(false);
 	const [message, setMessage] = useState("");
+	const [feedbackRatings, setFeedbackRatings] = useState<
+		Partial<Record<StudentCaseFeedbackRatingKey, number>>
+	>({});
+	const [feedbackComment, setFeedbackComment] = useState("");
+	const [feedbackState, setFeedbackState] = useState(
+		initialStudentCaseFeedbackFormState,
+	);
 	const [isExpired, setIsExpired] = useState(
 		() => Date.now() > caseRecord.deadlineAt,
 	);
 	const [quizState, setQuizState] = useState(initialStudentCaseQuizFormState);
 	const [isQuizPending, startQuizSubmission] = useTransition();
 	const [isReviewPending, startReviewCompletion] = useTransition();
+	const [isFeedbackPending, startFeedbackSubmission] = useTransition();
 	const wordCount = useMemo(
 		() => countAnalysisWords(analysisText),
 		[analysisText],
@@ -149,6 +173,9 @@ export function StudentCaseFlow({
 		quizQuestions.length > 0 &&
 		quizQuestions.every((question) => Boolean(quizAnswers[question.questionId]));
 	const hasPassedQuiz = quizState.status === "passed";
+	const hasAllFeedbackRatings = studentCaseFeedbackRatingQuestions.every(
+		(question) => Boolean(feedbackRatings[question.id]),
+	);
 	const showQuizFailureNotification =
 		quizState.status === "failed" || quizState.status === "review_required";
 	const showQuizReviewGateNotification = quizState.status === "review_required";
@@ -400,13 +427,49 @@ export function StudentCaseFlow({
 
 		if (result.status === "passed") {
 			setMessage("");
-			setStep("certificate");
+			setStep("feedback");
 			return;
 		}
 
 		if (result.status === "duplicate" || result.status === "error") {
 			setMessage("");
 		}
+	}
+
+	function submitFeedback(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+
+		if (
+			Object.keys(feedbackRatings).length === 0 &&
+			feedbackComment.trim().length === 0
+		) {
+			setFeedbackState(initialStudentCaseFeedbackFormState);
+			setMessage("");
+			setStep("certificate");
+			return;
+		}
+
+		if (!hasAllFeedbackRatings) {
+			setFeedbackState({
+				message: "Choose a 1-5 rating for each feedback question.",
+				status: "error",
+				submittedAt: Date.now(),
+			});
+			return;
+		}
+
+		const formData = new FormData(event.currentTarget);
+
+		startFeedbackSubmission(async () => {
+			const result = await feedbackAction(formData);
+
+			setFeedbackState(result);
+
+			if (result.status === "submitted") {
+				setMessage("");
+				setStep("certificate");
+			}
+		});
 	}
 
 	return (
@@ -903,6 +966,134 @@ export function StudentCaseFlow({
 							type="submit"
 						>
 							{isQuizPending ? "Submitting" : "Submit"}
+						</Button>
+					</div>
+				</form>
+			) : null}
+
+			{step === "feedback" ? (
+				<form
+					className="border border-border-gray bg-white p-5 sm:p-7"
+					data-testid="student-case-feedback-form"
+					onSubmit={submitFeedback}
+				>
+					<input
+						name="caseId"
+						type="hidden"
+						value={caseRecord.caseId}
+					/>
+					{feedbackState.status === "error" ? (
+						<p
+							className="border border-error-red bg-white p-3 text-sm font-medium text-error-red"
+							data-testid="student-case-feedback-status"
+							role="alert"
+						>
+							{feedbackState.message}
+						</p>
+					) : null}
+
+					<div
+						className="space-y-5"
+						data-testid="student-case-feedback-step"
+					>
+						{studentCaseFeedbackRatingQuestions.map((question, index) => (
+							<fieldset
+								className="border border-border-gray bg-app-canvas p-4"
+								data-testid={`student-case-feedback-question-${question.id}`}
+								key={question.id}
+							>
+								<legend className="text-sm font-semibold leading-6 text-primary-text">
+									<span className="text-brand-teal">
+										Question {index + 1}.{" "}
+									</span>
+									{question.question}
+								</legend>
+								<div className="mt-4 grid grid-cols-5 gap-2">
+									{feedbackScores.map((score) => {
+										const isSelected =
+											feedbackRatings[question.id] === score;
+
+										return (
+											<label
+												aria-label={`${score} out of 5`}
+												className={[
+													"flex min-h-11 cursor-pointer items-center justify-center border text-sm font-semibold transition",
+													isSelected
+														? "border-primary-action bg-soft-section text-primary-action"
+														: "border-border-gray bg-white text-muted-gray hover:border-primary-action hover:text-primary-text",
+												].join(" ")}
+												data-testid={`student-case-feedback-${question.id}-${score}`}
+												key={score}
+											>
+												<input
+													checked={isSelected}
+													className="sr-only"
+													name={`feedback:${question.id}`}
+													onChange={() => {
+														setFeedbackRatings((ratings) => ({
+															...ratings,
+															[question.id]: score,
+														}));
+														if (feedbackState.status === "error") {
+															setFeedbackState(
+																initialStudentCaseFeedbackFormState,
+															);
+														}
+													}}
+													type="radio"
+													value={score}
+												/>
+												{score}
+											</label>
+										);
+									})}
+								</div>
+								<div className="mt-2 flex justify-between text-xs text-muted-gray">
+									<span>1 - Strongly disagree</span>
+									<span>5 - Strongly agree</span>
+								</div>
+							</fieldset>
+						))}
+					</div>
+
+					<div className="mt-6">
+						<label
+							className="text-sm font-semibold text-primary-text"
+							htmlFor="student-case-feedback-comment"
+						>
+							{studentCaseFeedbackSuggestionsQuestion}
+						</label>
+						<textarea
+							className="mt-3 min-h-36 w-full resize-y border border-border-gray bg-white p-4 text-sm leading-6 text-primary-text outline-none transition placeholder:text-muted-gray focus:border-brand-teal"
+							data-testid="student-case-feedback-comment"
+							id="student-case-feedback-comment"
+							maxLength={2_000}
+							name="futureSuggestions"
+							onChange={(event) => {
+								setFeedbackComment(event.target.value);
+								if (feedbackState.status === "error") {
+									setFeedbackState(initialStudentCaseFeedbackFormState);
+								}
+							}}
+							placeholder="Optional response"
+							value={feedbackComment}
+						/>
+						<p
+							className="mt-2 text-right text-xs text-muted-gray"
+							data-testid="student-case-feedback-comment-count"
+						>
+							{feedbackComment.length} / 2000
+						</p>
+					</div>
+
+					<div className="mt-7 flex justify-end">
+						<Button
+							className="w-full sm:w-auto"
+							data-testid="student-case-submit-feedback"
+							disabled={isFeedbackPending}
+							type="submit"
+						>
+							{isFeedbackPending ? "Submitting" : "Submit Feedback"}
 						</Button>
 					</div>
 				</form>

@@ -44,7 +44,25 @@ export type StudentCaseQuizReviewAction = (
 	formData: FormData,
 ) => Promise<StudentCaseQuizReviewFormState>;
 
+export type StudentCaseFeedbackFormStatus = "idle" | "submitted" | "error";
+
+export type StudentCaseFeedbackFormState = {
+	message: string;
+	status: StudentCaseFeedbackFormStatus;
+	submittedAt?: number;
+};
+
+export type StudentCaseFeedbackAction = (
+	formData: FormData,
+) => Promise<StudentCaseFeedbackFormState>;
+
 export const initialStudentCaseQuizFormState: StudentCaseQuizFormState = {
 	message: "",
 	status: "idle",
 };
+
+export const initialStudentCaseFeedbackFormState: StudentCaseFeedbackFormState =
+	{
+		message: "",
+		status: "idle",
+	};

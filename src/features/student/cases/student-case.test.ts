@@ -5,6 +5,10 @@ import {
 	resetE2EAuthStore,
 	seedE2ETeacherCases,
 } from "@/lib/e2e/in-memory-auth";
+import type {
+	StudentCaseFeedbackRating,
+	StudentCaseFeedbackRatings,
+} from "@/features/case-feedback/feedback";
 
 vi.mock("server-only", () => ({}));
 
@@ -353,6 +357,93 @@ describe("InMemoryStudentCaseRepository", () => {
 		}
 	});
 
+	it("submits feedback for a completed case without double-counting", async () => {
+		const {
+			StudentCaseFeedbackUnavailableError,
+			completeStudentCaseQuiz,
+			submitStudentCaseFeedback,
+		} = await import("./student-case");
+		const previousMode = process.env.AUTH_E2E_MODE;
+		process.env.AUTH_E2E_MODE = "memory";
+		const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(2_000);
+		seedE2ETeacherCases([activeCase]);
+
+		try {
+			await expect(
+				submitStudentCaseFeedback({
+					caseId: "active-case",
+					studentProfileId: "student-1",
+					feedback: feedbackInputFixture(),
+				}),
+			).rejects.toBeInstanceOf(StudentCaseFeedbackUnavailableError);
+
+			await completeStudentCaseQuiz({
+				caseId: "active-case",
+				studentProfileId: "student-1",
+				studentDisplayName: "Jordan Adebayo",
+				personalAnalysis: finalPersonalAnalysis,
+				answers: {
+					"question-1": "q1-a",
+					"question-2": "q2-a",
+					"question-3": "q3-a",
+				},
+			});
+
+			await expect(
+				submitStudentCaseFeedback({
+					caseId: "active-case",
+					studentProfileId: "student-1",
+					feedback: feedbackInputFixture(),
+				}),
+			).resolves.toEqual({ status: "submitted" });
+
+			const store = getE2EAuthStore();
+			const completion = Array.from(store.studentCaseCompletions.values())[0];
+
+			expect(completion).toMatchObject({
+				caseId: "active-case",
+				feedback: {
+					futureSuggestions: "More hematology cases, please.",
+					ratings: {
+						knowledge: 5,
+						interpretation: 4,
+						patientCare: 5,
+						userExperience: 4,
+					},
+					submittedAt: 2_000,
+				},
+				studentDisplayName: "Jordan Adebayo",
+				studentProfileId: "student-1",
+			});
+			expect(store.teacherCases.get("active-case")?.feedbackCount).toBe(1);
+
+			await expect(
+				submitStudentCaseFeedback({
+					caseId: "active-case",
+					studentProfileId: "student-1",
+					feedback: feedbackInputFixture({
+						futureSuggestions: "Second response should not overwrite.",
+						ratings: {
+							knowledge: 1,
+							interpretation: 1,
+							patientCare: 1,
+							userExperience: 1,
+						},
+					}),
+				}),
+			).resolves.toEqual({ status: "already_submitted" });
+			expect(store.teacherCases.get("active-case")?.feedbackCount).toBe(1);
+			expect(
+				Array.from(store.studentCaseCompletions.values())[0]?.feedback,
+			).toMatchObject({
+				futureSuggestions: "More hematology cases, please.",
+			});
+		} finally {
+			dateNowSpy.mockRestore();
+			process.env.AUTH_E2E_MODE = previousMode;
+		}
+	});
+
 	it("returns active PDF attachment storage references only before the deadline", async () => {
 		const { InMemoryStudentCaseRepository } = await import("./student-case");
 		seedE2ETeacherCases([activeCase]);
@@ -575,6 +666,79 @@ describe("DynamoStudentCaseRepository", () => {
 		);
 	});
 
+	it("uses a transactional feedback update with duplicate-count protection", async () => {
+		const { DynamoStudentCaseRepository } = await import("./student-case");
+		const documentClient = {
+			send: vi.fn(async () => ({})),
+		} as unknown as DynamoDBDocumentClient;
+		const repository = new DynamoStudentCaseRepository(
+			"TeacherCaseTable",
+			"StudentCertificateTable",
+			"StudentCaseCompletionTable",
+			"StudentQuizAttemptTable",
+			documentClient,
+		);
+
+		await repository.submitStudentCaseFeedback(
+			{
+				caseId: "active-case",
+				studentProfileId: "student-1",
+				feedback: {
+					...feedbackInputFixture({
+						futureSuggestions: "More endocrine cases.",
+					}),
+					ratings: feedbackRatingsFixture(),
+					submittedAt: 2_000,
+				},
+			},
+		);
+
+		const command = mockCalls(documentClient.send)[0]?.[0] as {
+			input?: {
+				TransactItems?: Array<{
+					Update?: {
+						ConditionExpression?: string;
+						ExpressionAttributeValues?: Record<string, unknown>;
+						Key?: Record<string, unknown>;
+						TableName?: string;
+						UpdateExpression?: string;
+					};
+				}>;
+			};
+		};
+
+		expect(command.input?.TransactItems?.[0]?.Update).toMatchObject({
+			ConditionExpression:
+				"attribute_exists(completionId) AND attribute_not_exists(#feedback)",
+			Key: {
+				completionId: expect.stringMatching(/^case_completion_/),
+			},
+			TableName: "StudentCaseCompletionTable",
+			UpdateExpression: "SET #feedback = :feedback",
+		});
+		expect(
+			command.input?.TransactItems?.[0]?.Update?.ExpressionAttributeValues,
+		).toMatchObject({
+			":feedback": {
+					futureSuggestions: "More endocrine cases.",
+					ratings: {
+						knowledge: 5,
+						interpretation: 4,
+						patientCare: 5,
+						userExperience: 4,
+					},
+					submittedAt: 2_000,
+				},
+		});
+		expect(command.input?.TransactItems?.[1]?.Update).toMatchObject({
+			ConditionExpression: "attribute_exists(caseId)",
+			Key: { caseId: "active-case" },
+			TableName: "TeacherCaseTable",
+			UpdateExpression:
+				"SET feedbackCount = if_not_exists(feedbackCount, :zero) + :one",
+		});
+	});
+
 	it("records a failed quiz attempt without updating the attempt primary key", async () => {
 		const { DynamoStudentCaseRepository } = await import("./student-case");
 		const documentClient = {
@@ -613,6 +777,33 @@ describe("DynamoStudentCaseRepository", () => {
 		);
 	});
 });
+
+function feedbackInputFixture(
+	overrides: {
+		futureSuggestions?: string;
+		ratings?: StudentCaseFeedbackRatings;
+	} = {},
+) {
+	return {
+		futureSuggestions:
+			overrides.futureSuggestions ?? "More hematology cases, please.",
+		ratings: overrides.ratings ?? feedbackRatingsFixture(),
+	};
+}
+
+function feedbackRatingsFixture(
+	overrides: Partial<
+		Record<keyof StudentCaseFeedbackRatings, StudentCaseFeedbackRating>
+	> = {},
+): StudentCaseFeedbackRatings {
+	return {
+		knowledge: 5,
+		interpretation: 4,
+		patientCare: 5,
+		userExperience: 4,
+		...overrides,
+	};
+}
 
 function mockCalls(value: unknown) {
 	return (value as { mock: { calls: unknown[][] } }).mock.calls;

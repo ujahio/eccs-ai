@@ -20,6 +20,7 @@ describe("StudentCaseFlow", () => {
 		for (const step of deadlineSteps) {
 			expect(isStudentCaseDeadlineStep(step)).toBe(true);
 		}
+		expect(isStudentCaseDeadlineStep("feedback")).toBe(false);
 		expect(isStudentCaseDeadlineStep("certificate")).toBe(false);
 	});
 
@@ -27,6 +28,7 @@ describe("StudentCaseFlow", () => {
 		const markup = renderToStaticMarkup(
 			<StudentCaseFlow
 				caseRecord={caseRecordFixture()}
+				feedbackAction={feedbackActionStub}
 				quizAction={async () => ({
 					message: "",
 					status: "idle",
@@ -61,6 +63,7 @@ describe("StudentCaseFlow", () => {
 					caseRecord={caseRecordFixture({
 						deadlineAt: Date.UTC(2026, 6, 31, 11),
 					})}
+					feedbackAction={feedbackActionStub}
 					quizAction={async () => ({
 						message: "",
 						status: "idle",
@@ -97,6 +100,7 @@ describe("StudentCaseFlow", () => {
 					caseRecord={caseRecordFixture({
 						deadlineAt: Date.UTC(2026, 6, 31, 11),
 					})}
+					feedbackAction={feedbackActionStub}
 					quizAction={async () => ({
 						message: "",
 						status: "idle",
@@ -157,5 +161,12 @@ function caseRecordFixture(
 		presentation: "Patient presentation and clinical context.",
 		title: "Acute endocrine review",
 		...overrides,
+	};
+}
+
+async function feedbackActionStub() {
+	return {
+		message: "",
+		status: "submitted" as const,
 	};
 }

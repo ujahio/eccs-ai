@@ -7,12 +7,20 @@ import {
 	DuplicateStudentCaseCertificateError,
 	StudentCaseAnalysisRequiredError,
 	StudentCaseExpiredError,
+	StudentCaseFeedbackUnavailableError,
 	StudentCaseQuizReviewRequiredError,
+	submitStudentCaseFeedback,
 } from "@/features/student/cases/student-case";
 import type {
+	StudentCaseFeedbackFormState,
 	StudentCaseQuizFormState,
 	StudentCaseQuizReviewFormState,
 } from "@/features/student/cases/state";
+import {
+	StudentCaseFeedbackValidationError,
+	studentCaseFeedbackRatingQuestions,
+	type StudentCaseFeedbackRatingKey,
+} from "@/features/case-feedback/feedback";
 import { requireStudentSession } from "@/lib/auth/session";
 
 export async function submitStudentCaseQuizForm(
@@ -158,6 +166,66 @@ export async function completeStudentCaseQuizReviewForm(
 	}
 }
 
+export async function submitStudentCaseFeedbackForm(
+	formData: FormData,
+): Promise<StudentCaseFeedbackFormState> {
+	const { profile } = await requireStudentSession();
+	const caseId = stringFromFormData(formData.get("caseId"));
+
+	if (!caseId) {
+		return {
+			message:
+				"Unable to submit feedback. Return to your dashboard and retry.",
+			status: "error",
+			submittedAt: Date.now(),
+		};
+	}
+
+	try {
+		await submitStudentCaseFeedback({
+			caseId,
+			feedback: {
+				futureSuggestions: stringFromFormData(
+					formData.get("futureSuggestions"),
+				),
+				ratings: feedbackRatingsFromFormData(formData),
+			},
+			studentProfileId: profile.profileId,
+		});
+
+		revalidatePath("/teacher");
+		revalidatePath("/teacher/cases");
+
+		return {
+			message: "Thank you for sharing feedback.",
+			status: "submitted",
+			submittedAt: Date.now(),
+		};
+	} catch (error) {
+		if (error instanceof StudentCaseFeedbackValidationError) {
+			return {
+				message: error.message,
+				status: "error",
+				submittedAt: Date.now(),
+			};
+		}
+
+		if (error instanceof StudentCaseFeedbackUnavailableError) {
+			return {
+				message: error.message,
+				status: "error",
+				submittedAt: Date.now(),
+			};
+		}
+
+		return {
+			message: "Unable to submit feedback right now. Please try again.",
+			status: "error",
+			submittedAt: Date.now(),
+		};
+	}
+}
+
 function quizAnswersFromFormData(formData: FormData) {
 	const answers: Record<string, string> = {};
 
@@ -179,6 +247,20 @@ function quizAnswersFromFormData(formData: FormData) {
 
 function personalAnalysisFromFormData(formData: FormData) {
 	return stringFromFormData(formData.get("personalAnalysis"));
+}
+
+function feedbackRatingsFromFormData(formData: FormData) {
+	const ratings: Partial<Record<StudentCaseFeedbackRatingKey, number>> = {};
+
+	for (const question of studentCaseFeedbackRatingQuestions) {
+		const value = Number(formData.get(`feedback:${question.id}`));
+
+		if (Number.isFinite(value)) {
+			ratings[question.id] = value;
+		}
+	}
+
+	return ratings;
 }
 
 function stringFromFormData(value: FormDataEntryValue | null) {
