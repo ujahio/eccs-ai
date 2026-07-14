@@ -307,6 +307,18 @@ export function saveE2EStudentCaseCompletion(
 	getStore().studentCaseCompletions.set(completion.completionId, completion);
 }
 
+export function seedE2EStudentCaseCompletions(
+	completions: E2EStudentCaseCompletionRecord[],
+) {
+	const store = getStore();
+
+	store.studentCaseCompletions.clear();
+
+	for (const completion of completions) {
+		store.studentCaseCompletions.set(completion.completionId, completion);
+	}
+}
+
 export function seedE2ETeacherCases(
 	cases: Array<{
 		caseId: string;

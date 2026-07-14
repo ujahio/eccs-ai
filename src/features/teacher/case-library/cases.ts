@@ -10,6 +10,11 @@ import {
 	sortArchivedTeacherCases,
 	type TeacherCaseLifecycle,
 } from "@/features/teacher/cases/case-lifecycle";
+import {
+	applyTeacherCaseCompletionCounts,
+	dynamoTeacherCaseCompletionCounts,
+	e2eTeacherCaseCompletionCounts,
+} from "@/features/teacher/cases/completion-counts";
 import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import { requireTeacherSession } from "@/lib/auth/session";
@@ -36,10 +41,12 @@ type StoredTeacherCaseRecord = TeacherCaseLibraryArchivedCase & {
 
 export async function getTeacherCaseLibrary(): Promise<TeacherCaseLibrarySummary> {
 	const { profile } = await requireTeacherSession();
+	const resources = getSessionAuthResources();
 	const archivedRepository = isE2EMode()
 		? new InMemoryTeacherCaseLibraryRepository()
 		: new DynamoTeacherCaseLibraryRepository(
-				getSessionAuthResources().teacherCaseTableName,
+				resources.teacherCaseTableName,
+				resources.studentCaseCompletionTableName,
 			);
 	const [draftCases, archivedCases] = await Promise.all([
 		getTeacherCaseDraftRepository().listDrafts(profile.profileId),
@@ -54,7 +61,15 @@ export async function getTeacherCaseLibrary(): Promise<TeacherCaseLibrarySummary
 
 export class InMemoryTeacherCaseLibraryRepository {
 	async listArchivedCases(now: number) {
-		return sortArchivedCases(getE2ETeacherCaseStore(), now);
+		const cases = getE2ETeacherCaseStore();
+
+		return sortArchivedCases(
+			applyTeacherCaseCompletionCounts(
+				cases,
+				e2eTeacherCaseCompletionCounts(cases.map(({ caseId }) => caseId)),
+			),
+			now,
+		);
 	}
 }
 
@@ -62,7 +77,8 @@ export class DynamoTeacherCaseLibraryRepository {
 	private readonly documentClient: DynamoDBDocumentClient;
 
 	constructor(
-		private readonly tableName: string,
+		private readonly teacherCaseTableName: string,
+		private readonly studentCaseCompletionTableName: string,
 		documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({})),
 	) {
 		this.documentClient = documentClient;
@@ -73,7 +89,7 @@ export class DynamoTeacherCaseLibraryRepository {
 			queryAllDynamoItems<StoredTeacherCaseRecord>(
 				this.documentClient,
 				{
-					TableName: this.tableName,
+					TableName: this.teacherCaseTableName,
 					IndexName: "LifecycleArchivedIndex",
 					KeyConditionExpression: "#lifecycle = :archived",
 					ExpressionAttributeNames: {
@@ -88,7 +104,7 @@ export class DynamoTeacherCaseLibraryRepository {
 			queryAllDynamoItems<StoredTeacherCaseRecord>(
 				this.documentClient,
 				{
-					TableName: this.tableName,
+					TableName: this.teacherCaseTableName,
 					IndexName: "LifecycleDeadlineIndex",
 					KeyConditionExpression: "#lifecycle = :published AND deadlineAt < :now",
 					ExpressionAttributeNames: {
@@ -103,10 +119,14 @@ export class DynamoTeacherCaseLibraryRepository {
 			),
 		]);
 
-		return sortArchivedCases(
-			[...archivedCases, ...expiredPublishedCases],
-			now,
+		const cases = [...archivedCases, ...expiredPublishedCases];
+		const counts = await dynamoTeacherCaseCompletionCounts(
+			this.documentClient,
+			this.studentCaseCompletionTableName,
+			cases.map(({ caseId }) => caseId),
 		);
+
+		return sortArchivedCases(applyTeacherCaseCompletionCounts(cases, counts), now);
 	}
 }
 

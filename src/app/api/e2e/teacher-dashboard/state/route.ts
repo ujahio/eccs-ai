@@ -2,11 +2,15 @@ import { NextResponse } from "next/server";
 import {
 	getE2ETeacherCaseStore,
 	isE2EMode,
+	seedE2EStudentCaseCompletions,
 	seedE2ETeacherCases,
 } from "@/lib/e2e/in-memory-auth";
+import { studentCaseCompletionId } from "@/features/student/cases/ids";
 import { isActiveTeacherCase } from "@/features/teacher/cases/case-lifecycle";
+import type { StudentCaseFeedback } from "@/features/case-feedback/feedback";
 
 type E2ETeacherDashboardActiveCase = {
+	caseId?: string;
 	title: string;
 	publishedAt: number;
 	deadlineAt: number;
@@ -16,6 +20,18 @@ type E2ETeacherDashboardActiveCase = {
 
 type E2ETeacherDashboardArchivedCase = E2ETeacherDashboardActiveCase & {
 	archivedAt: number;
+};
+
+type E2ETeacherDashboardCompletion = {
+	analysisLockedAt: number;
+	analysisSubmittedAt: number;
+	caseId: string;
+	certificateId: string;
+	completedAt: number;
+	feedback?: StudentCaseFeedback;
+	personalAnalysis: string;
+	studentDisplayName: string;
+	studentProfileId: string;
 };
 
 function rejectNonE2EMode() {
@@ -40,6 +56,10 @@ function parseActiveCase(value: unknown): E2ETeacherDashboardActiveCase | null {
 
 	const input = value as Record<string, unknown>;
 	const title = String(input.title ?? "").trim();
+	const caseId =
+		typeof input.caseId === "string" && input.caseId.trim()
+			? input.caseId.trim()
+			: undefined;
 	const publishedAt = Number(input.publishedAt);
 	const deadlineAt = Number(input.deadlineAt);
 	const completionCount = Number(input.completionCount);
@@ -58,6 +78,7 @@ function parseActiveCase(value: unknown): E2ETeacherDashboardActiveCase | null {
 	}
 
 	return {
+		...(caseId ? { caseId } : {}),
 		title,
 		publishedAt,
 		deadlineAt,
@@ -93,6 +114,59 @@ function parseArchivedCases(value: unknown): E2ETeacherDashboardArchivedCase[] {
 	});
 }
 
+function parseCompletions(value: unknown): E2ETeacherDashboardCompletion[] {
+	if (value === null || value === undefined) {
+		return [];
+	}
+
+	if (!Array.isArray(value)) {
+		throw new Error("completions must be an array.");
+	}
+
+	return value.map((completion, index) => {
+		if (typeof completion !== "object" || completion === null) {
+			throw new Error(`completions[${index}] must be an object.`);
+		}
+
+		const input = completion as Record<string, unknown>;
+		const caseId = String(input.caseId ?? "").trim();
+		const certificateId = String(input.certificateId ?? "").trim();
+		const completedAt = Number(input.completedAt);
+		const personalAnalysis = String(input.personalAnalysis ?? "").trim();
+		const studentDisplayName = String(input.studentDisplayName ?? "").trim();
+		const studentProfileId = String(input.studentProfileId ?? "").trim();
+		const analysisSubmittedAt = Number(
+			input.analysisSubmittedAt ?? completedAt,
+		);
+		const analysisLockedAt = Number(input.analysisLockedAt ?? completedAt);
+
+		if (
+			!caseId ||
+			!certificateId ||
+			!Number.isFinite(completedAt) ||
+			!Number.isFinite(analysisSubmittedAt) ||
+			!Number.isFinite(analysisLockedAt) ||
+			!personalAnalysis ||
+			!studentDisplayName ||
+			!studentProfileId
+		) {
+			throw new Error(`completions[${index}] is missing required fields.`);
+		}
+
+		return {
+			analysisLockedAt,
+			analysisSubmittedAt,
+			caseId,
+			certificateId,
+			completedAt,
+			...(isFeedback(input.feedback) ? { feedback: input.feedback } : {}),
+			personalAnalysis,
+			studentDisplayName,
+			studentProfileId,
+		};
+	});
+}
+
 export async function GET() {
 	const modeResponse = rejectNonE2EMode();
 
@@ -120,22 +194,32 @@ export async function POST(request: Request) {
 	try {
 		const activeCase = parseActiveCase(body?.activeCase);
 		const archivedCases = parseArchivedCases(body?.archivedCases);
+		const completions = parseCompletions(body?.completions);
 
 		seedE2ETeacherCases(
 			[
 				activeCase
 					? {
-							caseId: "e2e-active-teacher-dashboard-case",
+							caseId:
+								activeCase.caseId ?? "e2e-active-teacher-dashboard-case",
 							lifecycle: "published" as const,
 							...activeCase,
 						}
 					: null,
 				...archivedCases.map((caseRecord, index) => ({
-					caseId: `e2e-archived-teacher-dashboard-case-${index}`,
+					caseId:
+						caseRecord.caseId ??
+						`e2e-archived-teacher-dashboard-case-${index}`,
 					lifecycle: "archived" as const,
 					...caseRecord,
 				})),
 			].filter((caseRecord) => caseRecord !== null),
+		);
+		seedE2EStudentCaseCompletions(
+			completions.map((completion) => ({
+				...completion,
+				completionId: studentCaseCompletionId(completion),
+			})),
 		);
 	} catch (error) {
 		return NextResponse.json(
@@ -155,6 +239,11 @@ export async function DELETE() {
 	}
 
 	seedE2ETeacherCases([]);
+	seedE2EStudentCaseCompletions([]);
 
 	return NextResponse.json({ reset: true });
+}
+
+function isFeedback(value: unknown): value is StudentCaseFeedback {
+	return typeof value === "object" && value !== null;
 }

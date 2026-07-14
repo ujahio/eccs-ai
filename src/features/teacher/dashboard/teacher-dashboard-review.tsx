@@ -75,6 +75,15 @@ export function TeacherDashboardReview({
 										</span>
 									</div>
 									<ActiveCaseMetrics caseRecord={activeCase} />
+									<ButtonLink
+										className="mt-5 w-full sm:w-auto"
+										data-testid="teacher-active-case-review-link"
+										href={`/teacher/cases/${encodeURIComponent(activeCase.caseId)}`}
+										size="sm"
+										variant="inverse"
+									>
+										View Responses
+									</ButtonLink>
 								</div>
 							) : (
 								<>
@@ -186,7 +195,17 @@ function ArchivedCaseRow({ caseRecord }: { caseRecord: TeacherDashboardCase }) {
 			className="border-b border-border-gray py-4"
 			data-testid="teacher-archived-case-card"
 		>
-			<h3 className="text-base font-semibold">{caseRecord.title}</h3>
+			<div className="flex items-start justify-between gap-4">
+				<h3 className="text-base font-semibold">{caseRecord.title}</h3>
+				<ButtonLink
+					data-testid="teacher-archived-case-review-link"
+					href={`/teacher/cases/${encodeURIComponent(caseRecord.caseId)}`}
+					size="sm"
+					variant="secondary"
+				>
+					Review
+				</ButtonLink>
+			</div>
 			<div className="mt-3 grid grid-cols-2 gap-3 text-sm">
 				<CompactMetric
 					label="Archived"

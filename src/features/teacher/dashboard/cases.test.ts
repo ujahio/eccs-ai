@@ -44,6 +44,34 @@ describe("DynamoTeacherDashboardRepository", () => {
 		const documentClient = {
 			send: vi.fn(async (command: { input: Record<string, unknown> }) => {
 				sentInputs.push(command.input);
+				const expressionValues = command.input
+					.ExpressionAttributeValues as Record<string, unknown> | undefined;
+
+				if (
+					command.input.TableName === "StudentCaseCompletionTable" &&
+					expressionValues?.[":caseId"] === "active-case"
+				) {
+					return { Items: [] };
+				}
+
+				if (
+					command.input.TableName === "StudentCaseCompletionTable" &&
+					expressionValues?.[":caseId"] === "expired-published-case"
+				) {
+					return { Items: [{ caseId: "expired-published-case" }] };
+				}
+
+				if (
+					command.input.TableName === "StudentCaseCompletionTable" &&
+					expressionValues?.[":caseId"] === "archived-case"
+				) {
+					return {
+						Items: [
+							{ caseId: "archived-case", feedback: { submittedAt: now } },
+							{ caseId: "archived-case" },
+						],
+					};
+				}
 
 				if (
 					command.input.KeyConditionExpression ===
@@ -64,15 +92,30 @@ describe("DynamoTeacherDashboardRepository", () => {
 		} as unknown as DynamoDBDocumentClient;
 		const repository = new DynamoTeacherDashboardRepository(
 			"TeacherCaseTable",
+			"StudentCaseCompletionTable",
 			documentClient,
 		);
 
 		const summary = await repository.getSummary(now);
 
 		expect(summary.activeCase?.caseId).toBe("active-case");
+		expect(summary.activeCase?.completionCount).toBe(0);
+		expect(summary.activeCase?.feedbackCount).toBe(0);
 		expect(summary.archivedCases.map((caseRecord) => caseRecord.caseId)).toEqual(
 			["expired-published-case", "archived-case"],
 		);
+		expect(summary.archivedCases).toEqual([
+			expect.objectContaining({
+				caseId: "expired-published-case",
+				completionCount: 1,
+				feedbackCount: 0,
+			}),
+			expect.objectContaining({
+				caseId: "archived-case",
+				completionCount: 2,
+				feedbackCount: 1,
+			}),
+		]);
 		expect(sentInputs).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({
