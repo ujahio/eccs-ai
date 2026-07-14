@@ -83,5 +83,14 @@ describe("case authoring sections", () => {
 		expect(markup).toContain("1 question started, 5 max");
 		expect(markup).toContain('aria-label="Question 2"');
 		expect(markup).toContain("Add Question");
+		expect(markup).toContain("Add A New Option");
+		expect(
+			markup.indexOf('data-testid="teacher-case-add-cme-question"'),
+		).toBeLessThan(
+			markup.indexOf('data-testid="teacher-case-remove-cme-question"'),
+		);
+		expect(
+			markup.indexOf('data-testid="teacher-case-add-cme-option"'),
+		).toBeGreaterThan(markup.indexOf("Options for question 1"));
 	});
 });

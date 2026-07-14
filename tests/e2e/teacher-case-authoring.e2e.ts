@@ -55,6 +55,8 @@ test.describe("Teacher case authoring", () => {
 			.getByTestId("teacher-case-description")
 			.fill("A draft description that can be saved before completion.");
 		await expect(page.getByTestId("teacher-case-dirty-message")).toBeVisible();
+		await expect(page.getByTestId("teacher-case-header-publish")).toHaveCount(0);
+		await expect(page.getByTestId("teacher-case-publish")).toHaveCount(0);
 		await page.getByTestId("teacher-case-save-draft").click();
 		await expect(page.getByTestId("teacher-case-draft-saved")).toHaveText(
 			"Draft saved.",
@@ -103,7 +105,8 @@ test.describe("Teacher case authoring", () => {
 		await expect(page.getByTestId("teacher-case-publish-readiness")).toContainText(
 			"Draft can be saved",
 		);
-		await expect(page.getByTestId("teacher-case-publish")).toBeDisabled();
+		await expect(page.getByTestId("teacher-case-header-publish")).toBeDisabled();
+		await expect(page.getByTestId("teacher-case-publish")).toHaveCount(0);
 
 		await page.getByTestId("teacher-cases-link").click();
 		await expect(page).toHaveURL(/\/teacher\/cases$/);
@@ -176,7 +179,8 @@ test.describe("Teacher case authoring", () => {
 		await expect(
 			page.getByTestId("teacher-case-active-publish-blocker"),
 		).toContainText("Currently active endocrine case");
-		await expect(page.getByTestId("teacher-case-publish")).toBeDisabled();
+		await expect(page.getByTestId("teacher-case-header-publish")).toBeDisabled();
+		await expect(page.getByTestId("teacher-case-publish")).toHaveCount(0);
 	});
 
 	test("publishes a complete case immediately as the active case", async ({
@@ -236,10 +240,13 @@ test.describe("Teacher case authoring", () => {
 		await expect(page.getByTestId("teacher-case-publish-readiness")).toContainText(
 			"Ready to publish",
 		);
+		await expect(page.getByTestId("teacher-case-ready-message")).toHaveCount(0);
 		await expect(page.getByTestId("teacher-case-deadline-summary")).toContainText(
 			"UAE time",
 		);
-		await page.getByTestId("teacher-case-publish").click();
+		await expect(page.getByTestId("teacher-case-header-publish")).toBeEnabled();
+		await expect(page.getByTestId("teacher-case-publish")).toHaveCount(0);
+		await page.getByTestId("teacher-case-header-publish").click();
 
 		await expect(page).toHaveURL(/\/teacher$/);
 		await expect(page.getByTestId("teacher-active-case-card")).toContainText(

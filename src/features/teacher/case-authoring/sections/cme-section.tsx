@@ -126,14 +126,14 @@ export function CmeSection({
 						<div className="flex items-center gap-2">
 							<Button
 								className="gap-2"
-								data-testid="teacher-case-add-cme-option"
-								disabled={question.options.length >= 5}
-								onClick={addOption}
+								data-testid="teacher-case-add-cme-question"
+								disabled={questions.length >= 5}
+								onClick={addQuestion}
 								size="sm"
 								variant="secondary"
 							>
 								<PlusIcon />
-								Add A New Option
+								Add Question
 							</Button>
 							<button
 								aria-label="Remove question"
@@ -226,12 +226,12 @@ export function CmeSection({
 
 				<button
 					className="mt-2 flex h-11 w-full items-center justify-between border border-border-gray bg-white px-5 text-left text-sm font-semibold uppercase text-primary-action transition hover:border-primary-action focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal disabled:pointer-events-none disabled:opacity-40"
-					data-testid="teacher-case-add-cme-question"
-					disabled={questions.length >= 5}
-					onClick={addQuestion}
+					data-testid="teacher-case-add-cme-option"
+					disabled={question.options.length >= 5}
+					onClick={addOption}
 					type="button"
 				>
-					Add Question
+					Add A New Option
 					<PlusIcon />
 				</button>
 			</div>
