@@ -54,6 +54,10 @@ type StudentDashboardRepository = {
 		studentProfileId: string,
 		certificateId: string,
 	): Promise<StudentDashboardCertificate | null>;
+	hasCertificateForCase(args: {
+		caseId: string;
+		studentProfileId: string;
+	}): Promise<boolean>;
 };
 
 type StoredTeacherCaseRecord = Omit<StudentDashboardActiveCase, "description"> & {
@@ -113,8 +117,17 @@ export class InMemoryStudentDashboardRepository
 	implements StudentDashboardRepository
 {
 	async getSummary(studentProfileId: string, now: number) {
+		const activeCase = activeCaseFromRecords(getE2ETeacherCaseStore(), now);
+
 		return {
-			activeCase: activeCaseFromRecords(getE2ETeacherCaseStore(), now),
+			activeCase:
+				activeCase &&
+				(await this.hasCertificateForCase({
+					caseId: activeCase.caseId,
+					studentProfileId,
+				}))
+					? null
+					: activeCase,
 			recentCertificates: await this.listCertificates(
 				studentProfileId,
 				recentCertificateLimit,
@@ -134,6 +147,18 @@ export class InMemoryStudentDashboardRepository
 			certificatesFromRecords(getE2EStudentCertificateStore(studentProfileId)).find(
 				(certificate) => certificate.certificateId === certificateId,
 			) ?? null
+		);
+	}
+
+	async hasCertificateForCase({
+		caseId,
+		studentProfileId,
+	}: {
+		caseId: string;
+		studentProfileId: string;
+	}) {
+		return getE2EStudentCertificateStore(studentProfileId).some(
+			(certificate) => certificate.caseId === caseId,
 		);
 	}
 }
@@ -156,9 +181,15 @@ export class DynamoStudentDashboardRepository
 			this.getActiveCase(now),
 			this.listCertificates(studentProfileId, recentCertificateLimit),
 		]);
+		const hasCompletedActiveCase =
+			activeCase !== null &&
+			(await this.hasCertificateForCase({
+				caseId: activeCase.caseId,
+				studentProfileId,
+			}));
 
 		return {
-			activeCase,
+			activeCase: hasCompletedActiveCase ? null : activeCase,
 			recentCertificates,
 		};
 	}
@@ -228,6 +259,31 @@ export class DynamoStudentDashboardRepository
 		return certificate && response.Item?.studentProfileId === studentProfileId
 			? certificate
 			: null;
+	}
+
+	async hasCertificateForCase({
+		caseId,
+		studentProfileId,
+	}: {
+		caseId: string;
+		studentProfileId: string;
+	}) {
+		const records = await queryAllDynamoItems<StoredStudentCertificateRecord>(
+			this.documentClient,
+			{
+				TableName: this.studentCertificateTableName,
+				IndexName: "StudentCompletedAtIndex",
+				KeyConditionExpression: "#studentProfileId = :studentProfileId",
+				ExpressionAttributeNames: {
+					"#studentProfileId": "studentProfileId",
+				},
+				ExpressionAttributeValues: {
+					":studentProfileId": studentProfileId,
+				},
+			},
+		);
+
+		return records.some((record) => record.caseId === caseId);
 	}
 }
 

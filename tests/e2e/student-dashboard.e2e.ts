@@ -53,6 +53,7 @@ async function seedStudentDashboard(
 	request: APIRequestContext,
 	data: {
 		activeCase: {
+			caseId?: string;
 			description?: string;
 			title: string;
 			publishedAt: number;
@@ -257,5 +258,49 @@ test.describe("Student dashboard", () => {
 		await expect(
 			page.getByTestId("student-dashboard-no-certificates"),
 		).toContainText("No certificates yet");
+	});
+
+	test("hides the active case after the student earns its certificate", async ({
+		page,
+		request,
+	}) => {
+		const email = uniqueEmail("student-dashboard-completed-active");
+		const profileId = e2eStudentProfileId(email);
+		const publishedAt = Date.now() - dayInMilliseconds;
+		const completedAt = Date.now();
+
+		await seedStudentDashboard(request, {
+			activeCase: {
+				caseId: "completed-active-case",
+				description: "This active case has already been completed.",
+				title: "Completed active case review",
+				publishedAt,
+				deadlineAt: Date.now() + 14 * dayInMilliseconds,
+			},
+			certificates: [
+				{
+					certificateBranding,
+					certificateId: "certificate-completed-active-case",
+					caseId: "completed-active-case",
+					caseTitle: "Completed active case review",
+					completedAt,
+					studentDisplayName: "Jordan Adebayo",
+					studentProfileId: profileId,
+				},
+			],
+		});
+		await bootstrapVerifiedStudent(request, email);
+		await loginStudent(page, email);
+
+		await expect(page.getByTestId("student-active-case-banner")).toHaveCount(0);
+		await expect(
+			page.getByTestId("student-dashboard-no-active-case"),
+		).toContainText("No active case available");
+		await expect(page.getByTestId("student-recent-certificate-card")).toHaveCount(
+			1,
+		);
+		await expect(page.getByTestId("student-recent-certificates")).toContainText(
+			"Completed active case review",
+		);
 	});
 });
