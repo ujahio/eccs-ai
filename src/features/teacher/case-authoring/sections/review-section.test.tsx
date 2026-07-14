@@ -38,14 +38,17 @@ describe("ReviewSection", () => {
 					],
 					deadlineDate: "2026-08-12",
 				}}
-				onPublish={() => {}}
-				publishDisabled
 				readyToPublish={false}
 				updateDraft={() => {}}
 				validation={{ cmeQuestions: "Add 3 to 5 CME questions." }}
 			/>,
 		);
 
+		expect(
+			markup.indexOf('data-testid="teacher-case-publish-readiness"'),
+		).toBeLessThan(markup.indexOf('data-testid="teacher-case-deadline-date"'));
+		expect(markup).toContain("space-y-4");
+		expect(markup).not.toContain("lg:grid-cols-3");
 		expect(markup).toContain('data-testid="teacher-case-review-presentation"');
 		expect(markup).toContain("<details");
 		expect(markup).toContain("<summary");
@@ -63,6 +66,7 @@ describe("ReviewSection", () => {
 		expect(markup).toContain("Expires at");
 		expect(markup).toContain("Aug 12, 2026");
 		expect(markup).toContain("11:59 PM UAE time");
+		expect(markup).not.toContain('data-testid="teacher-case-publish"');
 		expect(markup).not.toContain("<object");
 	});
 
@@ -74,8 +78,6 @@ describe("ReviewSection", () => {
 					deadlineAt: Date.UTC(2026, 7, 12, 19, 59, 59, 999),
 				}}
 				draft={emptyCaseDraft}
-				onPublish={() => {}}
-				publishDisabled
 				readyToPublish
 				updateDraft={() => {}}
 				validation={{}}
@@ -86,6 +88,6 @@ describe("ReviewSection", () => {
 			"Publishing is unavailable while another case is active.",
 		);
 		expect(markup).toContain('data-testid="teacher-case-active-publish-blocker"');
-		expect(markup).toContain("disabled");
+		expect(markup).not.toContain('data-testid="teacher-case-publish"');
 	});
 });

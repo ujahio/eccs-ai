@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import {
 	completeStudentCaseQuizReviewForm,
+	submitStudentCaseFeedbackForm,
 	submitStudentCaseQuizForm,
 } from "@/features/student/cases/actions";
 import { StudentCaseFlow } from "@/features/student/cases/student-case-flow";
@@ -26,6 +27,7 @@ export default async function StudentCasePage({ params }: StudentCasePageProps) 
 	return (
 		<StudentCaseFlow
 			caseRecord={caseRecord}
+			feedbackAction={submitStudentCaseFeedbackForm}
 			quizAction={submitStudentCaseQuizForm}
 			quizReviewAction={completeStudentCaseQuizReviewForm}
 		/>

@@ -1,4 +1,3 @@
-import { PublishCaseButton } from "../wizard-frame";
 import {
 	deadlineAtFromDubaiDate,
 	hasCmeQuestionContent,
@@ -15,16 +14,12 @@ type UpdateDraft = (update: Partial<CaseDraft>) => void;
 export function ReviewSection({
 	activePublishedCase,
 	draft,
-	onPublish,
-	publishDisabled,
 	readyToPublish,
 	updateDraft,
 	validation,
 }: {
 	activePublishedCase: ActivePublishedCaseSummary | null;
 	draft: CaseDraft;
-	onPublish: () => void | Promise<void>;
-	publishDisabled: boolean;
 	readyToPublish: boolean;
 	updateDraft: UpdateDraft;
 	validation: CaseDraftValidation;
@@ -41,6 +36,42 @@ export function ReviewSection({
 				description="Review all content, add the calendar deadline, and confirm publish readiness."
 				title="Final Review"
 			/>
+			<div
+				className={[
+					"mt-5 border p-4",
+					hasActivePublishedCase
+						? "border-warning-gold bg-white"
+						: readyToPublish
+							? "border-success-mint bg-success-soft"
+							: "border-border-gray bg-app-canvas",
+				].join(" ")}
+				data-testid="teacher-case-publish-readiness"
+			>
+				<p className="text-sm font-semibold">
+					{hasActivePublishedCase
+						? "Publishing is unavailable while another case is active."
+						: readyToPublish
+							? "Ready to publish"
+							: "Draft can be saved, but publish needs more content."}
+				</p>
+				{hasActivePublishedCase ? (
+					<p
+						className="mt-2 text-sm leading-6 text-muted-gray"
+						data-testid="teacher-case-active-publish-blocker"
+					>
+						{activePublishedCase.title} is active until{" "}
+						{formatDubaiDateTime(activePublishedCase.deadlineAt)} UAE time.
+						Publish this case after the active case closes.
+					</p>
+				) : null}
+				{validationEntries.length > 0 ? (
+					<ul className="mt-3 space-y-1 text-sm text-muted-gray">
+						{validationEntries.map(([key, value]) => (
+							<li key={key}>{value}</li>
+						))}
+					</ul>
+				) : null}
+			</div>
 			<Field label="Deadline Date" testId="teacher-case-deadline-date">
 				<input
 					className={[
@@ -62,7 +93,7 @@ export function ReviewSection({
 				) : null}
 				<DeadlineSummary deadlineDate={draft.deadlineDate} />
 			</Field>
-			<div className="mt-5 grid gap-4 lg:grid-cols-3">
+			<div className="mt-5 space-y-4">
 				<ReviewBlock label="Case Title" value={draft.title} />
 				<ReviewBlock label="Description" value={draft.description} />
 				<ReviewBlock
@@ -89,48 +120,6 @@ export function ReviewSection({
 				<ReviewCmeQuestions questions={draft.cmeQuestions} />
 				<ReviewAttachmentPreviews attachments={draft.attachments} />
 			</div>
-			<div
-				className={[
-					"mt-5 border p-4",
-					hasActivePublishedCase
-						? "border-warning-gold bg-white"
-						: readyToPublish
-						? "border-success-mint bg-success-soft"
-						: "border-border-gray bg-app-canvas",
-				].join(" ")}
-				data-testid="teacher-case-publish-readiness"
-			>
-				<p className="text-sm font-semibold">
-					{hasActivePublishedCase
-						? "Publishing is unavailable while another case is active."
-						: readyToPublish
-						? "Ready to publish"
-						: "Draft can be saved, but publish needs more content."}
-				</p>
-				{hasActivePublishedCase ? (
-					<p
-						className="mt-2 text-sm leading-6 text-muted-gray"
-						data-testid="teacher-case-active-publish-blocker"
-					>
-						{activePublishedCase.title} is active until{" "}
-						{formatDubaiDateTime(activePublishedCase.deadlineAt)} UAE time.
-						Publish this case after the active case closes.
-					</p>
-				) : null}
-				{validationEntries.length > 0 ? (
-					<ul className="mt-3 space-y-1 text-sm text-muted-gray">
-						{validationEntries.map(([key, value]) => (
-							<li key={key}>{value}</li>
-						))}
-					</ul>
-				) : null}
-			</div>
-			<PublishCaseButton
-				className="mt-5"
-				data-testid="teacher-case-publish"
-				disabled={publishDisabled}
-				onClick={onPublish}
-			/>
 		</div>
 	);
 }

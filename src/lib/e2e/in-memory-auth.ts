@@ -56,6 +56,7 @@ import {
 } from "@/features/profile-security/service";
 import type { CaseDraft } from "@/features/teacher/case-authoring/schema";
 import { teacherCaseRecordType } from "@/features/teacher/cases/case-lifecycle";
+import type { StudentCaseFeedback } from "@/features/case-feedback/feedback";
 
 export type E2EEmailRecord =
 	| {
@@ -181,6 +182,7 @@ export type E2EStudentCaseCompletionRecord = {
 	certificateId: string;
 	completedAt: number;
 	completionId: string;
+	feedback?: StudentCaseFeedback;
 	personalAnalysis: string;
 	studentDisplayName: string;
 	studentProfileId: string;

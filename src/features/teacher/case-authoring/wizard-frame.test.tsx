@@ -20,44 +20,61 @@ describe("case authoring wizard frame", () => {
 		expect(markup).toContain("Final Review");
 	});
 
-	it("renders Save Draft and header Publish Case actions", () => {
+	it("renders Save Draft without a readiness label or publish action before review", () => {
 		const markup = renderToStaticMarkup(
 			<WizardHeader
+				activeSection="title"
 				isDirty
-				onSaveDraft={() => {}}
 				onPublish={() => {}}
+				onSaveDraft={() => {}}
 				publishDisabled
 			/>,
 		);
 
 		expect(markup).toContain('data-testid="teacher-case-save-draft"');
-		expect(markup).toContain('data-testid="teacher-case-header-publish"');
 		expect(markup).toContain("Unsaved changes");
-		expect(markup).toContain("Publish Case");
-		expect(markup).toContain("disabled");
+		expect(markup).not.toContain('data-testid="teacher-case-ready-message"');
+		expect(markup).not.toContain("Ready to publish");
+		expect(markup).not.toContain('data-testid="teacher-case-header-publish"');
+		expect(markup).not.toContain("Publish Case");
 	});
 
-	it("renders draft status and non-blocking navigation warnings", () => {
+	it("renders the header Publish Case action on final review", () => {
+		const markup = renderToStaticMarkup(
+			<WizardHeader
+				activeSection="review"
+				isDirty={false}
+				onPublish={() => {}}
+				onSaveDraft={() => {}}
+				publishDisabled={false}
+			/>,
+		);
+
+		expect(markup).toContain('data-testid="teacher-case-header-publish"');
+		expect(markup).toContain("Publish Case");
+		expect(markup).not.toContain(
+			'data-testid="teacher-case-header-publish" disabled=""',
+		);
+	});
+
+	it("renders draft and publish status messages without duplicate dirty warnings", () => {
 		const markup = renderToStaticMarkup(
 			<WizardStatusMessages
 				draftValidationMessage="Enter a Case Title before saving this draft."
 				draftStatus="saving"
 				publishStatus="publishing"
-				sectionWarning="You have unsaved changes. Select Save Draft to store them."
 			/>,
 		);
 
 		expect(markup).toContain('data-testid="teacher-case-draft-validation"');
 		expect(markup).toContain('data-testid="teacher-case-draft-saving"');
 		expect(markup).toContain('data-testid="teacher-case-publishing"');
-		expect(markup).toContain('data-testid="teacher-case-navigation-warning"');
 		expect(markup).toContain("Enter a Case Title before saving this draft.");
-		expect(markup).toContain(
-			"You have unsaved changes. Select Save Draft to store them.",
-		);
+		expect(markup).not.toContain('data-testid="teacher-case-navigation-warning"');
+		expect(markup).not.toContain("You have unsaved changes.");
 	});
 
-	it("removes the next button from final review", () => {
+	it("removes footer navigation from final review", () => {
 		const markup = renderToStaticMarkup(
 			<WizardContentFrame
 				activeSection="review"
@@ -68,7 +85,7 @@ describe("case authoring wizard frame", () => {
 			</WizardContentFrame>,
 		);
 
-		expect(markup).toContain('data-testid="teacher-case-previous-section"');
+		expect(markup).not.toContain('data-testid="teacher-case-previous-section"');
 		expect(markup).not.toContain('data-testid="teacher-case-next-section"');
 	});
 });

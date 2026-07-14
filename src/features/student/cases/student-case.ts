@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
 	DynamoDBDocumentClient,
@@ -17,7 +17,18 @@ import {
 	saveE2EStudentCaseCompletion,
 	saveE2EStudentCertificate,
 } from "@/lib/e2e/in-memory-auth";
+import {
+	hasStudentCaseFeedbackValues,
+	type StudentCaseFeedback,
+	type StudentCaseFeedbackInput,
+	validateStudentCaseFeedbackInput,
+} from "@/features/case-feedback/feedback";
 import { validateAnalysisWordCount } from "./analysis";
+import {
+	studentCaseCertificateId,
+	studentCaseCompletionId,
+	studentCaseQuizAttemptId,
+} from "./ids";
 
 export type StudentCaseAttachmentDisposition = "inline" | "attachment";
 
@@ -88,6 +99,16 @@ export type CompleteStudentCaseQuizReviewArgs = {
 	studentProfileId: string;
 };
 
+export type SubmitStudentCaseFeedbackArgs = {
+	caseId: string;
+	feedback: StudentCaseFeedbackInput;
+	studentProfileId: string;
+};
+
+export type SubmitStudentCaseFeedbackResult = {
+	status: "already_submitted" | "skipped" | "submitted";
+};
+
 export type StudentCaseCertificateRecord = {
 	certificateBranding: StudentCaseCertificateBranding;
 	certificateId: string;
@@ -111,6 +132,7 @@ export type StudentCaseCompletionRecord = {
 	certificateId: string;
 	completedAt: number;
 	completionId: string;
+	feedback?: StudentCaseFeedback;
 	personalAnalysis: string;
 	recordType: typeof studentCaseCompletionRecordType;
 	studentDisplayName: string;
@@ -147,6 +169,13 @@ type StudentCaseRepository = {
 		args: CompleteStudentCaseQuizReviewArgs,
 		now: number,
 	): Promise<StudentCaseQuizAttemptState>;
+	submitStudentCaseFeedback(
+		args: {
+			caseId: string;
+			feedback: StudentCaseFeedback;
+			studentProfileId: string;
+		},
+	): Promise<SubmitStudentCaseFeedbackResult>;
 };
 
 type StoredTeacherCaseRecord = {
@@ -299,6 +328,31 @@ export async function completeStudentCaseQuizReview({
 	);
 }
 
+export async function submitStudentCaseFeedback({
+	caseId,
+	feedback,
+	studentProfileId,
+}: SubmitStudentCaseFeedbackArgs): Promise<SubmitStudentCaseFeedbackResult> {
+	const repository = getStudentCaseRepository();
+	const now = Date.now();
+	const validatedFeedback = validateStudentCaseFeedbackInput(feedback);
+
+	if (!hasStudentCaseFeedbackValues(validatedFeedback)) {
+		return { status: "skipped" };
+	}
+
+	return repository.submitStudentCaseFeedback(
+		{
+			caseId,
+			feedback: {
+				...validatedFeedback,
+				submittedAt: now,
+			},
+			studentProfileId,
+		},
+	);
+}
+
 export async function getStudentCaseAttachment({
 	attachmentId,
 	caseId,
@@ -443,6 +497,42 @@ export class InMemoryStudentCaseRepository implements StudentCaseRepository {
 			failuresSinceReview: nextState.failuresSinceReview,
 			reviewRequired,
 		};
+	}
+
+	async submitStudentCaseFeedback(
+		args: {
+			caseId: string;
+			feedback: StudentCaseFeedback;
+			studentProfileId: string;
+		},
+	) {
+		const store = getE2EAuthStore();
+		const completionId = studentCaseCompletionId(args);
+		const completion = store.studentCaseCompletions.get(completionId);
+
+		if (!completion) {
+			throw new StudentCaseFeedbackUnavailableError();
+		}
+
+		if (completion.feedback) {
+			return { status: "already_submitted" as const };
+		}
+
+		store.studentCaseCompletions.set(completionId, {
+			...completion,
+			feedback: args.feedback,
+		});
+
+		const caseRecord = store.teacherCases.get(args.caseId);
+
+		if (caseRecord) {
+			store.teacherCases.set(args.caseId, {
+				...caseRecord,
+				feedbackCount: caseRecord.feedbackCount + 1,
+			});
+		}
+
+		return { status: "submitted" as const };
 	}
 
 	async getActiveCaseAttachment(
@@ -697,6 +787,69 @@ export class DynamoStudentCaseRepository implements StudentCaseRepository {
 		return activeAttachmentFromRecord(response.Item ?? null, attachmentId, now);
 	}
 
+	async submitStudentCaseFeedback(
+		args: {
+			caseId: string;
+			feedback: StudentCaseFeedback;
+			studentProfileId: string;
+		},
+	) {
+		try {
+			await this.documentClient.send(
+				new TransactWriteCommand({
+					TransactItems: [
+						{
+							Update: {
+								TableName: this.studentCaseCompletionTableName,
+								Key: { completionId: studentCaseCompletionId(args) },
+								UpdateExpression: "SET #feedback = :feedback",
+								ConditionExpression:
+									"attribute_exists(completionId) AND attribute_not_exists(#feedback)",
+								ExpressionAttributeNames: {
+									"#feedback": "feedback",
+								},
+								ExpressionAttributeValues: {
+									":feedback": args.feedback,
+								},
+							},
+						},
+						{
+							Update: {
+								TableName: this.teacherCaseTableName,
+								Key: { caseId: args.caseId },
+								UpdateExpression:
+									"SET feedbackCount = if_not_exists(feedbackCount, :zero) + :one",
+								ConditionExpression: "attribute_exists(caseId)",
+								ExpressionAttributeValues: {
+									":one": 1,
+									":zero": 0,
+								},
+							},
+						},
+					],
+				}),
+			);
+		} catch (error) {
+			if (!isConditionalWriteFailure(error)) {
+				throw error;
+			}
+
+			const completion = await this.getStudentCaseCompletion(args);
+
+			if (!completion) {
+				throw new StudentCaseFeedbackUnavailableError();
+			}
+
+			if (hasStudentCaseFeedback(completion)) {
+				return { status: "already_submitted" as const };
+			}
+
+			throw new StudentCaseFeedbackUnavailableError();
+		}
+
+		return { status: "submitted" as const };
+	}
+
 	private async hasCertificate(certificateId: string) {
 		const response = await this.documentClient.send(
 			new GetCommand({
@@ -717,6 +870,20 @@ export class DynamoStudentCaseRepository implements StudentCaseRepository {
 		);
 
 		return quizAttemptStateFromRecord(response.Item ?? null).reviewRequired;
+	}
+
+	private async getStudentCaseCompletion(args: {
+		caseId: string;
+		studentProfileId: string;
+	}) {
+		const response = await this.documentClient.send(
+			new GetCommand({
+				TableName: this.studentCaseCompletionTableName,
+				Key: { completionId: studentCaseCompletionId(args) },
+			}),
+		);
+
+		return response.Item ?? null;
 	}
 }
 
@@ -745,6 +912,13 @@ export class StudentCaseAnalysisRequiredError extends Error {
 	constructor(message: string) {
 		super(message);
 		this.name = "StudentCaseAnalysisRequiredError";
+	}
+}
+
+export class StudentCaseFeedbackUnavailableError extends Error {
+	constructor() {
+		super("Complete the quiz before submitting feedback.");
+		this.name = "StudentCaseFeedbackUnavailableError";
 	}
 }
 
@@ -1138,65 +1312,6 @@ function personalAnalysisForCompletion(personalAnalysis: string) {
 	return trimmedAnalysis;
 }
 
-function studentCaseCertificateId({
-	caseId,
-	studentProfileId,
-}: {
-	caseId: string;
-	studentProfileId: string;
-}) {
-	return studentCaseScopedId({
-		caseId,
-		prefix: "cert",
-		studentProfileId,
-	});
-}
-
-function studentCaseCompletionId({
-	caseId,
-	studentProfileId,
-}: {
-	caseId: string;
-	studentProfileId: string;
-}) {
-	return studentCaseScopedId({
-		caseId,
-		prefix: "case_completion",
-		studentProfileId,
-	});
-}
-
-function studentCaseQuizAttemptId({
-	caseId,
-	studentProfileId,
-}: {
-	caseId: string;
-	studentProfileId: string;
-}) {
-	return studentCaseScopedId({
-		caseId,
-		prefix: "quiz_attempt",
-		studentProfileId,
-	});
-}
-
-function studentCaseScopedId({
-	caseId,
-	prefix,
-	studentProfileId,
-}: {
-	caseId: string;
-	prefix: "case_completion" | "cert" | "quiz_attempt";
-	studentProfileId: string;
-}) {
-	const digest = createHash("sha256")
-		.update(`${studentProfileId}\n${caseId}`)
-		.digest("base64url")
-		.slice(0, 32);
-
-	return `${prefix}_${digest}`;
-}
-
 function quizAttemptStateFromRecord(
 	record: unknown,
 ): StudentCaseQuizAttemptState {
@@ -1217,6 +1332,15 @@ function quizAttemptStateFromRecord(
 				: 0,
 		reviewRequired: candidate.reviewRequired === true,
 	};
+}
+
+function hasStudentCaseFeedback(record: unknown) {
+	return (
+		typeof record === "object" &&
+		record !== null &&
+		"feedback" in record &&
+		(record as { feedback?: unknown }).feedback !== undefined
+	);
 }
 
 function isConditionalWriteFailure(error: unknown) {

@@ -8,14 +8,16 @@ export type DraftStatus = "idle" | "saving" | "saved" | "error" | "load-error";
 export type PublishStatus = "idle" | "publishing" | "error";
 
 export function WizardHeader({
+	activeSection,
 	isDirty,
-	onSaveDraft,
 	onPublish,
+	onSaveDraft,
 	publishDisabled,
 }: {
+	activeSection: CaseAuthoringSection;
 	isDirty: boolean;
-	onSaveDraft: () => void | Promise<void>;
 	onPublish: () => void | Promise<void>;
+	onSaveDraft: () => void | Promise<void>;
 	publishDisabled: boolean;
 }) {
 	return (
@@ -42,11 +44,13 @@ export function WizardHeader({
 				>
 					Save Draft
 				</Button>
-				<PublishCaseButton
-					data-testid="teacher-case-header-publish"
-					disabled={publishDisabled}
-					onClick={onPublish}
-				/>
+				{activeSection === "review" ? (
+					<PublishCaseButton
+						data-testid="teacher-case-header-publish"
+						disabled={publishDisabled}
+						onClick={onPublish}
+					/>
+				) : null}
 			</div>
 		</div>
 	);
@@ -63,12 +67,10 @@ export function WizardStatusMessages({
 	draftValidationMessage = "",
 	draftStatus,
 	publishStatus,
-	sectionWarning,
 }: {
 	draftValidationMessage?: string;
 	draftStatus: DraftStatus;
 	publishStatus: PublishStatus;
-	sectionWarning: string;
 }) {
 	return (
 		<>
@@ -121,13 +123,6 @@ export function WizardStatusMessages({
 					value="The case could not be published. Review the deadline and active case status, then try again."
 				/>
 			) : null}
-			{sectionWarning ? (
-				<StatusMessage
-					testId="teacher-case-navigation-warning"
-					tone="warning"
-					value={sectionWarning}
-				/>
-			) : null}
 		</>
 	);
 }
@@ -178,6 +173,14 @@ export function WizardContentFrame({
 	onNextSection: () => void;
 	onPreviousSection: () => void;
 }) {
+	if (activeSection === "review") {
+		return (
+			<div className="rounded border border-border-gray bg-white p-5 sm:p-6">
+				{children}
+			</div>
+		);
+	}
+
 	return (
 		<div className="rounded border border-border-gray bg-white p-5 sm:p-6">
 			{children}
@@ -191,14 +194,9 @@ export function WizardContentFrame({
 					Previous
 				</Button>
 				<div className="flex flex-col gap-3 sm:flex-row">
-					{activeSection === "review" ? null : (
-						<Button
-							data-testid="teacher-case-next-section"
-							onClick={onNextSection}
-						>
-							Next
-						</Button>
-					)}
+					<Button data-testid="teacher-case-next-section" onClick={onNextSection}>
+						Next
+					</Button>
 				</div>
 			</div>
 		</div>

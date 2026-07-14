@@ -6,6 +6,7 @@ import {
 	GetCommand,
 	QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { studentCaseCertificateId } from "@/features/student/cases/ids";
 import { isActiveTeacherCase } from "@/features/teacher/cases/case-lifecycle";
 import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query";
 import { getSessionAuthResources } from "@/lib/aws/resources";
@@ -54,6 +55,10 @@ type StudentDashboardRepository = {
 		studentProfileId: string,
 		certificateId: string,
 	): Promise<StudentDashboardCertificate | null>;
+	hasCertificateForCase(args: {
+		caseId: string;
+		studentProfileId: string;
+	}): Promise<boolean>;
 };
 
 type StoredTeacherCaseRecord = Omit<StudentDashboardActiveCase, "description"> & {
@@ -113,12 +118,24 @@ export class InMemoryStudentDashboardRepository
 	implements StudentDashboardRepository
 {
 	async getSummary(studentProfileId: string, now: number) {
+		const activeCase = activeCaseFromRecords(getE2ETeacherCaseStore(), now);
+		const recentCertificates = await this.listCertificates(
+			studentProfileId,
+			recentCertificateLimit,
+		);
+		const hasCompletedActiveCase =
+			activeCase !== null &&
+			(recentCertificates.some(
+				(certificate) => certificate.caseId === activeCase.caseId,
+			) ||
+				(await this.hasCertificateForCase({
+					caseId: activeCase.caseId,
+					studentProfileId,
+				})));
+
 		return {
-			activeCase: activeCaseFromRecords(getE2ETeacherCaseStore(), now),
-			recentCertificates: await this.listCertificates(
-				studentProfileId,
-				recentCertificateLimit,
-			),
+			activeCase: hasCompletedActiveCase ? null : activeCase,
+			recentCertificates,
 		};
 	}
 
@@ -134,6 +151,18 @@ export class InMemoryStudentDashboardRepository
 			certificatesFromRecords(getE2EStudentCertificateStore(studentProfileId)).find(
 				(certificate) => certificate.certificateId === certificateId,
 			) ?? null
+		);
+	}
+
+	async hasCertificateForCase({
+		caseId,
+		studentProfileId,
+	}: {
+		caseId: string;
+		studentProfileId: string;
+	}) {
+		return getE2EStudentCertificateStore(studentProfileId).some(
+			(certificate) => certificate.caseId === caseId,
 		);
 	}
 }
@@ -156,9 +185,18 @@ export class DynamoStudentDashboardRepository
 			this.getActiveCase(now),
 			this.listCertificates(studentProfileId, recentCertificateLimit),
 		]);
+		const hasCompletedActiveCase =
+			activeCase !== null &&
+			(recentCertificates.some(
+				(certificate) => certificate.caseId === activeCase.caseId,
+			) ||
+				(await this.hasCertificateForCase({
+					caseId: activeCase.caseId,
+					studentProfileId,
+				})));
 
 		return {
-			activeCase,
+			activeCase: hasCompletedActiveCase ? null : activeCase,
 			recentCertificates,
 		};
 	}
@@ -228,6 +266,25 @@ export class DynamoStudentDashboardRepository
 		return certificate && response.Item?.studentProfileId === studentProfileId
 			? certificate
 			: null;
+	}
+
+	async hasCertificateForCase({
+		caseId,
+		studentProfileId,
+	}: {
+		caseId: string;
+		studentProfileId: string;
+	}) {
+		const response = await this.documentClient.send(
+			new GetCommand({
+				TableName: this.studentCertificateTableName,
+				Key: {
+					certificateId: studentCaseCertificateId({ caseId, studentProfileId }),
+				},
+			}),
+		);
+
+		return Boolean(response.Item);
 	}
 }
 

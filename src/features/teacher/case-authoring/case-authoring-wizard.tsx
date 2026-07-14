@@ -49,7 +49,6 @@ export function CaseAuthoringWizard({
 	const [publishValidation, setPublishValidation] = useState<CaseDraftValidation>(
 		{},
 	);
-	const [sectionWarning, setSectionWarning] = useState("");
 	const attachmentPreviewUrls = useRef(new Set<string>());
 	const isDirtyRef = useRef(false);
 	const validation = useMemo(
@@ -152,14 +151,12 @@ export function CaseAuthoringWizard({
 		if (Object.keys(draftSaveValidation).length > 0) {
 			setDraftStatus("idle");
 			setSaveValidation(draftSaveValidation);
-			setSectionWarning("");
 			setActiveSection("title");
 			return;
 		}
 
 		try {
 			setSaveValidation({});
-			setSectionWarning("");
 			setDraftStatus("saving");
 			const response = await fetch("/api/teacher/case-draft", {
 				body: JSON.stringify({
@@ -212,7 +209,6 @@ export function CaseAuthoringWizard({
 		try {
 			setSaveValidation({});
 			setPublishValidation({});
-			setSectionWarning("");
 			setPublishStatus("publishing");
 			const response = await fetch("/api/teacher/case-publish", {
 				body: JSON.stringify({
@@ -246,14 +242,6 @@ export function CaseAuthoringWizard({
 	}
 
 	function selectSection(section: CaseAuthoringSection) {
-		if (isDirty) {
-			setSectionWarning(
-				"You have unsaved changes. Select Save Draft to store them.",
-			);
-		} else {
-			setSectionWarning("");
-		}
-
 		setActiveSection(section);
 	}
 
@@ -356,16 +344,16 @@ export function CaseAuthoringWizard({
 			data-testid="teacher-case-authoring-root"
 		>
 			<WizardHeader
+				activeSection={activeSection}
 				isDirty={isDirty}
-				onSaveDraft={saveDraft}
 				onPublish={publishCase}
+				onSaveDraft={saveDraft}
 				publishDisabled={publishDisabled}
 			/>
 			<WizardStatusMessages
 				draftValidationMessage={saveValidation.title}
 				draftStatus={draftStatus}
 				publishStatus={publishStatus}
-				sectionWarning={sectionWarning}
 			/>
 
 			<div className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
@@ -386,8 +374,6 @@ export function CaseAuthoringWizard({
 						draft={draft}
 						readyToPublish={readyToPublish}
 						activePublishedCase={activePublishedCase}
-						onPublish={publishCase}
-						publishDisabled={publishDisabled}
 						removeAttachment={removeAttachment}
 						removeQuestion={removeQuestion}
 						saveValidation={saveValidation}

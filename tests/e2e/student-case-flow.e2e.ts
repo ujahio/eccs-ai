@@ -154,6 +154,16 @@ async function answerQuiz(
 	}
 }
 
+async function answerFeedback(page: Page) {
+	await page.getByTestId("student-case-feedback-knowledge-5").click();
+	await page.getByTestId("student-case-feedback-interpretation-4").click();
+	await page.getByTestId("student-case-feedback-patientCare-5").click();
+	await page.getByTestId("student-case-feedback-userExperience-4").click();
+	await page
+		.getByTestId("student-case-feedback-comment")
+		.fill("More cases on complex endocrine presentations would be helpful.");
+}
+
 function correctQuizAnswers() {
 	return {
 		"question-1": "question-1-a",
@@ -441,6 +451,13 @@ test.describe("Student case presentation and analysis flow", () => {
 		);
 		await page.getByTestId("student-case-submit-quiz").click();
 
+		await expect(page.getByTestId("student-case-feedback-step")).toBeVisible();
+		await expect(page.getByTestId("student-case-flow-heading")).toHaveText(
+			"Case Feedback",
+		);
+		await expect(page.getByTestId("student-case-submit-feedback")).toBeEnabled();
+		await answerFeedback(page);
+		await page.getByTestId("student-case-submit-feedback").click();
 		await expect(page.getByTestId("student-case-certificate-step")).toBeVisible();
 		await expect(page.getByTestId("student-case-flow-heading")).toHaveText(
 			"Certificate",
@@ -461,6 +478,73 @@ test.describe("Student case presentation and analysis flow", () => {
 		await expect(certificatePreview).not.toContainText("Credits");
 		await expect(certificatePreview).not.toContainText("Partner");
 		await expect(certificatePreview).not.toContainText("Issuing");
+
+		const stateResponse = await request.get("/api/e2e/teacher-dashboard/state");
+		expect(stateResponse.ok()).toBe(true);
+		const state = (await stateResponse.json()) as {
+			activeCase?: { feedbackCount?: number };
+		};
+		expect(state.activeCase?.feedbackCount).toBe(1);
+	});
+
+	test("allows students to leave feedback blank and still access the certificate", async ({
+		page,
+		request,
+	}) => {
+		const email = uniqueEmail("student-case-feedback-skip");
+
+		await seedStudentCase(request);
+		await bootstrapVerifiedStudent(request, email);
+		await loginStudent(page, email);
+		await startStudentCaseFlow(page);
+		await reachStudentCaseQuiz(page);
+		await answerQuiz(page);
+		await page.getByTestId("student-case-submit-quiz").click();
+
+		await expect(page.getByTestId("student-case-feedback-step")).toBeVisible();
+		await expect(page.getByTestId("student-case-submit-feedback")).toBeEnabled();
+		await page.getByTestId("student-case-submit-feedback").click();
+		await expect(page.getByTestId("student-case-certificate-step")).toBeVisible();
+		await expect(
+			page.getByTestId("student-case-certificate-download"),
+		).toHaveAttribute("href", /\/student\/certificates\/cert_.*\/download/);
+
+		const stateResponse = await request.get("/api/e2e/teacher-dashboard/state");
+		expect(stateResponse.ok()).toBe(true);
+		const state = (await stateResponse.json()) as {
+			activeCase?: { feedbackCount?: number };
+		};
+		expect(state.activeCase?.feedbackCount).toBe(0);
+	});
+
+	test("allows students to submit partial feedback and still access the certificate", async ({
+		page,
+		request,
+	}) => {
+		const email = uniqueEmail("student-case-feedback-partial");
+
+		await seedStudentCase(request);
+		await bootstrapVerifiedStudent(request, email);
+		await loginStudent(page, email);
+		await startStudentCaseFlow(page);
+		await reachStudentCaseQuiz(page);
+		await answerQuiz(page);
+		await page.getByTestId("student-case-submit-quiz").click();
+
+		await expect(page.getByTestId("student-case-feedback-step")).toBeVisible();
+		await page.getByTestId("student-case-feedback-knowledge-5").click();
+		await page.getByTestId("student-case-submit-feedback").click();
+		await expect(page.getByTestId("student-case-certificate-step")).toBeVisible();
+		await expect(
+			page.getByTestId("student-case-certificate-download"),
+		).toHaveAttribute("href", /\/student\/certificates\/cert_.*\/download/);
+
+		const stateResponse = await request.get("/api/e2e/teacher-dashboard/state");
+		expect(stateResponse.ok()).toBe(true);
+		const state = (await stateResponse.json()) as {
+			activeCase?: { feedbackCount?: number };
+		};
+		expect(state.activeCase?.feedbackCount).toBe(1);
 	});
 
 	test("shows failed quiz attempts without per-question correctness and forces review on the third failure", async ({
@@ -531,6 +615,8 @@ test.describe("Student case presentation and analysis flow", () => {
 
 		await answerQuiz(page);
 		await page.getByTestId("student-case-submit-quiz").click();
+		await expect(page.getByTestId("student-case-feedback-step")).toBeVisible();
+		await page.getByTestId("student-case-submit-feedback").click();
 		await expect(page.getByTestId("student-case-certificate-step")).toBeVisible();
 	});
 
@@ -657,7 +743,7 @@ test.describe("Student case presentation and analysis flow", () => {
 		await answerQuiz(secondPage);
 
 		await page.getByTestId("student-case-submit-quiz").click();
-		await expect(page.getByTestId("student-case-certificate-step")).toBeVisible();
+		await expect(page.getByTestId("student-case-feedback-step")).toBeVisible();
 
 		await secondPage.getByTestId("student-case-submit-quiz").click();
 		await expect(

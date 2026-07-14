@@ -171,6 +171,68 @@ describe("InMemoryStudentDashboardRepository", () => {
 			"certificate-oldest",
 		]);
 	});
+
+	it("hides the active case after the student earns its certificate", async () => {
+		const now = Date.UTC(2026, 6, 7);
+		seedE2ETeacherCases([
+			{
+				caseId: "active-case",
+				description: "A focused active case for learners.",
+				title: "Acute endocrine case review",
+				lifecycle: "published",
+				publishedAt: now - 1_000,
+				deadlineAt: now + 86_400_000,
+				completionCount: 1,
+				feedbackCount: 0,
+			},
+		]);
+		seedE2EStudentCertificates([
+			{
+				certificateBranding,
+				certificateId: "certificate-newest",
+				caseId: "case-newest",
+				caseTitle: "Latest certificate",
+				completedAt: now - 1_000,
+				studentDisplayName: "Jordan Adebayo",
+				studentProfileId: "student-1",
+			},
+			{
+				certificateBranding,
+				certificateId: "certificate-middle",
+				caseId: "case-middle",
+				caseTitle: "Middle certificate",
+				completedAt: now - 2_000,
+				studentDisplayName: "Jordan Adebayo",
+				studentProfileId: "student-1",
+			},
+			{
+				certificateBranding,
+				certificateId: "certificate-third",
+				caseId: "case-third",
+				caseTitle: "Third certificate",
+				completedAt: now - 3_000,
+				studentDisplayName: "Jordan Adebayo",
+				studentProfileId: "student-1",
+			},
+			{
+				certificateBranding,
+				certificateId: "certificate-active-case",
+				caseId: "active-case",
+				caseTitle: "Acute endocrine case review",
+				completedAt: now - 40_000,
+				studentDisplayName: "Jordan Adebayo",
+				studentProfileId: "student-1",
+			},
+		]);
+		const repository = new InMemoryStudentDashboardRepository();
+
+		const summary = await repository.getSummary("student-1", now);
+
+		expect(summary.activeCase).toBeNull();
+		expect(
+			summary.recentCertificates.map((certificate) => certificate.certificateId),
+		).toEqual(["certificate-newest", "certificate-middle", "certificate-third"]);
+	});
 });
 
 describe("DynamoStudentDashboardRepository", () => {
@@ -219,4 +281,95 @@ describe("DynamoStudentDashboardRepository", () => {
 		expect(summary.activeCase?.caseId).toBe("active-case");
 		expect(summary.recentCertificates).toHaveLength(1);
 	});
+
+	it("hides the active case when Dynamo has a matching student certificate", async () => {
+		const now = Date.UTC(2026, 6, 7);
+		const documentClient = {
+			send: vi.fn(async (command: { input: Record<string, unknown> }) => {
+				if (command.input.TableName === "TeacherCaseTable") {
+					return {
+						Items: [
+							{
+								caseId: "active-case",
+								description: "A focused active case for learners.",
+								title: "Acute endocrine case review",
+								lifecycle: "published",
+								deadlineAt: now + 86_400_000,
+								publishedAt: now - 1_000,
+							},
+						],
+					};
+				}
+
+				if ("Key" in command.input) {
+					return {
+						Item: {
+							certificateBranding,
+							certificateId: "certificate-active-case",
+							caseId: "active-case",
+							caseTitle: "Acute endocrine case review",
+							completedAt: now - 40_000,
+							studentDisplayName: "Jordan Adebayo",
+							studentProfileId: "student-1",
+						},
+					};
+				}
+
+				return {
+					Items: [
+						{
+							certificateBranding,
+							certificateId: "certificate-newest",
+							caseId: "case-newest",
+							caseTitle: "Latest certificate",
+							completedAt: now - 1_000,
+							studentDisplayName: "Jordan Adebayo",
+							studentProfileId: "student-1",
+						},
+						{
+							certificateBranding,
+							certificateId: "certificate-middle",
+							caseId: "case-middle",
+							caseTitle: "Middle certificate",
+							completedAt: now - 2_000,
+							studentDisplayName: "Jordan Adebayo",
+							studentProfileId: "student-1",
+						},
+						{
+							certificateBranding,
+							certificateId: "certificate-third",
+							caseId: "case-third",
+							caseTitle: "Third certificate",
+							completedAt: now - 3_000,
+							studentDisplayName: "Jordan Adebayo",
+							studentProfileId: "student-1",
+						},
+					],
+				};
+			}),
+		} as unknown as DynamoDBDocumentClient;
+		const repository = new DynamoStudentDashboardRepository(
+			"TeacherCaseTable",
+			"StudentCertificateTable",
+			documentClient,
+		);
+
+		const summary = await repository.getSummary("student-1", now);
+
+		expect(summary.activeCase).toBeNull();
+		expect(
+			summary.recentCertificates.map((certificate) => certificate.certificateId),
+		).toEqual(["certificate-newest", "certificate-middle", "certificate-third"]);
+		expect(
+			mockCalls(documentClient.send).filter(
+				([command]) =>
+					(command as { input?: { TableName?: string } }).input?.TableName ===
+					"StudentCertificateTable",
+			),
+		).toHaveLength(2);
+	});
 });
+
+function mockCalls(value: unknown) {
+	return (value as { mock: { calls: unknown[][] } }).mock.calls;
+}
