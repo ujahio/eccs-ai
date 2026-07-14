@@ -173,9 +173,6 @@ export function StudentCaseFlow({
 		quizQuestions.length > 0 &&
 		quizQuestions.every((question) => Boolean(quizAnswers[question.questionId]));
 	const hasPassedQuiz = quizState.status === "passed";
-	const hasAllFeedbackRatings = studentCaseFeedbackRatingQuestions.every(
-		(question) => Boolean(feedbackRatings[question.id]),
-	);
 	const showQuizFailureNotification =
 		quizState.status === "failed" || quizState.status === "review_required";
 	const showQuizReviewGateNotification = quizState.status === "review_required";
@@ -446,15 +443,6 @@ export function StudentCaseFlow({
 			setFeedbackState(initialStudentCaseFeedbackFormState);
 			setMessage("");
 			setStep("certificate");
-			return;
-		}
-
-		if (!hasAllFeedbackRatings) {
-			setFeedbackState({
-				message: "Choose a 1-5 rating for each feedback question.",
-				status: "error",
-				submittedAt: Date.now(),
-			});
 			return;
 		}
 

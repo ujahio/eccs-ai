@@ -6,46 +6,61 @@ import {
 } from "./feedback";
 
 describe("student case feedback validation", () => {
-	it("accepts complete 1-5 ratings and trims written feedback", () => {
+	it("accepts provided 1-5 ratings and trims written feedback", () => {
 		expect(
 			validateStudentCaseFeedbackInput({
 				futureSuggestions: "  Add more hematology cases.  ",
-				ratings: feedbackRatingsFixture(),
+				ratings: {
+					knowledge: 5,
+					patientCare: 4,
+				},
 			}),
 		).toEqual({
 			futureSuggestions: "Add more hematology cases.",
 			ratings: {
 				knowledge: 5,
-				interpretation: 4,
-				patientCare: 5,
-				userExperience: 4,
+				patientCare: 4,
 			},
 		});
 	});
 
-	it("omits empty written feedback", () => {
+	it("accepts written feedback without ratings", () => {
+		expect(
+			validateStudentCaseFeedbackInput({
+				futureSuggestions: "  Add future microbiology cases.  ",
+				ratings: {},
+			}),
+		).toEqual({
+			futureSuggestions: "Add future microbiology cases.",
+		});
+	});
+
+	it("omits empty written feedback and missing ratings", () => {
 		expect(
 			validateStudentCaseFeedbackInput({
 				futureSuggestions: "   ",
-				ratings: feedbackRatingsFixture({
+				ratings: {
 					knowledge: 1,
-					interpretation: 2,
-					patientCare: 3,
-				}),
+				},
 			}),
 		).toEqual({
 			ratings: {
 				knowledge: 1,
-				interpretation: 2,
-				patientCare: 3,
-				userExperience: 4,
 			},
 		});
 	});
 
-	it("rejects missing, out-of-range, and non-integer ratings", () => {
+	it("normalizes blank feedback to no saved values", () => {
+		expect(
+			validateStudentCaseFeedbackInput({
+				futureSuggestions: "   ",
+				ratings: {},
+			}),
+		).toEqual({});
+	});
+
+	it("rejects out-of-range and non-integer ratings", () => {
 		const invalidRatings = [
-			{},
 			{ knowledge: 0 },
 			{ knowledge: 6 },
 			{ knowledge: 3.5 },
@@ -53,19 +68,12 @@ describe("student case feedback validation", () => {
 
 		for (const ratingOverride of invalidRatings) {
 			expect(() =>
-				validateStudentCaseFeedbackInput({
-					futureSuggestions: "",
-					ratings:
-						"knowledge" in ratingOverride
-							? feedbackRatingsFixture(ratingOverride)
-							: {
-									interpretation: 4,
-									patientCare: 5,
-									userExperience: 4,
-								},
-				}),
-			).toThrow(StudentCaseFeedbackValidationError);
-		}
+					validateStudentCaseFeedbackInput({
+						futureSuggestions: "",
+						ratings: feedbackRatingsFixture(ratingOverride),
+					}),
+				).toThrow(StudentCaseFeedbackValidationError);
+			}
 	});
 
 	it("rejects written feedback over 2,000 characters", () => {

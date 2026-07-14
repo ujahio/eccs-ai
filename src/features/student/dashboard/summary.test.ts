@@ -301,19 +301,17 @@ describe("DynamoStudentDashboardRepository", () => {
 					};
 				}
 
-				if (command.input.Limit === 3) {
+				if ("Key" in command.input) {
 					return {
-						Items: [
-							{
-								certificateBranding,
-								certificateId: "certificate-newest",
-								caseId: "case-newest",
-								caseTitle: "Latest certificate",
-								completedAt: now - 1_000,
-								studentDisplayName: "Jordan Adebayo",
-								studentProfileId: "student-1",
-							},
-						],
+						Item: {
+							certificateBranding,
+							certificateId: "certificate-active-case",
+							caseId: "active-case",
+							caseTitle: "Acute endocrine case review",
+							completedAt: now - 40_000,
+							studentDisplayName: "Jordan Adebayo",
+							studentProfileId: "student-1",
+						},
 					};
 				}
 
@@ -321,10 +319,28 @@ describe("DynamoStudentDashboardRepository", () => {
 					Items: [
 						{
 							certificateBranding,
-							certificateId: "certificate-active-case",
-							caseId: "active-case",
-							caseTitle: "Acute endocrine case review",
-							completedAt: now - 40_000,
+							certificateId: "certificate-newest",
+							caseId: "case-newest",
+							caseTitle: "Latest certificate",
+							completedAt: now - 1_000,
+							studentDisplayName: "Jordan Adebayo",
+							studentProfileId: "student-1",
+						},
+						{
+							certificateBranding,
+							certificateId: "certificate-middle",
+							caseId: "case-middle",
+							caseTitle: "Middle certificate",
+							completedAt: now - 2_000,
+							studentDisplayName: "Jordan Adebayo",
+							studentProfileId: "student-1",
+						},
+						{
+							certificateBranding,
+							certificateId: "certificate-third",
+							caseId: "case-third",
+							caseTitle: "Third certificate",
+							completedAt: now - 3_000,
 							studentDisplayName: "Jordan Adebayo",
 							studentProfileId: "student-1",
 						},
@@ -341,6 +357,19 @@ describe("DynamoStudentDashboardRepository", () => {
 		const summary = await repository.getSummary("student-1", now);
 
 		expect(summary.activeCase).toBeNull();
-		expect(summary.recentCertificates).toHaveLength(1);
+		expect(
+			summary.recentCertificates.map((certificate) => certificate.certificateId),
+		).toEqual(["certificate-newest", "certificate-middle", "certificate-third"]);
+		expect(
+			mockCalls(documentClient.send).filter(
+				([command]) =>
+					(command as { input?: { TableName?: string } }).input?.TableName ===
+					"StudentCertificateTable",
+			),
+		).toHaveLength(2);
 	});
 });
+
+function mockCalls(value: unknown) {
+	return (value as { mock: { calls: unknown[][] } }).mock.calls;
+}

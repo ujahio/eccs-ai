@@ -6,6 +6,7 @@ import {
 	GetCommand,
 	QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { studentCaseCertificateId } from "@/features/student/cases/ids";
 import { isActiveTeacherCase } from "@/features/teacher/cases/case-lifecycle";
 import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query";
 import { getSessionAuthResources } from "@/lib/aws/resources";
@@ -118,20 +119,23 @@ export class InMemoryStudentDashboardRepository
 {
 	async getSummary(studentProfileId: string, now: number) {
 		const activeCase = activeCaseFromRecords(getE2ETeacherCaseStore(), now);
-
-		return {
-			activeCase:
-				activeCase &&
+		const recentCertificates = await this.listCertificates(
+			studentProfileId,
+			recentCertificateLimit,
+		);
+		const hasCompletedActiveCase =
+			activeCase !== null &&
+			(recentCertificates.some(
+				(certificate) => certificate.caseId === activeCase.caseId,
+			) ||
 				(await this.hasCertificateForCase({
 					caseId: activeCase.caseId,
 					studentProfileId,
-				}))
-					? null
-					: activeCase,
-			recentCertificates: await this.listCertificates(
-				studentProfileId,
-				recentCertificateLimit,
-			),
+				})));
+
+		return {
+			activeCase: hasCompletedActiveCase ? null : activeCase,
+			recentCertificates,
 		};
 	}
 
@@ -183,10 +187,13 @@ export class DynamoStudentDashboardRepository
 		]);
 		const hasCompletedActiveCase =
 			activeCase !== null &&
-			(await this.hasCertificateForCase({
-				caseId: activeCase.caseId,
-				studentProfileId,
-			}));
+			(recentCertificates.some(
+				(certificate) => certificate.caseId === activeCase.caseId,
+			) ||
+				(await this.hasCertificateForCase({
+					caseId: activeCase.caseId,
+					studentProfileId,
+				})));
 
 		return {
 			activeCase: hasCompletedActiveCase ? null : activeCase,
@@ -268,22 +275,16 @@ export class DynamoStudentDashboardRepository
 		caseId: string;
 		studentProfileId: string;
 	}) {
-		const records = await queryAllDynamoItems<StoredStudentCertificateRecord>(
-			this.documentClient,
-			{
+		const response = await this.documentClient.send(
+			new GetCommand({
 				TableName: this.studentCertificateTableName,
-				IndexName: "StudentCompletedAtIndex",
-				KeyConditionExpression: "#studentProfileId = :studentProfileId",
-				ExpressionAttributeNames: {
-					"#studentProfileId": "studentProfileId",
+				Key: {
+					certificateId: studentCaseCertificateId({ caseId, studentProfileId }),
 				},
-				ExpressionAttributeValues: {
-					":studentProfileId": studentProfileId,
-				},
-			},
+			}),
 		);
 
-		return records.some((record) => record.caseId === caseId);
+		return Boolean(response.Item);
 	}
 }
 

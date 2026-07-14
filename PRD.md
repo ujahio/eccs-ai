@@ -23,14 +23,14 @@ For v1, ECCS is a single-tenant platform with one teacher account/persona. The p
 
 ### Student Learner
 
-7. As a student, I want to view a personalized dashboard upon login, so that I can see my active case, recent certificates, and account payment status at a glance.
-8. As a student, I want to see a prominent active case banner on my dashboard, so that I know exactly what case is available and when it expires.
-9. As a student, I want to see my last 3 earned certificates on the dashboard, so that I can quickly re-download them or navigate to my full certificate history.
+7. As a student, I want to view a personalized dashboard upon login, so that I can see any available uncompleted active case, recent certificates, and account payment status at a glance.
+8. As a student, I want to see a prominent active case banner on my dashboard when I have an active case still available to complete, so that I know exactly what case is available and when it expires.
+9. As a student, I want to see up to my latest 3 earned certificates on the dashboard, so that I can quickly re-download them or navigate to my full certificate history.
 10. As a student, I want to understand that case access will be offered through an annual subscription, so that I know the future access model.
 11. As a student, I want clear subscription copy stating that the account will renew annually and can be cancelled at any time, so that renewal expectations are transparent.
 12. [Deferred until payment provider research] As a student, I want to pay via credit card during checkout, so that I can activate my subscription immediately.
 13. [Deferred until payment provider research] As a student, I want to manage my subscription from my profile, so that I can see my plan details, renewal date, and cancel if needed.
-14. As a student, when no case is currently active, I want the dashboard to clearly show that no case is available right now, so that I understand my account is still active and know to check back for the next case.
+14. As a student, when no case is currently active or I already completed the active case, I want the dashboard to clearly show that no case is available right now, so that I understand my account is still active and know to check back for the next case.
 15. As a student, I want to receive an email when a new case is published, so that I don't miss it.
 16. As a student, I want to read a case presentation with clinical scenario (that may include pertinent information like patient history, and lab results), so that I can understand the medical context.
 17. As a student, I want to write a personal analysis (150–700 words) for each case, so that I can practice clinical reasoning.
@@ -45,7 +45,7 @@ For v1, ECCS is a single-tenant platform with one teacher account/persona. The p
 26. As a student, I want my certificate to include my full name, case title, completion date, CE credit hours, ECCS branding, partner logo, and a unique certificate ID, so that it is accepted for license renewal.
 27. As a student, I want certificates to remain downloadable from my account, so that I can produce them for licensing audits years later.
 28. As a student, I want to view and download all my earned certificates from a dedicated page, so that I can manage my CE credit records.
-29. As a student, I want to leave optional feedback (rating/comment) on a case after completion, so that I can share my experience with teachers.
+29. As a student, I want to leave optional structured ratings and written feedback on a case after completion, so that I can share my experience with teachers.
 30. As a student, I want to change my email address and verify the new one via a confirmation link before it takes effect, so that my account stays secure.
 31. As a student, I want to change my full name in my profile, so that my account reflects my current name.
 32. As a student, I want past certificates to show the name I had when I earned them, so that my CE credits remain traceable to that point in time.
@@ -75,7 +75,7 @@ For v1, ECCS is a single-tenant platform with one teacher account/persona. The p
 61. As a teacher, I want the CME question creation to add one question at a time with a visible counter, so that I know how many I've added.
 62. As a teacher, I want to save my case as a draft after adding a Case Title, so that I can control when my work is persisted while every persisted draft has an identifiable record.
 63. As a teacher, I want to see a draft save confirmation after each save, so that I know my work is stored.
-64. As a teacher, I want to review all case content on a final step before publishing including confirming the deadline, so that I can confirm everything is correct and choose how long students have.
+64. As a teacher, I want to review all case content on a final step before publishing, confirm the deadline, see any publish blockers, and publish only from that review step, so that I can confirm everything is correct before students receive access.
 65. As a teacher, I want the deadline set as a calendar date (not a time) from the Case Study resources step and still editable in final review, so that I decide the student access window while authoring and confirm it before publish.
 66. As a teacher, I don't want to be able to create a new published case when there is an active published case, so that only one case runs at a time.
 67. As a teacher, I want to open a draft case and see the creation wizard pre-filled with all existing content, so that I can pick up where I left off.
@@ -96,8 +96,9 @@ No super-admin UI is included in v1. Teacher setup is handled through bootstrap/
 
 - Teacher creates a draft record after entering a Case Title. After the title exists, all fields are saveable to server-side draft storage via explicit "Save Draft" button. No auto-save.
 - Teacher case creation is section-based with free navigation (not strictly linear). Sections: title/description → case presentation → model answer → Case Study resources (lecture text → deadline date → optional PDFs) → CME questions → review & publish.
-- Teacher authoring uses explicit "Save Draft" only. The UI must show dirty-state messaging and warn before navigation when unsaved changes exist.
+- Teacher authoring uses explicit "Save Draft" only. The UI must show a persistent dirty-state indicator when unsaved draft changes exist and warn before leaving the page while unsaved changes exist. Teachers can still move between authoring sections while editing.
 - Drafts can be incomplete and saved after the Case Title minimum is met. Draft PDF attachments are retained with the draft content. Use partial section-level validation for author feedback, with full validation as the hard gate at publish.
+- Final review is the only authoring section where publishing is available. Publish readiness, publish blockers, and validation failures should be visible at the top of the review step. Long review content, including CME questions and case materials, can be collapsed so teachers can scan the page before publishing.
 - Draft deletion requires a confirmation dialog and then permanently deletes the draft. Deleting a draft also deletes its draft PDF attachments from storage.
 - Published case content is immutable in v1. Teachers can edit drafts only. Once published, the case presentation, model answer, teaching resources, quiz, and deadline are frozen.
 - If a serious typo or clinical correction is discovered after publishing, handle it manually outside the product. Minor typos remain unchanged.
@@ -108,7 +109,7 @@ No super-admin UI is included in v1. Teacher setup is handled through bootstrap/
 - At deadline, the case is treated as archived and all student operations on that case stop immediately. There is no mid-quiz exception in v1.
 - Case active/archive behavior is computed dynamically from the published case deadline for correctness.
 - A scheduled backend job also persists archived lifecycle state for operational clarity.
-- Students cannot access cases after the deadline unless they already earned a certificate. The only lasting student access is to their own certificates.
+- Students cannot access cases after the deadline unless they already earned a certificate. The only lasting student access is to their own certificates. A student who already earned the certificate for the active case should not see that case as an available active case on the dashboard.
 - Payments are deferred until payment provider research is complete. While payments are deferred, verified students are eligible to access active cases. Keep active-case eligibility behind a clearly defined product rule boundary so future payment rules can be added without changing every student flow.
 
 ### Teacher Dashboard
@@ -129,7 +130,7 @@ No super-admin UI is included in v1. Teacher setup is handled through bootstrap/
 3. **Side-by-side Comparison** — Student's submitted analysis on the left, teacher's model answer on the right. "Edit My Analysis" button available. Student can edit their submitted analysis after comparing within the same browser-based case response flow; edits replace the local submitted response until quiz pass.
 4. **Teaching Resources** — Lecture text, PDF attachments.
 5. **CME Quiz** — 3–5 MCQs. Shuffle question order only; keep answer option order exactly as authored. Must score 100%. Failed attempts show pass/fail only, not per-question correctness. On 3rd fail: forced navigation to re-read case presentation, model answer, and resources, then retry. Unlimited retries while the case is active.
-6. **Case Feedback** — The student is given invited to give the case study a rating (1–5) and comment section. The students can partake or skip to next page
+6. **Case Feedback** — After passing the quiz, the student is invited to provide structured 1-5 ratings across the case feedback prompts and an optional written response. Feedback is optional and can be partially completed. If the student provides at least one rating or a written response, save the feedback values provided. If the student leaves every rating and the written response blank, continue to the certificate without creating a feedback record.
 7. **Certificate** — Certificate record is created when the quiz is passed. Analysis locks at pass time. Certificate preview is available for viewing from certificate data; PDF generation/download occurs only when the student requests it.
 
 The student case response flow must be completed in one sitting. If the student leaves the experience before earning the certificate, no draft response is available when they return; they must restart the response flow. Student case-flow progress and analysis response state are tracked in the front end for the active browser experience only; do not create backend progress, draft-response, or per-student case-step records for this flow. Within the active uninterrupted flow, a valid analysis submission is the front-end progression marker and can be edited until quiz pass.
@@ -142,9 +143,9 @@ Uploaded case PDFs are viewable inline when supported by the browser and always 
 
 PDF attachments cover richer supplemental material.
 
-Feedback is optional and skippable. Passing the quiz earns the certificate; feedback does not gate certificate access.
+Feedback is optional and skippable. Passing the quiz earns the certificate; feedback does not gate certificate access, and the certificate remains available even if the student leaves the feedback step blank.
 
-Feedback is shown to the teacher with the student's name in v1.
+Submitted feedback is stored with the completed case and student. Teacher-facing feedback review with student identity is part of the teacher completion review workflow.
 
 ### Profile and Account Security
 

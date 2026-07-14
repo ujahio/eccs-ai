@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
 	DynamoDBDocumentClient,
@@ -18,11 +18,17 @@ import {
 	saveE2EStudentCertificate,
 } from "@/lib/e2e/in-memory-auth";
 import {
+	hasStudentCaseFeedbackValues,
 	type StudentCaseFeedback,
 	type StudentCaseFeedbackInput,
 	validateStudentCaseFeedbackInput,
 } from "@/features/case-feedback/feedback";
 import { validateAnalysisWordCount } from "./analysis";
+import {
+	studentCaseCertificateId,
+	studentCaseCompletionId,
+	studentCaseQuizAttemptId,
+} from "./ids";
 
 export type StudentCaseAttachmentDisposition = "inline" | "attachment";
 
@@ -100,7 +106,7 @@ export type SubmitStudentCaseFeedbackArgs = {
 };
 
 export type SubmitStudentCaseFeedbackResult = {
-	status: "already_submitted" | "submitted";
+	status: "already_submitted" | "skipped" | "submitted";
 };
 
 export type StudentCaseCertificateRecord = {
@@ -330,6 +336,10 @@ export async function submitStudentCaseFeedback({
 	const repository = getStudentCaseRepository();
 	const now = Date.now();
 	const validatedFeedback = validateStudentCaseFeedbackInput(feedback);
+
+	if (!hasStudentCaseFeedbackValues(validatedFeedback)) {
+		return { status: "skipped" };
+	}
 
 	return repository.submitStudentCaseFeedback(
 		{
@@ -1300,65 +1310,6 @@ function personalAnalysisForCompletion(personalAnalysis: string) {
 	}
 
 	return trimmedAnalysis;
-}
-
-function studentCaseCertificateId({
-	caseId,
-	studentProfileId,
-}: {
-	caseId: string;
-	studentProfileId: string;
-}) {
-	return studentCaseScopedId({
-		caseId,
-		prefix: "cert",
-		studentProfileId,
-	});
-}
-
-function studentCaseCompletionId({
-	caseId,
-	studentProfileId,
-}: {
-	caseId: string;
-	studentProfileId: string;
-}) {
-	return studentCaseScopedId({
-		caseId,
-		prefix: "case_completion",
-		studentProfileId,
-	});
-}
-
-function studentCaseQuizAttemptId({
-	caseId,
-	studentProfileId,
-}: {
-	caseId: string;
-	studentProfileId: string;
-}) {
-	return studentCaseScopedId({
-		caseId,
-		prefix: "quiz_attempt",
-		studentProfileId,
-	});
-}
-
-function studentCaseScopedId({
-	caseId,
-	prefix,
-	studentProfileId,
-}: {
-	caseId: string;
-	prefix: "case_completion" | "cert" | "quiz_attempt";
-	studentProfileId: string;
-}) {
-	const digest = createHash("sha256")
-		.update(`${studentProfileId}\n${caseId}`)
-		.digest("base64url")
-		.slice(0, 32);
-
-	return `${prefix}_${digest}`;
 }
 
 function quizAttemptStateFromRecord(

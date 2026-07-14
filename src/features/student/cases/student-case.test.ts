@@ -393,25 +393,26 @@ describe("InMemoryStudentCaseRepository", () => {
 				submitStudentCaseFeedback({
 					caseId: "active-case",
 					studentProfileId: "student-1",
-					feedback: feedbackInputFixture(),
+					feedback: feedbackInputFixture({
+						futureSuggestions: "",
+						ratings: {
+							knowledge: 5,
+						},
+					}),
 				}),
 			).resolves.toEqual({ status: "submitted" });
 
 			const store = getE2EAuthStore();
 			const completion = Array.from(store.studentCaseCompletions.values())[0];
 
-			expect(completion).toMatchObject({
-				caseId: "active-case",
-				feedback: {
-					futureSuggestions: "More hematology cases, please.",
-					ratings: {
-						knowledge: 5,
-						interpretation: 4,
-						patientCare: 5,
-						userExperience: 4,
+				expect(completion).toMatchObject({
+					caseId: "active-case",
+					feedback: {
+						ratings: {
+							knowledge: 5,
+						},
+						submittedAt: 2_000,
 					},
-					submittedAt: 2_000,
-				},
 				studentDisplayName: "Jordan Adebayo",
 				studentProfileId: "student-1",
 			});
@@ -433,16 +434,81 @@ describe("InMemoryStudentCaseRepository", () => {
 				}),
 			).resolves.toEqual({ status: "already_submitted" });
 			expect(store.teacherCases.get("active-case")?.feedbackCount).toBe(1);
-			expect(
-				Array.from(store.studentCaseCompletions.values())[0]?.feedback,
-			).toMatchObject({
-				futureSuggestions: "More hematology cases, please.",
-			});
-		} finally {
-			dateNowSpy.mockRestore();
+				expect(
+					Array.from(store.studentCaseCompletions.values())[0]?.feedback,
+				).toMatchObject({
+					ratings: {
+						knowledge: 5,
+					},
+				});
+			} finally {
+				dateNowSpy.mockRestore();
 			process.env.AUTH_E2E_MODE = previousMode;
-		}
-	});
+			}
+		});
+
+		it("skips blank feedback and saves written-only feedback later", async () => {
+			const { completeStudentCaseQuiz, submitStudentCaseFeedback } = await import(
+				"./student-case"
+			);
+			const previousMode = process.env.AUTH_E2E_MODE;
+			process.env.AUTH_E2E_MODE = "memory";
+			const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(2_000);
+			seedE2ETeacherCases([activeCase]);
+
+			try {
+				await completeStudentCaseQuiz({
+					caseId: "active-case",
+					studentProfileId: "student-1",
+					studentDisplayName: "Jordan Adebayo",
+					personalAnalysis: finalPersonalAnalysis,
+					answers: {
+						"question-1": "q1-a",
+						"question-2": "q2-a",
+						"question-3": "q3-a",
+					},
+				});
+
+				await expect(
+					submitStudentCaseFeedback({
+						caseId: "active-case",
+						studentProfileId: "student-1",
+						feedback: feedbackInputFixture({
+							futureSuggestions: "   ",
+							ratings: {},
+						}),
+					}),
+				).resolves.toEqual({ status: "skipped" });
+
+				const store = getE2EAuthStore();
+				expect(store.teacherCases.get("active-case")?.feedbackCount).toBe(0);
+				expect(
+					Array.from(store.studentCaseCompletions.values())[0]?.feedback,
+				).toBeUndefined();
+
+				await expect(
+					submitStudentCaseFeedback({
+						caseId: "active-case",
+						studentProfileId: "student-1",
+						feedback: feedbackInputFixture({
+							futureSuggestions: "More short case discussions would help.",
+							ratings: {},
+						}),
+					}),
+				).resolves.toEqual({ status: "submitted" });
+
+				expect(store.teacherCases.get("active-case")?.feedbackCount).toBe(1);
+				expect(
+					Array.from(store.studentCaseCompletions.values())[0]?.feedback,
+				).toEqual({
+					futureSuggestions: "More short case discussions would help.",
+					submittedAt: 2_000,
+				});
+			} finally {
+				dateNowSpy.mockRestore();
+				process.env.AUTH_E2E_MODE = previousMode;
+			}
+		});
 
 	it("returns active PDF attachment storage references only before the deadline", async () => {
 		const { InMemoryStudentCaseRepository } = await import("./student-case");
@@ -683,14 +749,13 @@ describe("DynamoStudentCaseRepository", () => {
 			{
 				caseId: "active-case",
 				studentProfileId: "student-1",
-				feedback: {
-					...feedbackInputFixture({
-						futureSuggestions: "More endocrine cases.",
-					}),
-					ratings: feedbackRatingsFixture(),
-					submittedAt: 2_000,
+					feedback: {
+						ratings: {
+							knowledge: 5,
+						},
+						submittedAt: 2_000,
+					},
 				},
-			},
 		);
 
 		const command = mockCalls(documentClient.send)[0]?.[0] as {
@@ -718,17 +783,13 @@ describe("DynamoStudentCaseRepository", () => {
 		});
 		expect(
 			command.input?.TransactItems?.[0]?.Update?.ExpressionAttributeValues,
-		).toMatchObject({
-			":feedback": {
-					futureSuggestions: "More endocrine cases.",
-					ratings: {
-						knowledge: 5,
-						interpretation: 4,
-						patientCare: 5,
-						userExperience: 4,
+			).toMatchObject({
+				":feedback": {
+						ratings: {
+							knowledge: 5,
+						},
+						submittedAt: 2_000,
 					},
-					submittedAt: 2_000,
-				},
 		});
 		expect(command.input?.TransactItems?.[1]?.Update).toMatchObject({
 			ConditionExpression: "attribute_exists(caseId)",

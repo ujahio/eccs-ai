@@ -27,20 +27,22 @@ export type StudentCaseFeedbackRatingKey =
 	(typeof studentCaseFeedbackRatingQuestions)[number]["id"];
 export type StudentCaseFeedbackRating = 1 | 2 | 3 | 4 | 5;
 
-export type StudentCaseFeedbackRatings = Record<
-	StudentCaseFeedbackRatingKey,
-	StudentCaseFeedbackRating
+export type StudentCaseFeedbackRatings = Partial<
+	Record<StudentCaseFeedbackRatingKey, StudentCaseFeedbackRating>
 >;
 
-export type StudentCaseFeedback = {
+export type StudentCaseFeedbackValues = {
 	futureSuggestions?: string;
-	ratings: StudentCaseFeedbackRatings;
-	submittedAt: number;
+	ratings?: StudentCaseFeedbackRatings;
 };
 
 export type StudentCaseFeedbackInput = {
 	futureSuggestions: string;
 	ratings: Partial<Record<StudentCaseFeedbackRatingKey, number>>;
+};
+
+export type StudentCaseFeedback = StudentCaseFeedbackValues & {
+	submittedAt: number;
 };
 
 export class StudentCaseFeedbackValidationError extends Error {
@@ -53,14 +55,18 @@ export class StudentCaseFeedbackValidationError extends Error {
 export function validateStudentCaseFeedbackInput(
 	input: StudentCaseFeedbackInput,
 ) {
-	const ratings = {} as StudentCaseFeedbackRatings;
+	const ratings: StudentCaseFeedbackRatings = {};
 
 	for (const question of studentCaseFeedbackRatingQuestions) {
 		const rating = input.ratings[question.id];
 
+		if (rating === undefined) {
+			continue;
+		}
+
 		if (!isStudentCaseFeedbackRating(rating)) {
 			throw new StudentCaseFeedbackValidationError(
-				"Choose a 1-5 rating for each feedback question.",
+				"Choose ratings from 1 to 5.",
 			);
 		}
 
@@ -77,8 +83,17 @@ export function validateStudentCaseFeedbackInput(
 
 	return {
 		...(futureSuggestions ? { futureSuggestions } : {}),
-		ratings,
+		...(Object.keys(ratings).length > 0 ? { ratings } : {}),
 	};
+}
+
+export function hasStudentCaseFeedbackValues(
+	feedback: StudentCaseFeedbackValues,
+) {
+	return Boolean(
+		feedback.futureSuggestions?.trim() ||
+			Object.keys(feedback.ratings ?? {}).length > 0,
+	);
 }
 
 function isStudentCaseFeedbackRating(

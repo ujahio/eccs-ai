@@ -182,7 +182,7 @@ export async function submitStudentCaseFeedbackForm(
 	}
 
 	try {
-		await submitStudentCaseFeedback({
+		const result = await submitStudentCaseFeedback({
 			caseId,
 			feedback: {
 				futureSuggestions: stringFromFormData(
@@ -193,11 +193,14 @@ export async function submitStudentCaseFeedbackForm(
 			studentProfileId: profile.profileId,
 		});
 
-		revalidatePath("/teacher");
-		revalidatePath("/teacher/cases");
+		if (result.status === "submitted") {
+			revalidatePath("/teacher");
+			revalidatePath("/teacher/cases");
+		}
 
 		return {
-			message: "Thank you for sharing feedback.",
+			message:
+				result.status === "skipped" ? "" : "Thank you for sharing feedback.",
 			status: "submitted",
 			submittedAt: Date.now(),
 		};
@@ -253,11 +256,13 @@ function feedbackRatingsFromFormData(formData: FormData) {
 	const ratings: Partial<Record<StudentCaseFeedbackRatingKey, number>> = {};
 
 	for (const question of studentCaseFeedbackRatingQuestions) {
-		const value = Number(formData.get(`feedback:${question.id}`));
+		const rawValue = formData.get(`feedback:${question.id}`);
 
-		if (Number.isFinite(value)) {
-			ratings[question.id] = value;
+		if (rawValue === null) {
+			continue;
 		}
+
+		ratings[question.id] = Number(rawValue);
 	}
 
 	return ratings;

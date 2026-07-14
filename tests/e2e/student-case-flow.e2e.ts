@@ -517,6 +517,36 @@ test.describe("Student case presentation and analysis flow", () => {
 		expect(state.activeCase?.feedbackCount).toBe(0);
 	});
 
+	test("allows students to submit partial feedback and still access the certificate", async ({
+		page,
+		request,
+	}) => {
+		const email = uniqueEmail("student-case-feedback-partial");
+
+		await seedStudentCase(request);
+		await bootstrapVerifiedStudent(request, email);
+		await loginStudent(page, email);
+		await startStudentCaseFlow(page);
+		await reachStudentCaseQuiz(page);
+		await answerQuiz(page);
+		await page.getByTestId("student-case-submit-quiz").click();
+
+		await expect(page.getByTestId("student-case-feedback-step")).toBeVisible();
+		await page.getByTestId("student-case-feedback-knowledge-5").click();
+		await page.getByTestId("student-case-submit-feedback").click();
+		await expect(page.getByTestId("student-case-certificate-step")).toBeVisible();
+		await expect(
+			page.getByTestId("student-case-certificate-download"),
+		).toHaveAttribute("href", /\/student\/certificates\/cert_.*\/download/);
+
+		const stateResponse = await request.get("/api/e2e/teacher-dashboard/state");
+		expect(stateResponse.ok()).toBe(true);
+		const state = (await stateResponse.json()) as {
+			activeCase?: { feedbackCount?: number };
+		};
+		expect(state.activeCase?.feedbackCount).toBe(1);
+	});
+
 	test("shows failed quiz attempts without per-question correctness and forces review on the third failure", async ({
 		page,
 		request,
