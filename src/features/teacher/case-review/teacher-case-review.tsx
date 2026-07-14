@@ -99,17 +99,7 @@ export function TeacherStudentResponseDetail({
 				</ButtonLink>
 			</div>
 
-			<div className="grid gap-4 sm:grid-cols-3">
-				<StatusTile
-					label="Analysis Submitted"
-					testId="teacher-student-response-submitted-at"
-					value={formatDateTime(completion.analysisSubmittedAt)}
-				/>
-				<StatusTile
-					label="Analysis Locked"
-					testId="teacher-student-response-locked-at"
-					value={formatDateTime(completion.analysisLockedAt)}
-				/>
+			<div className="max-w-sm">
 				<StatusTile
 					label="Completed"
 					testId="teacher-student-response-completed-at"
@@ -161,17 +151,7 @@ function StudentCompletionCard({
 					</p>
 				</div>
 
-				<div className="grid gap-2 text-sm sm:grid-cols-3 lg:min-w-[440px]">
-					<StatusPill
-						label="Analysis"
-						testId="teacher-case-review-analysis-status"
-						value="Locked"
-					/>
-					<StatusPill
-						label="Completion"
-						testId="teacher-case-review-completion-status"
-						value="Complete"
-					/>
+				<div className="text-sm sm:w-40 lg:ml-auto">
 					<StatusPill
 						label="Feedback"
 						testId="teacher-case-review-feedback-status"
@@ -206,9 +186,6 @@ function FeedbackPanel({ feedback }: { feedback?: StudentCaseFeedback }) {
 			</h2>
 			{feedback ? (
 				<>
-					<p className="mt-2 text-sm text-muted-gray">
-						Submitted {formatDateTime(feedback.submittedAt)}
-					</p>
 					<div className="mt-4 space-y-3">
 						{studentCaseFeedbackRatingQuestions.map((question) => {
 							const rating = feedback.ratings?.[question.id];

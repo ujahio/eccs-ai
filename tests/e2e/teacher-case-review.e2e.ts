@@ -124,12 +124,12 @@ test.describe("Teacher case review", () => {
 		await expect(page.getByTestId("teacher-case-review-student-name")).toHaveText(
 			"Jordan Adebayo",
 		);
-		await expect(page.getByTestId("teacher-case-review-analysis-status")).toHaveText(
-			"Locked",
-		);
+		await expect(
+			page.getByTestId("teacher-case-review-analysis-status"),
+		).toHaveCount(0);
 		await expect(
 			page.getByTestId("teacher-case-review-completion-status"),
-		).toHaveText("Complete");
+		).toHaveCount(0);
 		await expect(page.getByTestId("teacher-case-review-feedback-status")).toHaveText(
 			"Left",
 		);
@@ -154,8 +154,17 @@ test.describe("Teacher case review", () => {
 			page.getByTestId("teacher-student-response-completed-at"),
 		).toBeVisible();
 		await expect(
+			page.getByTestId("teacher-student-response-submitted-at"),
+		).toHaveCount(0);
+		await expect(
+			page.getByTestId("teacher-student-response-locked-at"),
+		).toHaveCount(0);
+		await expect(
 			page.getByTestId("teacher-student-response-root"),
 		).not.toContainText("Certificate");
+		await expect(
+			page.getByTestId("teacher-student-response-feedback"),
+		).not.toContainText("Submitted");
 		await expect(
 			page.getByTestId("teacher-student-response-feedback-rating"),
 		).toHaveCount(2);
