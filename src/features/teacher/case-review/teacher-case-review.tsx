@@ -120,7 +120,10 @@ export function TeacherStudentResponseDetail({
 					</p>
 				</article>
 
-				<FeedbackPanel feedback={completion.feedback} />
+				<FeedbackPanel
+					feedback={completion.feedback}
+					studentDisplayName={completion.studentDisplayName}
+				/>
 			</div>
 		</section>
 	);
@@ -175,17 +178,23 @@ function StudentCompletionCard({
 	);
 }
 
-function FeedbackPanel({ feedback }: { feedback?: StudentCaseFeedback }) {
+function FeedbackPanel({
+	feedback,
+	studentDisplayName,
+}: {
+	feedback?: StudentCaseFeedback;
+	studentDisplayName: string;
+}) {
 	return (
 		<aside
 			className="border border-border-gray bg-soft-section p-5 sm:p-6"
 			data-testid="teacher-student-response-feedback"
 		>
-			<h2 className="text-base font-semibold text-primary-text">
-				Student Feedback
-			</h2>
 			{feedback ? (
 				<>
+					<h2 className="text-base font-semibold text-primary-text">
+						{possessiveFirstNameFromDisplayName(studentDisplayName)} Feedback
+					</h2>
 					<div className="mt-4 space-y-3">
 						{studentCaseFeedbackRatingQuestions.map((question) => {
 							const rating = feedback.ratings?.[question.id];
@@ -225,11 +234,17 @@ function FeedbackPanel({ feedback }: { feedback?: StudentCaseFeedback }) {
 					className="mt-3 text-sm leading-6 text-muted-gray"
 					data-testid="teacher-student-response-no-feedback"
 				>
-					No optional feedback was submitted for this completion.
+					No feedback was submitted
 				</p>
 			)}
 		</aside>
 	);
+}
+
+function possessiveFirstNameFromDisplayName(displayName: string) {
+	const firstName = displayName.trim().split(/\s+/)[0] || "Student";
+
+	return `${firstName}'s`;
 }
 
 function StatusTile({

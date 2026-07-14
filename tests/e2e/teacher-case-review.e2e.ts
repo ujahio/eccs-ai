@@ -165,6 +165,9 @@ test.describe("Teacher case review", () => {
 		await expect(
 			page.getByTestId("teacher-student-response-feedback"),
 		).not.toContainText("Submitted");
+		await expect(page.getByTestId("teacher-student-response-feedback")).toContainText(
+			"Jordan's Feedback",
+		);
 		await expect(
 			page.getByTestId("teacher-student-response-feedback-rating"),
 		).toHaveCount(2);
@@ -181,6 +184,13 @@ test.describe("Teacher case review", () => {
 		await expect(page.getByTestId("teacher-case-review-feedback-status")).toHaveText(
 			"Not Left",
 		);
+		await page.getByTestId("teacher-case-review-open-response").click();
+		await expect(
+			page.getByTestId("teacher-student-response-feedback"),
+		).toContainText("No feedback was submitted");
+		await expect(
+			page.getByTestId("teacher-student-response-feedback"),
+		).not.toContainText("Morgan's Feedback");
 	});
 
 	test("rejects student access to teacher case review routes", async ({
