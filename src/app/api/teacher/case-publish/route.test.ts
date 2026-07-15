@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	ActivePublishedCaseError,
+	PublishArchiveSchedulingError,
 	PublishDraftNotFoundError,
 	PublishValidationError,
 } from "@/features/teacher/case-authoring/publishing";
@@ -89,6 +90,38 @@ describe("teacher case publish route", () => {
 			publishedAt: Date.UTC(2026, 6, 7),
 			title: "Acute endocrine review",
 		});
+	});
+
+	it("returns unavailable when archive scheduling fails during publish", async () => {
+		const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+		mocks.publishDraft.mockRejectedValue(
+			new PublishArchiveSchedulingError({
+				cause: new Error("scheduler unavailable"),
+			}),
+		);
+
+		const response = await POST(
+			new Request("http://localhost/api/teacher/case-publish", {
+				body: JSON.stringify({
+					caseId: "case-1",
+					draft: { title: "Acute endocrine review" },
+				}),
+				headers: { "content-type": "application/json" },
+				method: "POST",
+			}),
+		);
+
+		expect(response.status).toBe(503);
+		expect(await response.json()).toEqual({
+			error:
+				"Publishing is temporarily unavailable because archive scheduling failed.",
+		});
+		expect(errorSpy).toHaveBeenCalledWith(
+			"Case archive scheduling failed",
+			expect.any(PublishArchiveSchedulingError),
+		);
+		expect(mocks.sendNewCasePublishedEmail).not.toHaveBeenCalled();
+		errorSpy.mockRestore();
 	});
 
 	it("keeps publish successful when new-case email delivery fails", async () => {

@@ -6,6 +6,10 @@
 
 declare module "sst" {
   export interface Resource {
+    "ActiveCaseArchiveFunction": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
     "AuthUserPool": {
       "id": string
       "type": "sst.aws.CognitoUserPool"

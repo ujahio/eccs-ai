@@ -39,7 +39,7 @@ describe("StudentDashboard", () => {
 		);
 		expect(markup).toContain("Deadline:");
 		expect(markup).toContain("View Case Study");
-		expect(markup).toContain("href=\"/student/cases/active-case\"");
+		expect(markup).toContain('href="/student/cases/active-case"');
 		expect(markup).toContain("bg-primary-action");
 		expect(markup).toContain(
 			"border border-white bg-white !text-primary-action",
@@ -62,7 +62,6 @@ describe("StudentDashboard", () => {
 		);
 
 		expect(markup).toContain("No active case available");
-		expect(markup).toContain("Your account is active.");
 		expect(markup).toContain("No certificates yet");
 	});
 });

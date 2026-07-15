@@ -25,12 +25,6 @@ export function StudentAccountMenu({ studentName }: StudentAccountMenuProps) {
 					label: "Profile",
 					testId: "student-account-menu-profile",
 				},
-				{
-					className: "hidden sm:block",
-					href: "/student",
-					label: "Case studies",
-					testId: "student-account-menu-cases",
-				},
 			]}
 			logoutButtonTestId="student-logout-button"
 			logoutErrorTestId="student-logout-error"

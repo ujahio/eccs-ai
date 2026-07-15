@@ -1,11 +1,10 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
 	DynamoDBDocumentClient,
-	QueryCommand,
-	type QueryCommandInput,
 	UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import type { AppProfileRecord } from "@/features/auth/registration/repository";
+import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query-core";
 import { deadlineReminderLeadTimeMs } from "./service";
 import type { CaseLifecycleNotificationRepository } from "./service";
 import {
@@ -123,30 +122,6 @@ export class DynamoCaseLifecycleNotificationRepository
 			}
 		}
 	}
-}
-
-async function queryAllDynamoItems<T>(
-	documentClient: DynamoDBDocumentClient,
-	input: QueryCommandInput,
-) {
-	const records: T[] = [];
-	let exclusiveStartKey: QueryCommandInput["ExclusiveStartKey"];
-
-	do {
-		const response = await documentClient.send(
-			new QueryCommand({
-				...input,
-				...(exclusiveStartKey
-					? { ExclusiveStartKey: exclusiveStartKey }
-					: {}),
-			}),
-		);
-
-		records.push(...((response.Items ?? []) as T[]));
-		exclusiveStartKey = response.LastEvaluatedKey;
-	} while (exclusiveStartKey);
-
-	return records;
 }
 
 function errorName(error: unknown) {

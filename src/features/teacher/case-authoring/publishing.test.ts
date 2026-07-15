@@ -12,6 +12,7 @@ import {
 	ActivePublishedCaseError,
 	DynamoTeacherCasePublisher,
 	InMemoryTeacherCasePublisher,
+	PublishArchiveSchedulingError,
 	PublishDraftNotFoundError,
 	PublishValidationError,
 } from "./publishing";
@@ -203,9 +204,13 @@ describe("DynamoTeacherCasePublisher", () => {
 				return {};
 			}),
 		} as unknown as DynamoDBDocumentClient;
+		const archiveScheduler = {
+			scheduleArchive: vi.fn(async () => {}),
+		};
 		const publisher = new DynamoTeacherCasePublisher(
 			"TeacherCaseTable",
 			documentClient,
+			archiveScheduler,
 		);
 
 		await publisher.publishDraft({
@@ -235,6 +240,81 @@ describe("DynamoTeacherCasePublisher", () => {
 							title: "Acute endocrine case review",
 						}),
 						ConditionExpression: "attribute_not_exists(caseId)",
+					},
+				},
+			],
+		});
+		expect(archiveScheduler.scheduleArchive).toHaveBeenCalledWith({
+			caseId: expect.any(String),
+			deadlineAt: Date.UTC(2026, 7, 12, 19, 59, 59, 999),
+		});
+	});
+
+	it("rolls back the published case when archive scheduling fails", async () => {
+		const now = Date.UTC(2026, 6, 7);
+		const sentInputs: Array<Record<string, unknown>> = [];
+		const documentClient = {
+			send: vi.fn(async (command: { input: Record<string, unknown> }) => {
+				sentInputs.push(command.input);
+
+				if (command.input.KeyConditionExpression) {
+					return { Items: [] };
+				}
+
+				return {};
+			}),
+		} as unknown as DynamoDBDocumentClient;
+		const archiveScheduler = {
+			scheduleArchive: vi.fn(async () => {
+				throw new Error("scheduler unavailable");
+			}),
+		};
+		const publisher = new DynamoTeacherCasePublisher(
+			"TeacherCaseTable",
+			documentClient,
+			archiveScheduler,
+		);
+
+		await expect(
+			publisher.publishDraft({
+				draft: validDraft(),
+				now,
+				teacherProfileId,
+			}),
+		).rejects.toBeInstanceOf(PublishArchiveSchedulingError);
+
+		const transactions = sentInputs.filter((input) => input.TransactItems);
+		const publishTransaction = transactions[0] as {
+			TransactItems: Array<{ Put?: { Item?: { caseId?: string } } }>;
+		};
+		const publishedCaseId =
+			publishTransaction.TransactItems[1]?.Put?.Item?.caseId;
+
+		expect(typeof publishedCaseId).toBe("string");
+		expect(transactions).toHaveLength(2);
+		expect(transactions[1]).toMatchObject({
+			TransactItems: [
+				{
+					Delete: {
+						ConditionExpression:
+							"publishedCaseId = :caseId AND deadlineAt = :deadlineAt",
+						ExpressionAttributeValues: {
+							":caseId": publishedCaseId,
+							":deadlineAt": Date.UTC(2026, 7, 12, 19, 59, 59, 999),
+						},
+						Key: { caseId: "teacher-case-active-lock" },
+					},
+				},
+				{
+					Delete: {
+						ConditionExpression:
+							"#recordType = :caseRecordType AND #lifecycle = :published AND deadlineAt = :deadlineAt",
+						ExpressionAttributeValues: {
+							":caseRecordType": "case",
+							":deadlineAt": Date.UTC(2026, 7, 12, 19, 59, 59, 999),
+							":published": "published",
+						},
+						Key: { caseId: publishedCaseId },
 					},
 				},
 			],
@@ -271,6 +351,7 @@ describe("DynamoTeacherCasePublisher", () => {
 		const publisher = new DynamoTeacherCasePublisher(
 			"TeacherCaseTable",
 			documentClient,
+			{ scheduleArchive: vi.fn(async () => {}) },
 		);
 
 		await expect(

@@ -16,6 +16,10 @@ import {
 	cleanupUploadedAttachments,
 	storeDraftAttachments,
 } from "@/features/case-materials/storage";
+import {
+	getActiveCaseArchiveScheduler,
+	type ActiveCaseArchiveScheduler,
+} from "@/features/teacher/cases/active-case-archive-scheduler";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import {
 	deleteE2ETeacherCaseDraftRecord,
@@ -94,6 +98,12 @@ export class PublishDraftNotFoundError extends Error {
 	}
 }
 
+export class PublishArchiveSchedulingError extends Error {
+	constructor(options?: { cause?: unknown }) {
+		super("Case archive scheduling failed.", options);
+	}
+}
+
 export interface TeacherCasePublisher {
 	publishDraft(
 		args: PublishTeacherCaseDraftArgs,
@@ -105,6 +115,8 @@ export function getTeacherCasePublisher(): TeacherCasePublisher {
 		? new InMemoryTeacherCasePublisher()
 		: new DynamoTeacherCasePublisher(
 				getSessionAuthResources().teacherCaseTableName,
+				undefined,
+				getActiveCaseArchiveScheduler(),
 			);
 }
 
@@ -149,6 +161,7 @@ export class DynamoTeacherCasePublisher implements TeacherCasePublisher {
 	constructor(
 		private readonly tableName: string,
 		documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({})),
+		private readonly archiveScheduler: ActiveCaseArchiveScheduler,
 	) {
 		this.documentClient = documentClient;
 	}
@@ -236,6 +249,23 @@ export class DynamoTeacherCasePublisher implements TeacherCasePublisher {
 			throw error;
 		}
 
+		try {
+			await this.archiveScheduler.scheduleArchive({
+				caseId: storedRecord.caseId,
+				deadlineAt: storedRecord.deadlineAt,
+			});
+		} catch (error) {
+			await this.rollbackPublishedCase({
+				existingDraft,
+				publishedCase: storedRecord,
+			});
+			await cleanupUploadedAttachments({
+				storageKeys: uploadedStorageKeys,
+			});
+
+			throw new PublishArchiveSchedulingError({ cause: error });
+		}
+
 		return storedRecord;
 	}
 
@@ -284,6 +314,68 @@ export class DynamoTeacherCasePublisher implements TeacherCasePublisher {
 		}
 
 		return record;
+	}
+
+	private async rollbackPublishedCase({
+		existingDraft,
+		publishedCase,
+	}: {
+		existingDraft: StoredTeacherCaseRecord | null;
+		publishedCase: PublishedTeacherCaseRecord;
+	}) {
+		await this.documentClient.send(
+			new TransactWriteCommand({
+				TransactItems: [
+					{
+						Delete: {
+							TableName: this.tableName,
+							Key: { caseId: activeCaseLockCaseId },
+							ConditionExpression:
+								"publishedCaseId = :caseId AND deadlineAt = :deadlineAt",
+							ExpressionAttributeValues: {
+								":caseId": publishedCase.caseId,
+								":deadlineAt": publishedCase.deadlineAt,
+							},
+						},
+					},
+					existingDraft
+						? {
+								Put: {
+									TableName: this.tableName,
+									Item: existingDraft,
+									ConditionExpression:
+										"#recordType = :caseRecordType AND #lifecycle = :published AND deadlineAt = :deadlineAt",
+									ExpressionAttributeNames: {
+										"#lifecycle": "lifecycle",
+										"#recordType": "recordType",
+									},
+									ExpressionAttributeValues: {
+										":caseRecordType": teacherCaseRecordType,
+										":deadlineAt": publishedCase.deadlineAt,
+										":published": "published",
+									},
+								},
+							}
+						: {
+								Delete: {
+									TableName: this.tableName,
+									Key: { caseId: publishedCase.caseId },
+									ConditionExpression:
+										"#recordType = :caseRecordType AND #lifecycle = :published AND deadlineAt = :deadlineAt",
+									ExpressionAttributeNames: {
+										"#lifecycle": "lifecycle",
+										"#recordType": "recordType",
+									},
+									ExpressionAttributeValues: {
+										":caseRecordType": teacherCaseRecordType,
+										":deadlineAt": publishedCase.deadlineAt,
+										":published": "published",
+									},
+								},
+							},
+				],
+			}),
+		);
 	}
 }
 

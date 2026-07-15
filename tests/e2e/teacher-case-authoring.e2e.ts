@@ -246,7 +246,19 @@ test.describe("Teacher case authoring", () => {
 		);
 		await expect(page.getByTestId("teacher-case-header-publish")).toBeEnabled();
 		await expect(page.getByTestId("teacher-case-publish")).toHaveCount(0);
-		await page.getByTestId("teacher-case-header-publish").click();
+		const [publishResponse] = await Promise.all([
+			page.waitForResponse(
+				(response) =>
+					response.url().endsWith("/api/teacher/case-publish") &&
+					response.request().method() === "POST",
+			),
+			page.getByTestId("teacher-case-header-publish").click(),
+		]);
+		const publishResponseBody = publishResponse.ok()
+			? ""
+			: await publishResponse.text();
+
+		expect(publishResponse.ok(), publishResponseBody).toBe(true);
 
 		await expect(page).toHaveURL(/\/teacher$/);
 		await expect(page.getByTestId("teacher-active-case-card")).toContainText(
