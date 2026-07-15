@@ -119,7 +119,7 @@ No super-admin UI is included in v1. Teacher setup is handled through bootstrap/
 - Clicking an active or archived case shows a student list with student name, completion timestamp, and feedback status.
 - Clicking a draft case opens the creation wizard pre-filled with all existing content.
 - V1 has a single teacher account/persona. Teacher screens can assume one teacher-owned content library and do not need multi-teacher ownership boundaries.
-- Teachers can see student names attached to analyses, completion, and feedback for case review. Teachers do not view student certificates in v1.
+- Teachers can see student names attached to analyses, completion, and feedback for case review.
 - Teachers see only the final locked student analysis in v1. Store key timestamps such as `analysisSubmittedAt` and `analysisLockedAt`, but do not store revision history.
 - Teacher completion data is view-only in-app for v1. No export feature.
 
