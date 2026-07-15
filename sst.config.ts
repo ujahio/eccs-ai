@@ -12,6 +12,7 @@ export default $config({
 		await import("./infra/case-materials");
 		await import("./infra/secrets");
 		await import("./infra/tables");
+		await import("./infra/case-archive");
 		await import("./infra/jobs");
 		await import("./infra/nextjs-client");
 	},

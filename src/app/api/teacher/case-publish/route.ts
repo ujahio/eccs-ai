@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
 	ActivePublishedCaseError,
 	getTeacherCasePublisher,
+	PublishArchiveSchedulingError,
 	PublishDraftNotFoundError,
 	PublishValidationError,
 } from "@/features/teacher/case-authoring/publishing";
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
 			now: Date.now(),
 			teacherProfileId: profile.profileId,
 		});
+
 		try {
 			await getCaseLifecycleNotificationService().sendNewCasePublishedEmail(
 				publishedCase,
@@ -60,6 +62,18 @@ export async function POST(request: Request) {
 
 		if (error instanceof PublishDraftNotFoundError) {
 			return NextResponse.json({ error: "Draft not found." }, { status: 404 });
+		}
+
+		if (error instanceof PublishArchiveSchedulingError) {
+			console.error("Case archive scheduling failed", error);
+
+			return NextResponse.json(
+				{
+					error:
+						"Publishing is temporarily unavailable because archive scheduling failed.",
+				},
+				{ status: 503 },
+			);
 		}
 
 		throw error;

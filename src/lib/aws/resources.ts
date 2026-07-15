@@ -84,6 +84,27 @@ export function getCaseNotificationResources() {
 	};
 }
 
+export function getActiveCaseArchiveScheduleResources() {
+	// EventBridge Scheduler schedule metadata comes from raw aws.* resources in
+	// infra/case-archive.ts, so the Next server receives these values as
+	// deployment-time env vars instead of SST Resource links.
+	return {
+		groupName: process.env.CASE_ARCHIVE_SCHEDULE_GROUP_NAME ?? "default",
+		roleArn: required(
+			process.env.CASE_ARCHIVE_SCHEDULER_ROLE_ARN,
+			"CASE_ARCHIVE_SCHEDULER_ROLE_ARN",
+		),
+		scheduleName: required(
+			process.env.CASE_ARCHIVE_SCHEDULE_NAME,
+			"CASE_ARCHIVE_SCHEDULE_NAME",
+		),
+		targetArn: required(
+			process.env.CASE_ARCHIVE_TARGET_ARN,
+			"CASE_ARCHIVE_TARGET_ARN",
+		),
+	};
+}
+
 export function getSessionAuthResources() {
 	const e2eMode = isE2EMode();
 
