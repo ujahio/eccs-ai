@@ -83,6 +83,30 @@ export function failedPasswordRequirements(password: string) {
 	return PASSWORD_REQUIREMENTS.filter((requirement) => !requirement.isMet(password));
 }
 
+export function zodFieldErrors<T extends object>(
+	error: z.ZodError<T>
+): Partial<Record<keyof T, string>> {
+	const fieldErrors: Partial<Record<keyof T, string>> = {};
+	const entries = Object.entries(z.flattenError(error).fieldErrors) as Array<
+		[keyof T, string[] | undefined]
+	>;
+
+	for (const [field, messages] of entries) {
+		const message = messages?.[0];
+		if (message) {
+			fieldErrors[field] = message;
+		}
+	}
+
+	return fieldErrors;
+}
+
+export function passwordRequirementMessage(requirements: PasswordRequirement[]) {
+	return `Password is missing: ${requirements
+		.map((requirement) => requirement.label.toLowerCase())
+		.join(", ")}.`;
+}
+
 export function parseRegistrationInput(
 	input: RegistrationInput
 ): ParsedRegistrationInput {
@@ -90,7 +114,7 @@ export function parseRegistrationInput(
 	const missingPasswordRequirements = failedPasswordRequirements(input.password);
 
 	if (!parsed.success) {
-		const fieldErrors = zodErrorToFieldErrors(parsed.error);
+		const fieldErrors = zodFieldErrors(parsed.error);
 		if (missingPasswordRequirements.length > 0) {
 			fieldErrors.password = passwordRequirementMessage(
 				missingPasswordRequirements
@@ -109,32 +133,6 @@ export function parseRegistrationInput(
 			password: parsed.data.password
 		}
 	};
-}
-
-function zodErrorToFieldErrors(
-	error: z.ZodError<RegistrationInput>
-): RegistrationFieldErrors {
-	const fieldErrors: RegistrationFieldErrors = {};
-
-	for (const issue of error.issues) {
-		const field = issue.path[0];
-		if (
-			field === "firstName" ||
-			field === "lastName" ||
-			field === "email" ||
-			field === "password"
-		) {
-			fieldErrors[field] ??= issue.message;
-		}
-	}
-
-	return fieldErrors;
-}
-
-function passwordRequirementMessage(requirements: PasswordRequirement[]) {
-	return `Password is missing: ${requirements
-		.map((requirement) => requirement.label.toLowerCase())
-		.join(", ")}.`;
 }
 
 export function registrationInputFromFormData(

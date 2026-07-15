@@ -2,6 +2,8 @@ import { z } from "zod";
 import {
 	failedPasswordRequirements,
 	normalizeEmail,
+	passwordRequirementMessage,
+	zodFieldErrors,
 	type PasswordRequirement,
 } from "@/features/auth/registration/schema";
 
@@ -124,10 +126,7 @@ export function parseProfileSecurityNameInput(
 	if (!parsed.success) {
 		return {
 			success: false,
-			fieldErrors: zodErrorToFieldErrors(parsed.error, [
-				"firstName",
-				"lastName",
-			]),
+			fieldErrors: zodFieldErrors(parsed.error),
 		};
 	}
 
@@ -149,7 +148,7 @@ export function parseProfileSecurityEmailChangeInput(
 	if (!parsed.success) {
 		return {
 			success: false,
-			fieldErrors: zodErrorToFieldErrors(parsed.error, ["email"]),
+			fieldErrors: zodFieldErrors(parsed.error),
 		};
 	}
 
@@ -173,11 +172,7 @@ export function parseProfileSecurityPasswordChangeInput(
 	if (!parsed.success) {
 		return {
 			success: false,
-			fieldErrors: zodErrorToFieldErrors(parsed.error, [
-				"currentPassword",
-				"password",
-				"confirmPassword",
-			]),
+			fieldErrors: zodFieldErrors(parsed.error),
 			failedPasswordRequirementIds: failedRequirementIds,
 		};
 	}
@@ -190,30 +185,6 @@ export function parseProfileSecurityPasswordChangeInput(
 			confirmPassword: parsed.data.confirmPassword,
 		},
 	};
-}
-
-function zodErrorToFieldErrors<Field extends string>(
-	error: z.ZodError,
-	fields: Field[],
-): Partial<Record<Field, string>> {
-	const fieldSet = new Set(fields);
-	const fieldErrors: Partial<Record<Field, string>> = {};
-
-	for (const issue of error.issues) {
-		const field = issue.path[0];
-
-		if (typeof field === "string" && fieldSet.has(field as Field)) {
-			fieldErrors[field as Field] ??= issue.message;
-		}
-	}
-
-	return fieldErrors;
-}
-
-function passwordRequirementMessage(requirements: PasswordRequirement[]) {
-	return `Password is missing: ${requirements
-		.map((requirement) => requirement.label.toLowerCase())
-		.join(", ")}.`;
 }
 
 export function profileSecurityNameInputFromFormData(
