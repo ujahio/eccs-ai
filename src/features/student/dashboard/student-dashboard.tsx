@@ -121,8 +121,7 @@ function ActiveCasePanel({
 								No active case available
 							</h2>
 							<p className="mt-3 max-w-md text-sm leading-6 text-muted-gray">
-								Your account is active. Check back when the next case is
-								published.
+								Check back when the next case is published.
 							</p>
 						</div>
 					)}

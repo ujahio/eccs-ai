@@ -533,11 +533,11 @@ export function StudentCaseFlow({
 
 			{!isCurrentStepBlockedByDeadline && step === "presentation" ? (
 				<article
-					className="border border-border-gray bg-app-canvas p-8 sm:p-10"
+					className="border border-border-gray bg-white px-5 pb-5 pt-8 sm:px-7 sm:pb-7 sm:pt-10"
 					data-testid="student-case-presentation-step"
 				>
 					<div
-						className="whitespace-pre-wrap break-words text-base leading-7 text-primary-text"
+						className="mx-auto max-w-4xl whitespace-pre-wrap break-words border border-border-gray bg-app-canvas p-4 text-base leading-7 text-primary-text sm:p-6"
 						data-testid="student-case-presentation"
 					>
 						{caseRecord.presentation}
@@ -723,11 +723,11 @@ export function StudentCaseFlow({
 
 			{!isCurrentStepBlockedByDeadline && step === "resources" ? (
 				<article
-					className="border border-border-gray bg-app-canvas p-8 sm:p-10"
+					className="border border-border-gray bg-white px-5 pb-5 pt-8 sm:px-7 sm:pb-7 sm:pt-10"
 					data-testid="student-case-resources-step"
 				>
 					<div
-						className="whitespace-pre-wrap break-words text-base leading-7 text-primary-text"
+						className="mx-auto max-w-4xl whitespace-pre-wrap break-words border border-border-gray bg-app-canvas p-4 text-base leading-7 text-primary-text sm:p-6"
 						data-testid="student-case-lecture-text"
 					>
 						{caseRecord.lectureText}
@@ -735,7 +735,7 @@ export function StudentCaseFlow({
 
 					{caseRecord.attachments.length > 0 ? (
 						<section
-							className="mt-6 border-t border-border-gray pt-6"
+							className="mx-auto mt-6 max-w-4xl border-t border-border-gray pt-6"
 							data-testid="student-case-pdf-attachments"
 						>
 							<h2 className="text-base font-semibold">Case Materials</h2>
