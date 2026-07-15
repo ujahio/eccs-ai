@@ -68,6 +68,23 @@ describe("InMemoryTeacherCaseLibraryRepository", () => {
 			"expired-published",
 			"archived-older",
 		]);
+		expect(archivedCases).toEqual([
+			expect.objectContaining({
+				caseId: "archived-newer",
+				completionCount: 9,
+				feedbackCount: 4,
+			}),
+			expect.objectContaining({
+				caseId: "expired-published",
+				completionCount: 7,
+				feedbackCount: 3,
+			}),
+			expect.objectContaining({
+				caseId: "archived-older",
+				completionCount: 5,
+				feedbackCount: 2,
+			}),
+		]);
 		expect(archivedCases).not.toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({ caseId: "active-case" }),

@@ -533,11 +533,11 @@ export function StudentCaseFlow({
 
 			{!isCurrentStepBlockedByDeadline && step === "presentation" ? (
 				<article
-					className="border border-border-gray bg-white p-5 sm:p-7"
+					className="border border-border-gray bg-app-canvas p-8 sm:p-10"
 					data-testid="student-case-presentation-step"
 				>
 					<div
-						className="whitespace-pre-wrap text-base leading-8 text-primary-text"
+						className="whitespace-pre-wrap break-words text-base leading-7 text-primary-text"
 						data-testid="student-case-presentation"
 					>
 						{caseRecord.presentation}
@@ -723,26 +723,23 @@ export function StudentCaseFlow({
 
 			{!isCurrentStepBlockedByDeadline && step === "resources" ? (
 				<article
-					className="border border-border-gray bg-white p-5 sm:p-7"
+					className="border border-border-gray bg-app-canvas p-8 sm:p-10"
 					data-testid="student-case-resources-step"
 				>
-					<section>
-						<h2 className="text-base font-semibold">Lecture Text</h2>
-						<div
-							className="mt-4 whitespace-pre-wrap text-base leading-8 text-primary-text"
-							data-testid="student-case-lecture-text"
-						>
-							{caseRecord.lectureText}
-						</div>
-					</section>
+					<div
+						className="whitespace-pre-wrap break-words text-base leading-7 text-primary-text"
+						data-testid="student-case-lecture-text"
+					>
+						{caseRecord.lectureText}
+					</div>
 
 					{caseRecord.attachments.length > 0 ? (
 						<section
-							className="mt-8"
+							className="mt-6 border-t border-border-gray pt-6"
 							data-testid="student-case-pdf-attachments"
 						>
 							<h2 className="text-base font-semibold">Case Materials</h2>
-							<div className="mt-4 space-y-3">
+							<div className="mt-4 max-w-3xl space-y-3">
 								{caseRecord.attachments.map((attachment) => (
 									<section
 										className="flex flex-col gap-3 border border-border-gray bg-white p-3 transition hover:border-brand-teal sm:flex-row sm:items-center sm:justify-between"

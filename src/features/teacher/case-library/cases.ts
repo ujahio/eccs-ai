@@ -36,11 +36,10 @@ type StoredTeacherCaseRecord = TeacherCaseLibraryArchivedCase & {
 
 export async function getTeacherCaseLibrary(): Promise<TeacherCaseLibrarySummary> {
 	const { profile } = await requireTeacherSession();
+	const resources = getSessionAuthResources();
 	const archivedRepository = isE2EMode()
 		? new InMemoryTeacherCaseLibraryRepository()
-		: new DynamoTeacherCaseLibraryRepository(
-				getSessionAuthResources().teacherCaseTableName,
-			);
+		: new DynamoTeacherCaseLibraryRepository(resources.teacherCaseTableName);
 	const [draftCases, archivedCases] = await Promise.all([
 		getTeacherCaseDraftRepository().listDrafts(profile.profileId),
 		archivedRepository.listArchivedCases(Date.now()),
@@ -54,7 +53,9 @@ export async function getTeacherCaseLibrary(): Promise<TeacherCaseLibrarySummary
 
 export class InMemoryTeacherCaseLibraryRepository {
 	async listArchivedCases(now: number) {
-		return sortArchivedCases(getE2ETeacherCaseStore(), now);
+		const cases = getE2ETeacherCaseStore();
+
+		return sortArchivedCases(cases, now);
 	}
 }
 
@@ -62,7 +63,7 @@ export class DynamoTeacherCaseLibraryRepository {
 	private readonly documentClient: DynamoDBDocumentClient;
 
 	constructor(
-		private readonly tableName: string,
+		private readonly teacherCaseTableName: string,
 		documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({})),
 	) {
 		this.documentClient = documentClient;
@@ -73,7 +74,7 @@ export class DynamoTeacherCaseLibraryRepository {
 			queryAllDynamoItems<StoredTeacherCaseRecord>(
 				this.documentClient,
 				{
-					TableName: this.tableName,
+					TableName: this.teacherCaseTableName,
 					IndexName: "LifecycleArchivedIndex",
 					KeyConditionExpression: "#lifecycle = :archived",
 					ExpressionAttributeNames: {
@@ -88,7 +89,7 @@ export class DynamoTeacherCaseLibraryRepository {
 			queryAllDynamoItems<StoredTeacherCaseRecord>(
 				this.documentClient,
 				{
-					TableName: this.tableName,
+					TableName: this.teacherCaseTableName,
 					IndexName: "LifecycleDeadlineIndex",
 					KeyConditionExpression: "#lifecycle = :published AND deadlineAt < :now",
 					ExpressionAttributeNames: {
@@ -103,10 +104,7 @@ export class DynamoTeacherCaseLibraryRepository {
 			),
 		]);
 
-		return sortArchivedCases(
-			[...archivedCases, ...expiredPublishedCases],
-			now,
-		);
+		return sortArchivedCases([...archivedCases, ...expiredPublishedCases], now);
 	}
 }
 

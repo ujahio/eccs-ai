@@ -28,7 +28,7 @@ import {
 	studentCaseCertificateId,
 	studentCaseCompletionId,
 	studentCaseQuizAttemptId,
-} from "./ids";
+} from "@/features/student-case-records/ids";
 
 export type StudentCaseAttachmentDisposition = "inline" | "attachment";
 

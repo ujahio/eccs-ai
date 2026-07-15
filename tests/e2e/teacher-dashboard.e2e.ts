@@ -34,11 +34,54 @@ async function seedTeacherDashboard(
 		feedbackCount: number;
 	}> = [],
 ) {
+	const completions = [
+		...(activeCase
+			? completionFixtures({
+					caseId: "e2e-active-teacher-dashboard-case",
+					completedAt: activeCase.publishedAt,
+					completionCount: activeCase.completionCount,
+					feedbackCount: activeCase.feedbackCount,
+				})
+			: []),
+		...archivedCases.flatMap((caseRecord, index) =>
+			completionFixtures({
+				caseId: `e2e-archived-teacher-dashboard-case-${index}`,
+				completedAt: caseRecord.archivedAt,
+				completionCount: caseRecord.completionCount,
+				feedbackCount: caseRecord.feedbackCount,
+			}),
+		),
+	];
 	const response = await request.post("/api/e2e/teacher-dashboard/state", {
-		data: { activeCase, archivedCases },
+		data: { activeCase, archivedCases, completions },
 	});
 
 	expect(response.ok()).toBe(true);
+}
+
+function completionFixtures({
+	caseId,
+	completedAt,
+	completionCount,
+	feedbackCount,
+}: {
+	caseId: string;
+	completedAt: number;
+	completionCount: number;
+	feedbackCount: number;
+}) {
+	return Array.from({ length: completionCount }, (_, index) => ({
+		caseId,
+		certificateId: `certificate-${caseId}-${index}`,
+		completedAt: completedAt + index,
+		feedback:
+			index < feedbackCount
+				? { ratings: { knowledge: 5 }, submittedAt: completedAt + index }
+				: undefined,
+		personalAnalysis: `Completed analysis ${index + 1}.`,
+		studentDisplayName: `Student ${index + 1}`,
+		studentProfileId: `student-${caseId}-${index}`,
+	}));
 }
 
 test.describe("Teacher dashboard", () => {

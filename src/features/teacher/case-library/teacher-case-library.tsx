@@ -276,7 +276,14 @@ function TeacherCaseCard({
 					<TeacherCaseCardContent caseRecord={caseRecord} />
 				</Link>
 			) : (
-				<TeacherCaseCardContent caseRecord={caseRecord} />
+				<Link
+					aria-label={`Review ${caseRecord.title}`}
+					className="block flex-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-teal"
+					data-testid="teacher-library-archived-review-link"
+					href={`/teacher/cases/${encodeURIComponent(caseRecord.caseId)}`}
+				>
+					<TeacherCaseCardContent caseRecord={caseRecord} />
+				</Link>
 			)}
 
 			{caseRecord.kind === "draft" ? (

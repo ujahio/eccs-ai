@@ -29,21 +29,26 @@ type StoredTeacherCaseRecord = TeacherDashboardCaseRecord & {
 	lifecycle: TeacherCaseLifecycle;
 };
 
+type TeacherDashboardCaseRecordWithLifecycle = TeacherDashboardCaseRecord & {
+	lifecycle: TeacherCaseLifecycle;
+};
+
 const recentArchivedLimit = 3;
 
 export async function getTeacherDashboardSummary(): Promise<TeacherDashboardSummary> {
+	const resources = getSessionAuthResources();
 	const repository = isE2EMode()
 		? new InMemoryTeacherDashboardRepository()
-		: new DynamoTeacherDashboardRepository(
-				getSessionAuthResources().teacherCaseTableName,
-			);
+		: new DynamoTeacherDashboardRepository(resources.teacherCaseTableName);
 
 	return repository.getSummary(Date.now());
 }
 
 export class InMemoryTeacherDashboardRepository {
 	async getSummary(now: number): Promise<TeacherDashboardSummary> {
-		return summarizeCases(getE2ETeacherCaseStore(), now);
+		const cases = getE2ETeacherCaseStore();
+
+		return summarizeCases(cases, now);
 	}
 }
 
@@ -51,7 +56,7 @@ export class DynamoTeacherDashboardRepository {
 	private readonly documentClient: DynamoDBDocumentClient;
 
 	constructor(
-		private readonly tableName: string,
+		private readonly teacherCaseTableName: string,
 		documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({})),
 	) {
 		this.documentClient = documentClient;
@@ -64,13 +69,15 @@ export class DynamoTeacherDashboardRepository {
 			this.listExpiredPublishedCases(now),
 		]);
 
-		return summarizeCases([...published, ...archived, ...expiredPublished], now);
+		const cases = [...published, ...archived, ...expiredPublished];
+
+		return summarizeCases(cases, now);
 	}
 
 	private async listActivePublishedCases(now: number) {
 		const response = await this.documentClient.send(
 			new QueryCommand({
-				TableName: this.tableName,
+				TableName: this.teacherCaseTableName,
 				IndexName: "LifecycleDeadlineIndex",
 				KeyConditionExpression: "#lifecycle = :published AND deadlineAt >= :now",
 				ExpressionAttributeNames: {
@@ -91,7 +98,7 @@ export class DynamoTeacherDashboardRepository {
 	private async listExpiredPublishedCases(now: number) {
 		const response = await this.documentClient.send(
 			new QueryCommand({
-				TableName: this.tableName,
+				TableName: this.teacherCaseTableName,
 				IndexName: "LifecycleDeadlineIndex",
 				KeyConditionExpression: "#lifecycle = :published AND deadlineAt < :now",
 				ExpressionAttributeNames: {
@@ -112,7 +119,7 @@ export class DynamoTeacherDashboardRepository {
 	private async listArchivedCases() {
 		const response = await this.documentClient.send(
 			new QueryCommand({
-				TableName: this.tableName,
+				TableName: this.teacherCaseTableName,
 				IndexName: "LifecycleArchivedIndex",
 				KeyConditionExpression: "#lifecycle = :archived",
 				ExpressionAttributeNames: {
@@ -134,12 +141,13 @@ function summarizeCases(
 	cases: StoredTeacherCaseRecord[],
 	now: number,
 ): TeacherDashboardSummary {
+	const dashboardCases = cases.map(dashboardCaseRecord);
 	const activeCase =
-		cases
+		dashboardCases
 			.filter((caseRecord) => isActiveTeacherCase(caseRecord, now))
 			.sort((a, b) => a.deadlineAt - b.deadlineAt)[0] ?? null;
 	const archivedCases = sortArchivedTeacherCases(
-		cases,
+		dashboardCases,
 		now,
 		recentArchivedLimit,
 	);
@@ -147,5 +155,17 @@ function summarizeCases(
 	return {
 		activeCase,
 		archivedCases,
+	};
+}
+
+function dashboardCaseRecord({
+	completionCount,
+	feedbackCount,
+	...caseRecord
+}: StoredTeacherCaseRecord): TeacherDashboardCaseRecordWithLifecycle {
+	return {
+		...caseRecord,
+		completionCount,
+		feedbackCount,
 	};
 }

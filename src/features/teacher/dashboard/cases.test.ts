@@ -70,14 +70,35 @@ describe("DynamoTeacherDashboardRepository", () => {
 		const summary = await repository.getSummary(now);
 
 		expect(summary.activeCase?.caseId).toBe("active-case");
+		expect(summary.activeCase?.completionCount).toBe(2);
+		expect(summary.activeCase?.feedbackCount).toBe(1);
 		expect(summary.archivedCases.map((caseRecord) => caseRecord.caseId)).toEqual(
 			["expired-published-case", "archived-case"],
 		);
+		expect(summary.archivedCases).toEqual([
+			expect.objectContaining({
+				caseId: "expired-published-case",
+				completionCount: 7,
+				feedbackCount: 3,
+			}),
+			expect.objectContaining({
+				caseId: "archived-case",
+				completionCount: 5,
+				feedbackCount: 2,
+			}),
+		]);
 		expect(sentInputs).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({
 					KeyConditionExpression:
 						"#lifecycle = :published AND deadlineAt < :now",
+				}),
+			]),
+		);
+		expect(sentInputs).not.toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					TableName: "StudentCaseCompletionTable",
 				}),
 			]),
 		);

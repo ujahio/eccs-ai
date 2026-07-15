@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-type StudentCaseScopedIdArgs = {
+export type StudentCaseScopedIdArgs = {
 	caseId: string;
 	studentProfileId: string;
 };
