@@ -6,7 +6,7 @@ import {
 	GetCommand,
 	QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { studentCaseCertificateId } from "@/features/student/cases/ids";
+import { studentCaseCertificateId } from "@/features/student-case-records/ids";
 import { isActiveTeacherCase } from "@/features/teacher/cases/case-lifecycle";
 import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query";
 import { getSessionAuthResources } from "@/lib/aws/resources";

@@ -533,17 +533,15 @@ export function StudentCaseFlow({
 
 			{!isCurrentStepBlockedByDeadline && step === "presentation" ? (
 				<article
-					className="border border-border-gray bg-white p-5 sm:p-7"
+					className="border border-border-gray bg-app-canvas p-8 sm:p-10"
 					data-testid="student-case-presentation-step"
 				>
-					<section className="border border-border-gray bg-app-canvas p-8 sm:p-10">
-						<div
-							className="whitespace-pre-wrap break-words text-base leading-7 text-primary-text"
-							data-testid="student-case-presentation"
-						>
-							{caseRecord.presentation}
-						</div>
-					</section>
+					<div
+						className="whitespace-pre-wrap break-words text-base leading-7 text-primary-text"
+						data-testid="student-case-presentation"
+					>
+						{caseRecord.presentation}
+					</div>
 					<div className="mt-7 flex justify-end">
 						<Button
 							className="w-full sm:w-auto"
@@ -725,21 +723,19 @@ export function StudentCaseFlow({
 
 			{!isCurrentStepBlockedByDeadline && step === "resources" ? (
 				<article
-					className="border border-border-gray bg-white p-5 sm:p-7"
+					className="border border-border-gray bg-app-canvas p-8 sm:p-10"
 					data-testid="student-case-resources-step"
 				>
-					<section className="border border-border-gray bg-app-canvas p-8 sm:p-10">
-						<div
-							className="whitespace-pre-wrap break-words text-base leading-7 text-primary-text"
-							data-testid="student-case-lecture-text"
-						>
-							{caseRecord.lectureText}
-						</div>
-					</section>
+					<div
+						className="whitespace-pre-wrap break-words text-base leading-7 text-primary-text"
+						data-testid="student-case-lecture-text"
+					>
+						{caseRecord.lectureText}
+					</div>
 
 					{caseRecord.attachments.length > 0 ? (
 						<section
-							className="mt-5 border border-border-gray bg-white p-4 sm:p-5"
+							className="mt-6 border-t border-border-gray pt-6"
 							data-testid="student-case-pdf-attachments"
 						>
 							<h2 className="text-base font-semibold">Case Materials</h2>

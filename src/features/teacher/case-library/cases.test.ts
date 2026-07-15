@@ -1,7 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	resetE2EAuthStore,
-	seedE2EStudentCaseCompletions,
 	seedE2ETeacherCases,
 } from "@/lib/e2e/in-memory-auth";
 
@@ -60,42 +59,6 @@ describe("InMemoryTeacherCaseLibraryRepository", () => {
 				feedbackCount: 4,
 			},
 		]);
-		seedE2EStudentCaseCompletions([
-			{
-				analysisLockedAt: now,
-				analysisSubmittedAt: now,
-				caseId: "archived-newer",
-				certificateId: "certificate-1",
-				completedAt: now,
-				completionId: "completion-1",
-				feedback: { submittedAt: now },
-				personalAnalysis: "Analysis one.",
-				studentDisplayName: "Jordan Adebayo",
-				studentProfileId: "student-1",
-			},
-			{
-				analysisLockedAt: now,
-				analysisSubmittedAt: now,
-				caseId: "archived-newer",
-				certificateId: "certificate-2",
-				completedAt: now - 1,
-				completionId: "completion-2",
-				personalAnalysis: "Analysis two.",
-				studentDisplayName: "Morgan Lee",
-				studentProfileId: "student-2",
-			},
-			{
-				analysisLockedAt: now,
-				analysisSubmittedAt: now,
-				caseId: "expired-published",
-				certificateId: "certificate-3",
-				completedAt: now - 2,
-				completionId: "completion-3",
-				personalAnalysis: "Analysis three.",
-				studentDisplayName: "Riley Chen",
-				studentProfileId: "student-3",
-			},
-		]);
 		const repository = new InMemoryTeacherCaseLibraryRepository();
 
 		const archivedCases = await repository.listArchivedCases(now);
@@ -108,18 +71,18 @@ describe("InMemoryTeacherCaseLibraryRepository", () => {
 		expect(archivedCases).toEqual([
 			expect.objectContaining({
 				caseId: "archived-newer",
-				completionCount: 2,
-				feedbackCount: 1,
+				completionCount: 9,
+				feedbackCount: 4,
 			}),
 			expect.objectContaining({
 				caseId: "expired-published",
-				completionCount: 1,
-				feedbackCount: 0,
+				completionCount: 7,
+				feedbackCount: 3,
 			}),
 			expect.objectContaining({
 				caseId: "archived-older",
-				completionCount: 0,
-				feedbackCount: 0,
+				completionCount: 5,
+				feedbackCount: 2,
 			}),
 		]);
 		expect(archivedCases).not.toEqual(

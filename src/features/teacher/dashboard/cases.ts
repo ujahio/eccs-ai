@@ -9,11 +9,6 @@ import {
 	sortArchivedTeacherCases,
 	type TeacherCaseLifecycle,
 } from "@/features/teacher/cases/case-lifecycle";
-import {
-	applyTeacherCaseCompletionCounts,
-	dynamoTeacherCaseCompletionCounts,
-	e2eTeacherCaseCompletionCounts,
-} from "@/features/teacher/cases/completion-counts";
 
 export type TeacherDashboardCaseRecord = {
 	caseId: string;
@@ -34,16 +29,17 @@ type StoredTeacherCaseRecord = TeacherDashboardCaseRecord & {
 	lifecycle: TeacherCaseLifecycle;
 };
 
+type TeacherDashboardCaseRecordWithLifecycle = TeacherDashboardCaseRecord & {
+	lifecycle: TeacherCaseLifecycle;
+};
+
 const recentArchivedLimit = 3;
 
 export async function getTeacherDashboardSummary(): Promise<TeacherDashboardSummary> {
 	const resources = getSessionAuthResources();
 	const repository = isE2EMode()
 		? new InMemoryTeacherDashboardRepository()
-		: new DynamoTeacherDashboardRepository(
-				resources.teacherCaseTableName,
-				resources.studentCaseCompletionTableName,
-			);
+		: new DynamoTeacherDashboardRepository(resources.teacherCaseTableName);
 
 	return repository.getSummary(Date.now());
 }
@@ -52,13 +48,7 @@ export class InMemoryTeacherDashboardRepository {
 	async getSummary(now: number): Promise<TeacherDashboardSummary> {
 		const cases = getE2ETeacherCaseStore();
 
-		return summarizeCases(
-			applyTeacherCaseCompletionCounts(
-				cases,
-				e2eTeacherCaseCompletionCounts(cases.map(({ caseId }) => caseId)),
-			),
-			now,
-		);
+		return summarizeCases(cases, now);
 	}
 }
 
@@ -67,7 +57,6 @@ export class DynamoTeacherDashboardRepository {
 
 	constructor(
 		private readonly teacherCaseTableName: string,
-		private readonly studentCaseCompletionTableName: string,
 		documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({})),
 	) {
 		this.documentClient = documentClient;
@@ -81,13 +70,8 @@ export class DynamoTeacherDashboardRepository {
 		]);
 
 		const cases = [...published, ...archived, ...expiredPublished];
-		const counts = await dynamoTeacherCaseCompletionCounts(
-			this.documentClient,
-			this.studentCaseCompletionTableName,
-			cases.map(({ caseId }) => caseId),
-		);
 
-		return summarizeCases(applyTeacherCaseCompletionCounts(cases, counts), now);
+		return summarizeCases(cases, now);
 	}
 
 	private async listActivePublishedCases(now: number) {
@@ -157,12 +141,13 @@ function summarizeCases(
 	cases: StoredTeacherCaseRecord[],
 	now: number,
 ): TeacherDashboardSummary {
+	const dashboardCases = cases.map(dashboardCaseRecord);
 	const activeCase =
-		cases
+		dashboardCases
 			.filter((caseRecord) => isActiveTeacherCase(caseRecord, now))
 			.sort((a, b) => a.deadlineAt - b.deadlineAt)[0] ?? null;
 	const archivedCases = sortArchivedTeacherCases(
-		cases,
+		dashboardCases,
 		now,
 		recentArchivedLimit,
 	);
@@ -170,5 +155,17 @@ function summarizeCases(
 	return {
 		activeCase,
 		archivedCases,
+	};
+}
+
+function dashboardCaseRecord({
+	completionCount,
+	feedbackCount,
+	...caseRecord
+}: StoredTeacherCaseRecord): TeacherDashboardCaseRecordWithLifecycle {
+	return {
+		...caseRecord,
+		completionCount,
+		feedbackCount,
 	};
 }

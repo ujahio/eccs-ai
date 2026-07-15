@@ -4,6 +4,7 @@ import {
 	seedE2EStudentCaseCompletions,
 	seedE2ETeacherCases,
 } from "@/lib/e2e/in-memory-auth";
+import { studentCaseCompletionId } from "@/features/student-case-records/ids";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth/session", () => ({
@@ -13,9 +14,12 @@ vi.mock("@/lib/auth/session", () => ({
 }));
 
 let getTeacherCaseReview: typeof import("./case-review").getTeacherCaseReview;
+let getTeacherStudentCaseResponse: typeof import("./case-review").getTeacherStudentCaseResponse;
 
 beforeAll(async () => {
-	({ getTeacherCaseReview } = await import("./case-review"));
+	({ getTeacherCaseReview, getTeacherStudentCaseResponse } = await import(
+		"./case-review"
+	));
 });
 
 beforeEach(() => {
@@ -96,5 +100,71 @@ describe("getTeacherCaseReview", () => {
 
 		await expect(getTeacherCaseReview("draft-case")).resolves.toBeNull();
 		await expect(getTeacherCaseReview("other-teacher-case")).resolves.toBeNull();
+	});
+
+	it("loads one student response by completion id", async () => {
+		const now = Date.UTC(2026, 6, 7, 12);
+		seedE2ETeacherCases([
+			{
+				caseId: "case-1",
+				title: "Acute endocrine case review",
+				lifecycle: "published",
+				publishedAt: now - 1_000,
+				deadlineAt: now + 86_400_000,
+				teacherProfileId: "teacher-1",
+				completionCount: 1,
+				feedbackCount: 0,
+			},
+		]);
+		seedE2EStudentCaseCompletions([
+			{
+				analysisLockedAt: now,
+				analysisSubmittedAt: now - 1_000,
+				caseId: "case-1",
+				certificateId: "certificate-1",
+				completedAt: now,
+				completionId: studentCaseCompletionId({
+					caseId: "case-1",
+					studentProfileId: "student-1",
+				}),
+				personalAnalysis: "Final student clinical reasoning.",
+				studentDisplayName: "Jordan Adebayo",
+				studentProfileId: "student-1",
+			},
+			{
+				analysisLockedAt: now,
+				analysisSubmittedAt: now - 1_000,
+				caseId: "case-1",
+				certificateId: "certificate-2",
+				completedAt: now - 1_000,
+				completionId: studentCaseCompletionId({
+					caseId: "case-1",
+					studentProfileId: "student-2",
+				}),
+				personalAnalysis: "Different student response.",
+				studentDisplayName: "Morgan Lee",
+				studentProfileId: "student-2",
+			},
+		]);
+
+		const response = await getTeacherStudentCaseResponse("case-1", "student-1");
+
+		expect(response?.caseRecord.title).toBe("Acute endocrine case review");
+		expect(response?.completion).toEqual(
+			expect.objectContaining({
+				personalAnalysis: "Final student clinical reasoning.",
+				studentDisplayName: "Jordan Adebayo",
+			}),
+		);
+		await expect(
+			getTeacherStudentCaseResponse("case-1", "student-2"),
+		).resolves.toEqual(
+			expect.objectContaining({
+				completion: expect.objectContaining({
+					personalAnalysis: "Different student response.",
+					studentDisplayName: "Morgan Lee",
+				}),
+			}),
+		);
 	});
 });

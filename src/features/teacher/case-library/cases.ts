@@ -10,11 +10,6 @@ import {
 	sortArchivedTeacherCases,
 	type TeacherCaseLifecycle,
 } from "@/features/teacher/cases/case-lifecycle";
-import {
-	applyTeacherCaseCompletionCounts,
-	dynamoTeacherCaseCompletionCounts,
-	e2eTeacherCaseCompletionCounts,
-} from "@/features/teacher/cases/completion-counts";
 import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import { requireTeacherSession } from "@/lib/auth/session";
@@ -44,10 +39,7 @@ export async function getTeacherCaseLibrary(): Promise<TeacherCaseLibrarySummary
 	const resources = getSessionAuthResources();
 	const archivedRepository = isE2EMode()
 		? new InMemoryTeacherCaseLibraryRepository()
-		: new DynamoTeacherCaseLibraryRepository(
-				resources.teacherCaseTableName,
-				resources.studentCaseCompletionTableName,
-			);
+		: new DynamoTeacherCaseLibraryRepository(resources.teacherCaseTableName);
 	const [draftCases, archivedCases] = await Promise.all([
 		getTeacherCaseDraftRepository().listDrafts(profile.profileId),
 		archivedRepository.listArchivedCases(Date.now()),
@@ -63,13 +55,7 @@ export class InMemoryTeacherCaseLibraryRepository {
 	async listArchivedCases(now: number) {
 		const cases = getE2ETeacherCaseStore();
 
-		return sortArchivedCases(
-			applyTeacherCaseCompletionCounts(
-				cases,
-				e2eTeacherCaseCompletionCounts(cases.map(({ caseId }) => caseId)),
-			),
-			now,
-		);
+		return sortArchivedCases(cases, now);
 	}
 }
 
@@ -78,7 +64,6 @@ export class DynamoTeacherCaseLibraryRepository {
 
 	constructor(
 		private readonly teacherCaseTableName: string,
-		private readonly studentCaseCompletionTableName: string,
 		documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({})),
 	) {
 		this.documentClient = documentClient;
@@ -119,14 +104,7 @@ export class DynamoTeacherCaseLibraryRepository {
 			),
 		]);
 
-		const cases = [...archivedCases, ...expiredPublishedCases];
-		const counts = await dynamoTeacherCaseCompletionCounts(
-			this.documentClient,
-			this.studentCaseCompletionTableName,
-			cases.map(({ caseId }) => caseId),
-		);
-
-		return sortArchivedCases(applyTeacherCaseCompletionCounts(cases, counts), now);
+		return sortArchivedCases([...archivedCases, ...expiredPublishedCases], now);
 	}
 }
 

@@ -18,6 +18,7 @@ import {
 	type TeacherCaseLifecycle,
 } from "@/features/teacher/cases/case-lifecycle";
 import type { StudentCaseFeedback } from "@/features/case-feedback/feedback";
+import { studentCaseCompletionId } from "@/features/student-case-records/ids";
 
 export type TeacherCaseReviewCase = {
 	archivedAt?: number;
@@ -55,6 +56,10 @@ type StoredStudentCaseCompletionRecord = TeacherCaseReviewCompletion & {
 
 type TeacherCaseReviewRepository = {
 	getCase(caseId: string): Promise<StoredTeacherCaseReviewRecord | null>;
+	getCompletion(
+		caseId: string,
+		studentProfileId: string,
+	): Promise<TeacherCaseReviewCompletion | null>;
 	listCompletions(caseId: string): Promise<TeacherCaseReviewCompletion[]>;
 };
 
@@ -63,14 +68,13 @@ export async function getTeacherCaseReview(
 ): Promise<TeacherCaseReview | null> {
 	const { profile } = await requireTeacherSession();
 	const repository = getTeacherCaseReviewRepository();
-	const caseRecord = await repository.getCase(caseId);
-	const now = Date.now();
+	const caseRecord = await getAuthorizedTeacherReviewCase(
+		repository,
+		caseId,
+		profile.profileId,
+	);
 
-	if (
-		!caseRecord ||
-		!isTeacherReviewCase(caseRecord, now) ||
-		!isTeacherAuthorizedForCase(caseRecord, profile.profileId)
-	) {
+	if (!caseRecord) {
 		return null;
 	}
 
@@ -84,18 +88,23 @@ export async function getTeacherStudentCaseResponse(
 	caseId: string,
 	studentProfileId: string,
 ) {
-	const review = await getTeacherCaseReview(caseId);
+	const { profile } = await requireTeacherSession();
+	const repository = getTeacherCaseReviewRepository();
+	const caseRecord = await getAuthorizedTeacherReviewCase(
+		repository,
+		caseId,
+		profile.profileId,
+	);
 
-	if (!review) {
+	if (!caseRecord) {
 		return null;
 	}
 
-	const completion =
-		review.completions.find(
-			(record) => record.studentProfileId === studentProfileId,
-		) ?? null;
+	const completion = await repository.getCompletion(caseId, studentProfileId);
 
-	return completion ? { ...review, completion } : null;
+	return completion
+		? { caseRecord: caseReviewCase(caseRecord), completion }
+		: null;
 }
 
 export class InMemoryTeacherCaseReviewRepository
@@ -103,6 +112,15 @@ export class InMemoryTeacherCaseReviewRepository
 {
 	async getCase(caseId: string) {
 		return getE2EAuthStore().teacherCases.get(caseId) ?? null;
+	}
+
+	async getCompletion(caseId: string, studentProfileId: string) {
+		const completion =
+			getE2EAuthStore().studentCaseCompletions.get(
+				studentCaseCompletionId({ caseId, studentProfileId }),
+			) ?? null;
+
+		return completion ? completionReviewRecord(completion) : null;
 	}
 
 	async listCompletions(caseId: string) {
@@ -137,6 +155,29 @@ export class DynamoTeacherCaseReviewRepository
 		return (response.Item ?? null) as StoredTeacherCaseReviewRecord | null;
 	}
 
+	async getCompletion(caseId: string, studentProfileId: string) {
+		const response = await this.documentClient.send(
+			new GetCommand({
+				TableName: this.studentCaseCompletionTableName,
+				Key: {
+					completionId: studentCaseCompletionId({ caseId, studentProfileId }),
+				},
+			}),
+		);
+		const completion =
+			(response.Item ?? null) as StoredStudentCaseCompletionRecord | null;
+
+		if (
+			!completion ||
+			completion.caseId !== caseId ||
+			completion.studentProfileId !== studentProfileId
+		) {
+			return null;
+		}
+
+		return completionReviewRecord(completion);
+	}
+
 	async listCompletions(caseId: string) {
 		const records = await queryAllDynamoItems<StoredStudentCaseCompletionRecord>(
 			this.documentClient,
@@ -166,6 +207,25 @@ function getTeacherCaseReviewRepository(): TeacherCaseReviewRepository {
 		resources.teacherCaseTableName,
 		resources.studentCaseCompletionTableName,
 	);
+}
+
+async function getAuthorizedTeacherReviewCase(
+	repository: TeacherCaseReviewRepository,
+	caseId: string,
+	teacherProfileId: string,
+) {
+	const caseRecord = await repository.getCase(caseId);
+	const now = Date.now();
+
+	if (
+		!caseRecord ||
+		!isTeacherReviewCase(caseRecord, now) ||
+		!isTeacherAuthorizedForCase(caseRecord, teacherProfileId)
+	) {
+		return null;
+	}
+
+	return caseRecord;
 }
 
 function isTeacherReviewCase(

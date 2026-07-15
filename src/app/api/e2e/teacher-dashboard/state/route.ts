@@ -5,7 +5,7 @@ import {
 	seedE2EStudentCaseCompletions,
 	seedE2ETeacherCases,
 } from "@/lib/e2e/in-memory-auth";
-import { studentCaseCompletionId } from "@/features/student/cases/ids";
+import { studentCaseCompletionId } from "@/features/student-case-records/ids";
 import { isActiveTeacherCase } from "@/features/teacher/cases/case-lifecycle";
 import type { StudentCaseFeedback } from "@/features/case-feedback/feedback";
 
