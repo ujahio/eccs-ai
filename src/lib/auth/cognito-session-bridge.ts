@@ -6,13 +6,13 @@ import type { BetterAuthPlugin, User } from "better-auth";
 import { z } from "zod";
 import { toFormErrors } from "@/features/auth/form-errors";
 import {
+	GENERIC_SIGN_IN_ERROR_MESSAGE,
 	InvalidLoginCredentialsError,
 	LoginBlockedUntilVerifiedError,
 	type AuthSessionTokens,
 	type LoginAuthenticationResult,
 	isNewPasswordRequiredChallenge,
 } from "@/features/auth/login/service";
-import { GENERIC_SIGN_IN_ERROR_MESSAGE } from "@/features/auth/login/messages";
 import {
 	parseCompleteNewPasswordInput,
 	parseLoginInput,

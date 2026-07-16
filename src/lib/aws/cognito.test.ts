@@ -223,7 +223,7 @@ describe("CognitoAuthAdapter password reset", () => {
 	it("updates Cognito student name attributes", async () => {
 		const { adapter, client } = createHarness();
 
-		await adapter.updateStudentName({
+		await adapter.updateProfileName({
 			emailNormalized: "student@example.com",
 			firstName: "Alex",
 			lastName: "Chen",
@@ -247,7 +247,7 @@ describe("CognitoAuthAdapter password reset", () => {
 	it("updates Cognito email and marks it verified only after app verification", async () => {
 		const { adapter, client } = createHarness();
 
-		await adapter.updateStudentEmail({
+		await adapter.updateProfileEmail({
 			currentEmailNormalized: "student@example.com",
 			newEmailNormalized: "new@example.com"
 		});
@@ -270,7 +270,7 @@ describe("CognitoAuthAdapter password reset", () => {
 		client.nextErrors = [undefined, namedError("AliasExistsException")];
 
 		await expect(
-			adapter.updateStudentEmail({
+			adapter.updateProfileEmail({
 				currentEmailNormalized: "student@example.com",
 				newEmailNormalized: "taken@example.com"
 			})
@@ -280,7 +280,7 @@ describe("CognitoAuthAdapter password reset", () => {
 	it("sets a permanent Cognito password for logged-in password changes", async () => {
 		const { adapter, client } = createHarness();
 
-		await adapter.setStudentPassword({
+		await adapter.setProfilePassword({
 			emailNormalized: "student@example.com",
 			password: "newcase1"
 		});

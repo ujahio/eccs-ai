@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { LoginForm } from "@/features/auth/login/login-form";
-import { GENERIC_SIGN_IN_ERROR_MESSAGE } from "@/features/auth/login/messages";
+import { GENERIC_SIGN_IN_ERROR_MESSAGE } from "@/features/auth/login/service";
 import {
 	initialLoginFormState,
 	type LoginFormState,

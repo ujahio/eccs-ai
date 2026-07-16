@@ -525,13 +525,6 @@ export class InMemoryIdentityProvider
 		};
 	}
 
-	async isStudentLoginEligible(args: { emailNormalized: string }) {
-		return this.isRoleLoginEligible({
-			emailNormalized: args.emailNormalized,
-			role: "student",
-		});
-	}
-
 	async isRoleLoginEligible(args: {
 		emailNormalized: string;
 		role: "student" | "teacher";
@@ -643,28 +636,6 @@ export class InMemoryIdentityProvider
 		user.password = args.password;
 	}
 
-	async updateStudentName(args: {
-		emailNormalized: string;
-		firstName: string;
-		lastName: string;
-		fullName: string;
-	}) {
-		await this.updateProfileName(args);
-	}
-
-	async updateStudentEmail(args: {
-		currentEmailNormalized: string;
-		newEmailNormalized: string;
-	}) {
-		await this.updateProfileEmail(args);
-	}
-
-	async setStudentPassword(args: {
-		emailNormalized: string;
-		password: string;
-	}) {
-		await this.setProfilePassword(args);
-	}
 }
 
 export class InMemoryRegistrationRepository
@@ -781,18 +752,8 @@ export class InMemoryRegistrationRepository
 
 	async recordCleanupFailure() {}
 
-	async hasStudentProfile(emailNormalized: string) {
-		return this.hasAppProfile(emailNormalized);
-	}
-
 	async hasAppProfile(emailNormalized: string) {
 		return getStore().profiles.has(emailNormalized);
-	}
-
-	async getStudentProfileById(profileId: string) {
-		const profile = await this.getAppProfileById(profileId);
-
-		return profile?.role === "student" ? profile : null;
 	}
 
 	async getAppProfileById(profileId: string) {
@@ -811,16 +772,6 @@ export class InMemoryRegistrationRepository
 
 	async getProfileByEmail(emailNormalized: string) {
 		return getStore().profiles.get(emailNormalized) ?? null;
-	}
-
-	async updateStudentName(args: {
-		profileId: string;
-		firstName: string;
-		lastName: string;
-		fullName: string;
-		updatedAt: number;
-	}) {
-		await this.updateProfileName(args);
 	}
 
 	async updateProfileName(args: {
@@ -876,12 +827,6 @@ export class InMemoryRegistrationRepository
 				args.pendingEmailVerificationRequestedAt,
 			updatedAt: args.updatedAt
 		});
-	}
-
-	async findStudentProfileByPendingEmailTokenHash(tokenHash: string) {
-		const profile = await this.findProfileByPendingEmailTokenHash(tokenHash);
-
-		return profile?.role === "student" ? profile : null;
 	}
 
 	async findProfileByPendingEmailTokenHash(tokenHash: string) {

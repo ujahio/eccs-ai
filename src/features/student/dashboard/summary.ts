@@ -8,7 +8,7 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { studentCaseCertificateId } from "@/features/student-case-records/ids";
 import { isActiveTeacherCase } from "@/features/teacher/cases/case-lifecycle";
-import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query";
+import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query-core";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import {
 	getE2EStudentCertificateStore,

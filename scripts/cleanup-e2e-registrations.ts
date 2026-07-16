@@ -1,14 +1,14 @@
 import {
-	CognitoIdentityProviderClient,
 	AdminDeleteUserCommand,
-	ListUsersCommand,
+	CognitoIdentityProviderClient,
+	paginateListUsers,
 	type UserType
 } from "@aws-sdk/client-cognito-identity-provider";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
 	DeleteCommand,
 	DynamoDBDocumentClient,
-	ScanCommand
+	paginateScan
 } from "@aws-sdk/lib-dynamodb";
 import { Resource } from "sst";
 
@@ -126,20 +126,16 @@ if (shouldDelete) {
 
 async function listCognitoUsers() {
 	const users: UserType[] = [];
-	let PaginationToken: string | undefined;
 
-	do {
-		const page = await cognito.send(
-			new ListUsersCommand({
-				UserPoolId: userPoolId,
-				Filter: `email ^= "${prefix}"`,
-				PaginationToken
-			})
-		);
-
+	for await (const page of paginateListUsers(
+		{ client: cognito },
+		{
+			UserPoolId: userPoolId,
+			Filter: `email ^= "${prefix}"`
+		}
+	)) {
 		users.push(...(page.Users ?? []));
-		PaginationToken = page.PaginationToken;
-	} while (PaginationToken);
+	}
 
 	return users.filter((user) => getUserEmail(user)?.startsWith(prefix));
 }
@@ -150,28 +146,24 @@ function getUserEmail(user: UserType) {
 
 async function listPendingRegistrations() {
 	const registrations: PendingRegistrationItem[] = [];
-	let ExclusiveStartKey: Record<string, unknown> | undefined;
 
-	do {
-		const page = await dynamo.send(
-			new ScanCommand({
-				TableName: registrationTableName,
-				FilterExpression:
-					"begins_with(emailNormalized, :prefix) AND #status = :pending",
-				ExpressionAttributeNames: {
-					"#status": "status"
-				},
-				ExpressionAttributeValues: {
-					":prefix": prefix,
-					":pending": "pending"
-				},
-				ExclusiveStartKey
-			})
-		);
-
+	for await (const page of paginateScan(
+		{ client: dynamo },
+		{
+			TableName: registrationTableName,
+			FilterExpression:
+				"begins_with(emailNormalized, :prefix) AND #status = :pending",
+			ExpressionAttributeNames: {
+				"#status": "status"
+			},
+			ExpressionAttributeValues: {
+				":prefix": prefix,
+				":pending": "pending"
+			}
+		}
+	)) {
 		registrations.push(...((page.Items ?? []) as PendingRegistrationItem[]));
-		ExclusiveStartKey = page.LastEvaluatedKey;
-	} while (ExclusiveStartKey);
+	}
 
 	return registrations;
 }

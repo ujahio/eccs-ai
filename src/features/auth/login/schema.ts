@@ -1,7 +1,7 @@
 import {
 	failedPasswordRequirements,
 	normalizeEmail,
-	type PasswordRequirement,
+	passwordRequirementMessage,
 } from "../registration/schema";
 
 export type LoginInput = {
@@ -115,10 +115,4 @@ export function parseCompleteNewPasswordInput(
 			challengeSession,
 		},
 	};
-}
-
-function passwordRequirementMessage(requirements: PasswordRequirement[]) {
-	return `Password is missing: ${requirements
-		.map((requirement) => requirement.label.toLowerCase())
-		.join(", ")}.`;
 }
