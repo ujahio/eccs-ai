@@ -216,13 +216,6 @@ export class CognitoAuthAdapter
 		}
 	}
 
-	async authenticateStudent(args: {
-		emailNormalized: string;
-		password: string;
-	}) {
-		return this.authenticateUser(args);
-	}
-
 	async completeNewPasswordChallenge(args: {
 		emailNormalized: string;
 		newPassword: string;
@@ -268,13 +261,6 @@ export class CognitoAuthAdapter
 
 			throw error;
 		}
-	}
-
-	async isStudentLoginEligible(args: { emailNormalized: string }) {
-		return this.isRoleLoginEligible({
-			emailNormalized: args.emailNormalized,
-			role: "student"
-		});
 	}
 
 	async isRoleLoginEligible(args: {
@@ -409,15 +395,6 @@ export class CognitoAuthAdapter
 		}
 	}
 
-	async updateStudentName(args: {
-		emailNormalized: string;
-		firstName: string;
-		lastName: string;
-		fullName: string;
-	}) {
-		await this.updateProfileName(args);
-	}
-
 	async updateProfileName(args: {
 		emailNormalized: string;
 		firstName: string;
@@ -437,13 +414,6 @@ export class CognitoAuthAdapter
 				]
 			})
 		);
-	}
-
-	async updateStudentEmail(args: {
-		currentEmailNormalized: string;
-		newEmailNormalized: string;
-	}) {
-		await this.updateProfileEmail(args);
 	}
 
 	async updateProfileEmail(args: {
@@ -472,13 +442,6 @@ export class CognitoAuthAdapter
 
 			throw error;
 		}
-	}
-
-	async setStudentPassword(args: {
-		emailNormalized: string;
-		password: string;
-	}) {
-		await this.setProfilePassword(args);
 	}
 
 	async setProfilePassword(args: {

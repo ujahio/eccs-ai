@@ -5,9 +5,9 @@ import {
 	DeleteCommand,
 	DynamoDBDocumentClient,
 	GetCommand,
+	paginateScan,
 	PutCommand,
 	QueryCommand,
-	ScanCommand,
 	UpdateCommand
 } from "@aws-sdk/lib-dynamodb";
 import type { LoginProfileRepository } from "@/features/auth/login/service";
@@ -258,16 +258,6 @@ export class DynamoAuthRepository
 		return (response.Items?.[0] as AppProfileRecord | undefined) ?? null;
 	}
 
-	async updateStudentName(args: {
-		profileId: string;
-		firstName: string;
-		lastName: string;
-		fullName: string;
-		updatedAt: number;
-	}) {
-		await this.updateProfileName(args);
-	}
-
 	async updateProfileName(args: {
 		profileId: string;
 		firstName: string;
@@ -501,29 +491,24 @@ export class DynamoAuthRepository
 	}
 
 	private async scanPendingByTokenHash(verificationTokenHash: string) {
-		let ExclusiveStartKey: Record<string, unknown> | undefined;
-
-		do {
-			const response = await this.documentClient.send(
-				new ScanCommand({
-					TableName: this.registrationTableName,
-					FilterExpression:
-						"attribute_exists(verificationTokenHashes) AND contains(verificationTokenHashes, :tokenHash)",
-					ExpressionAttributeValues: {
-						":tokenHash": verificationTokenHash
-					},
-					ExclusiveStartKey
-				})
-			);
+		for await (const page of paginateScan(
+			{ client: this.documentClient },
+			{
+				TableName: this.registrationTableName,
+				FilterExpression:
+					"attribute_exists(verificationTokenHashes) AND contains(verificationTokenHashes, :tokenHash)",
+				ExpressionAttributeValues: {
+					":tokenHash": verificationTokenHash
+				}
+			}
+		)) {
 			const match =
-				(response.Items?.[0] as PendingRegistrationRecord | undefined) ?? null;
+				(page.Items?.[0] as PendingRegistrationRecord | undefined) ?? null;
 
 			if (match) {
 				return match;
 			}
-
-			ExclusiveStartKey = response.LastEvaluatedKey;
-		} while (ExclusiveStartKey);
+		}
 
 		return null;
 	}

@@ -1,4 +1,5 @@
-import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { emptyCaseDraft, type CaseDraft } from "./schema";
 import type { TeacherCaseDraftRecord } from "./drafts";
@@ -152,40 +153,39 @@ function createDocumentClient(
 	records = new Map<string, TeacherCaseDraftRecord>(),
 ) {
 	const sentInputs: Array<Record<string, unknown>> = [];
-	const documentClient = {
-		send: vi.fn(
-			async (command: {
-				constructor: { name: string };
-				input: Record<string, unknown>;
-			}) => {
-				sentInputs.push(command.input);
+	const documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+	documentClient.send = vi.fn(
+		async (command: {
+			constructor: { name: string };
+			input: Record<string, unknown>;
+		}) => {
+			sentInputs.push(command.input);
 
-				if (command.constructor.name === "QueryCommand") {
-					return { Items: Array.from(records.values()) };
-				}
+			if (command.constructor.name === "QueryCommand") {
+				return { Items: Array.from(records.values()) };
+			}
 
-				if (command.constructor.name === "GetCommand") {
-					const key = command.input.Key as { caseId: string };
+			if (command.constructor.name === "GetCommand") {
+				const key = command.input.Key as { caseId: string };
 
-					return { Item: records.get(key.caseId) };
-				}
+				return { Item: records.get(key.caseId) };
+			}
 
-				if (command.constructor.name === "PutCommand") {
-					const record = command.input.Item as TeacherCaseDraftRecord;
+			if (command.constructor.name === "PutCommand") {
+				const record = command.input.Item as TeacherCaseDraftRecord;
 
-					records.set(record.caseId, record);
-				}
+				records.set(record.caseId, record);
+			}
 
-				if (command.constructor.name === "DeleteCommand") {
-					const key = command.input.Key as { caseId: string };
+			if (command.constructor.name === "DeleteCommand") {
+				const key = command.input.Key as { caseId: string };
 
-					records.delete(key.caseId);
-				}
+				records.delete(key.caseId);
+			}
 
-				return {};
-			},
-		),
-	} as unknown as DynamoDBDocumentClient;
+			return {};
+		},
+	) as unknown as DynamoDBDocumentClient["send"];
 
 	return { documentClient, records, sentInputs };
 }

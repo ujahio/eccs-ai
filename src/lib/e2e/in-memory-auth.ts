@@ -525,13 +525,6 @@ export class InMemoryIdentityProvider
 		};
 	}
 
-	async isStudentLoginEligible(args: { emailNormalized: string }) {
-		return this.isRoleLoginEligible({
-			emailNormalized: args.emailNormalized,
-			role: "student",
-		});
-	}
-
 	async isRoleLoginEligible(args: {
 		emailNormalized: string;
 		role: "student" | "teacher";
@@ -643,28 +636,6 @@ export class InMemoryIdentityProvider
 		user.password = args.password;
 	}
 
-	async updateStudentName(args: {
-		emailNormalized: string;
-		firstName: string;
-		lastName: string;
-		fullName: string;
-	}) {
-		await this.updateProfileName(args);
-	}
-
-	async updateStudentEmail(args: {
-		currentEmailNormalized: string;
-		newEmailNormalized: string;
-	}) {
-		await this.updateProfileEmail(args);
-	}
-
-	async setStudentPassword(args: {
-		emailNormalized: string;
-		password: string;
-	}) {
-		await this.setProfilePassword(args);
-	}
 }
 
 export class InMemoryRegistrationRepository
@@ -811,16 +782,6 @@ export class InMemoryRegistrationRepository
 
 	async getProfileByEmail(emailNormalized: string) {
 		return getStore().profiles.get(emailNormalized) ?? null;
-	}
-
-	async updateStudentName(args: {
-		profileId: string;
-		firstName: string;
-		lastName: string;
-		fullName: string;
-		updatedAt: number;
-	}) {
-		await this.updateProfileName(args);
 	}
 
 	async updateProfileName(args: {

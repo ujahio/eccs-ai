@@ -1,4 +1,5 @@
-import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	bootstrapE2EStudent,
@@ -240,8 +241,9 @@ describe("InMemoryCaseLifecycleNotificationRepository", () => {
 describe("DynamoCaseLifecycleNotificationRepository", () => {
 	it("queries active cases from now through the 48-hour reminder threshold", async () => {
 		const sentInputs: Array<Record<string, unknown>> = [];
-		const documentClient = {
-			send: vi.fn(async (command: { input: Record<string, unknown> }) => {
+		const documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+		documentClient.send = vi.fn(
+			async (command: { input: Record<string, unknown> }) => {
 				sentInputs.push(command.input);
 
 				return {
@@ -262,8 +264,8 @@ describe("DynamoCaseLifecycleNotificationRepository", () => {
 						},
 					],
 				};
-			}),
-		} as unknown as DynamoDBDocumentClient;
+			},
+		) as unknown as DynamoDBDocumentClient["send"];
 		const repository = new DynamoCaseLifecycleNotificationRepository(
 			"UserProfileTable",
 			"TeacherCaseTable",

@@ -9,7 +9,7 @@ import {
 	AdminSetUserPasswordCommand,
 	AdminUpdateUserAttributesCommand,
 	CognitoIdentityProviderClient,
-	ListUsersInGroupCommand,
+	paginateListUsersInGroup,
 	type AdminGetUserCommandOutput,
 	type AttributeType,
 	type UserType,
@@ -18,7 +18,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
 	DynamoDBDocumentClient,
 	GetCommand,
-	type NativeAttributeValue,
+	paginateQuery,
 	PutCommand,
 	QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
@@ -672,27 +672,23 @@ async function getProfilesByEmail(
 
 async function getTeacherProfiles(context: BootstrapContext) {
 	const profiles: TeacherProfileRecord[] = [];
-	let exclusiveStartKey: Record<string, NativeAttributeValue> | undefined;
 
-	do {
-		const response = await context.dynamo.send(
-			new QueryCommand({
-				TableName: context.userProfileTableName,
-				IndexName: "RoleIndex",
-				KeyConditionExpression: "#role = :role",
-				ExpressionAttributeNames: {
-					"#role": "role",
-				},
-				ExpressionAttributeValues: {
-					":role": TEACHER_GROUP,
-				},
-				ExclusiveStartKey: exclusiveStartKey,
-			}),
-		);
-
-		profiles.push(...((response.Items ?? []) as TeacherProfileRecord[]));
-		exclusiveStartKey = response.LastEvaluatedKey;
-	} while (exclusiveStartKey);
+	for await (const page of paginateQuery(
+		{ client: context.dynamo },
+		{
+			TableName: context.userProfileTableName,
+			IndexName: "RoleIndex",
+			KeyConditionExpression: "#role = :role",
+			ExpressionAttributeNames: {
+				"#role": "role",
+			},
+			ExpressionAttributeValues: {
+				":role": TEACHER_GROUP,
+			},
+		},
+	)) {
+		profiles.push(...((page.Items ?? []) as TeacherProfileRecord[]));
+	}
 
 	return profiles;
 }
@@ -712,20 +708,16 @@ async function listUserGroups(context: BootstrapContext, username: string) {
 
 async function listTeacherUsers(context: BootstrapContext) {
 	const users: CognitoUserState[] = [];
-	let nextToken: string | undefined;
 
-	do {
-		const response = await context.cognito.send(
-			new ListUsersInGroupCommand({
-				UserPoolId: context.userPoolId,
-				GroupName: TEACHER_GROUP,
-				NextToken: nextToken,
-			}),
-		);
-
-		users.push(...(response.Users ?? []).map(mapCognitoGroupUser));
-		nextToken = response.NextToken;
-	} while (nextToken);
+	for await (const page of paginateListUsersInGroup(
+		{ client: context.cognito },
+		{
+			UserPoolId: context.userPoolId,
+			GroupName: TEACHER_GROUP,
+		},
+	)) {
+		users.push(...(page.Users ?? []).map(mapCognitoGroupUser));
+	}
 
 	return users;
 }
