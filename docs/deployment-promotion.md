@@ -28,7 +28,6 @@ gate for pull requests to `main`.
 It runs:
 
 - `bun run lint`
-- `bun run typecheck`
 - `bun run test`
 - `bun run build`
 - `bun run test:e2e:memory` for smoke and integration coverage
