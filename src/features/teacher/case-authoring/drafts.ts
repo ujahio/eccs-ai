@@ -14,7 +14,7 @@ import {
 	deleteStoredAttachments,
 	storeDraftAttachments,
 } from "@/features/case-materials/storage";
-import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query";
+import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query-core";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import {
 	deleteE2ETeacherCaseDraftRecord,

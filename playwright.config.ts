@@ -19,6 +19,7 @@ const webServerEnv = isMemoryMode
 export default defineConfig({
 	testDir: "./tests/e2e",
 	testMatch: "**/*.e2e.ts",
+	workers: isMemoryMode ? 1 : undefined,
 	use: {
 		baseURL,
 	},

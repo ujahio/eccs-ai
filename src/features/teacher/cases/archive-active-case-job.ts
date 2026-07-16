@@ -3,7 +3,8 @@ import { getTeacherCaseArchiveService } from "./archive-active-case-service";
 
 export async function handler(event: unknown) {
 	const payload = activeCaseArchivePayloadFromEvent(event);
-	const result = await getTeacherCaseArchiveService().archiveActiveCase(payload);
+	const service = await getTeacherCaseArchiveService();
+	const result = await service.archiveActiveCase(payload);
 
 	return {
 		statusCode: 200,

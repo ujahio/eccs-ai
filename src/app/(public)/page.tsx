@@ -171,10 +171,6 @@ export default function Home() {
 							height={603}
 							sizes="(min-width: 1024px) 36vw, 100vw"
 						/>
-						<p className="mt-5 text-sm leading-6 text-muted-gray">
-							Certificates are created after a learner passes the CME quiz and
-							preserve immutable completion details for future download.
-						</p>
 					</div>
 				</div>
 			</section>

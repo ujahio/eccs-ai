@@ -10,7 +10,7 @@ import {
 	sortArchivedTeacherCases,
 	type TeacherCaseLifecycle,
 } from "@/features/teacher/cases/case-lifecycle";
-import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query";
+import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query-core";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import { requireTeacherSession } from "@/lib/auth/session";
 import { getE2ETeacherCaseStore, isE2EMode } from "@/lib/e2e/in-memory-auth";

@@ -105,6 +105,19 @@ export function getActiveCaseArchiveScheduleResources() {
 	};
 }
 
+export function getTeacherCaseArchiveResources() {
+	const e2eMode = isE2EMode();
+
+	return {
+		teacherCaseTableName: e2eMode
+			? "e2e-teacher-case-table"
+			: required(
+					linkedValue(() => linkedResources.TeacherCaseTable?.name),
+					"TeacherCaseTable.name",
+				),
+	};
+}
+
 export function getSessionAuthResources() {
 	const e2eMode = isE2EMode();
 

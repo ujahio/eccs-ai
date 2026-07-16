@@ -5,7 +5,7 @@ import {
 	DynamoDBDocumentClient,
 	GetCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query";
+import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query-core";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import { requireTeacherSession } from "@/lib/auth/session";
 import {

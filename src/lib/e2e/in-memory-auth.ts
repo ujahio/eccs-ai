@@ -752,18 +752,8 @@ export class InMemoryRegistrationRepository
 
 	async recordCleanupFailure() {}
 
-	async hasStudentProfile(emailNormalized: string) {
-		return this.hasAppProfile(emailNormalized);
-	}
-
 	async hasAppProfile(emailNormalized: string) {
 		return getStore().profiles.has(emailNormalized);
-	}
-
-	async getStudentProfileById(profileId: string) {
-		const profile = await this.getAppProfileById(profileId);
-
-		return profile?.role === "student" ? profile : null;
 	}
 
 	async getAppProfileById(profileId: string) {
@@ -837,12 +827,6 @@ export class InMemoryRegistrationRepository
 				args.pendingEmailVerificationRequestedAt,
 			updatedAt: args.updatedAt
 		});
-	}
-
-	async findStudentProfileByPendingEmailTokenHash(tokenHash: string) {
-		const profile = await this.findProfileByPendingEmailTokenHash(tokenHash);
-
-		return profile?.role === "student" ? profile : null;
 	}
 
 	async findProfileByPendingEmailTokenHash(tokenHash: string) {

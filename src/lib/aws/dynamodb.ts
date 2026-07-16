@@ -199,10 +199,6 @@ export class DynamoAuthRepository
 		);
 	}
 
-	async hasStudentProfile(emailNormalized: string) {
-		return this.hasAppProfile(emailNormalized);
-	}
-
 	async hasAppProfile(emailNormalized: string) {
 		const response = await this.documentClient.send(
 			new QueryCommand({
@@ -217,12 +213,6 @@ export class DynamoAuthRepository
 		);
 
 		return Boolean(response.Items?.length);
-	}
-
-	async getStudentProfileById(profileId: string) {
-		const profile = await this.getAppProfileById(profileId);
-
-		return profile?.role === "student" ? profile : null;
 	}
 
 	async getAppProfileById(profileId: string) {
@@ -312,12 +302,6 @@ export class DynamoAuthRepository
 				}
 			})
 		);
-	}
-
-	async findStudentProfileByPendingEmailTokenHash(tokenHash: string) {
-		const profile = await this.findProfileByPendingEmailTokenHash(tokenHash);
-
-		return profile?.role === "student" ? profile : null;
 	}
 
 	async findProfileByPendingEmailTokenHash(tokenHash: string) {
