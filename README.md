@@ -52,3 +52,10 @@ Before running SST locally:
 5. Use `bun run test:e2e:local` for isolated local auth flows backed by the in-memory e2e harness.
 
 Do not commit generated credentials, account-specific secrets, or Graphify harness artifacts.
+
+## Deployment
+
+Stage deployment is documented in
+[docs/deployment-promotion.md](./docs/deployment-promotion.md). The important
+rule is that the GitHub Environment name must match the SST `--stage` name
+exactly, because the SST stage controls AWS resource allocation.

@@ -1,6 +1,6 @@
 import { defineConfig } from "@playwright/test";
 
-const e2eHost = process.env.E2E_HOST ?? "localhost";
+const e2eHost = process.env.E2E_HOST ?? "127.0.0.1";
 const e2ePort = process.env.E2E_PORT ?? "3001";
 const baseURL =
 	process.env.PLAYWRIGHT_BASE_URL ?? `http://${e2eHost}:${e2ePort}`;
@@ -19,6 +19,8 @@ const webServerEnv = isMemoryMode
 export default defineConfig({
 	testDir: "./tests/e2e",
 	testMatch: "**/*.e2e.ts",
+	forbidOnly: !!process.env.CI,
+	retries: process.env.CI ? 1 : 0,
 	workers: isMemoryMode ? 1 : undefined,
 	use: {
 		baseURL,
