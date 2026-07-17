@@ -17,6 +17,7 @@
 		"test:e2e:local": "bun run test:e2e:memory",
 		"cleanup:e2e-registrations": "bunx sst shell --stage ailocal -- bun scripts/cleanup-e2e-registrations.ts",
 		"sst:dev": "bun run dev",
+		"sst:deploy:staging": "bunx sst deploy --stage staging",
 		"sst:remove": "bunx sst remove --stage ailocal"
 	},
 	"dependencies": {
