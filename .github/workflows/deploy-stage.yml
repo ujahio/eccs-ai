@@ -32,7 +32,6 @@ jobs:
       ECCS_EMAIL_SENDER: ${{ vars.ECCS_EMAIL_SENDER }}
       NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-      SST_STAGE: staging
 
     steps:
       - name: Validate stage configuration
@@ -46,7 +45,7 @@ jobs:
           done
 
           if (( ${#missing[@]} > 0 )); then
-            echo "::error::Missing required GitHub Environment configuration for '$SST_STAGE': ${missing[*]}"
+            echo "::error::Missing required GitHub Environment configuration for 'staging': ${missing[*]}"
             exit 1
           fi
 
@@ -69,4 +68,4 @@ jobs:
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
 
       - name: Deploy SST stage
-        run: bunx sst deploy --stage "$SST_STAGE"
+        run: bunx sst deploy --stage staging
