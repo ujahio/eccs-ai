@@ -1,58 +1,28 @@
-name: Deploy SST Stage
+name: Deploy Staging
 
 on:
-  workflow_dispatch:
-    inputs:
-      stage:
-        description: SST stage to deploy. The GitHub Environment name must match.
-        required: true
-        default: staging
-        type: choice
-        options:
-          - staging
-          - production
+  push:
+    branches:
+      - staging
 
-run-name: Deploy ${{ inputs.stage }} from ${{ github.ref_name }} by @${{ github.actor }}
+run-name: Deploy staging from ${{ github.ref_name }} by @${{ github.actor }}
 
 permissions:
   contents: read
 
 concurrency:
-  group: deploy-${{ inputs.stage }}
+  group: deploy-staging
   cancel-in-progress: false
 
 jobs:
-  validate-target:
-    name: Validate Target
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Validate selected stage
-        shell: bash
-        run: |
-          case "${{ inputs.stage }}" in
-            staging|production) ;;
-            *)
-              echo "::error::Unsupported SST stage '${{ inputs.stage }}'. Add it intentionally before deploying it."
-              exit 1
-              ;;
-          esac
-
-          if [[ "${{ inputs.stage }}" == "production" && "$GITHUB_REF" != "refs/heads/main" ]]; then
-            echo "::error::Production deployments must run from main."
-            exit 1
-          fi
-
   deploy:
-    name: Deploy ${{ inputs.stage }}
+    name: Deploy staging
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    needs:
-      - validate-target
     permissions:
       contents: read
       id-token: write
-    environment: ${{ inputs.stage }}
+    environment: staging
     env:
       AUTH_E2E_MODE: ""
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
@@ -62,7 +32,7 @@ jobs:
       ECCS_EMAIL_SENDER: ${{ vars.ECCS_EMAIL_SENDER }}
       NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-      SST_STAGE: ${{ inputs.stage }}
+      SST_STAGE: staging
 
     steps:
       - name: Validate stage configuration
@@ -95,7 +65,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v6.1.0
         with:
           aws-region: ${{ env.AWS_REGION }}
-          role-session-name: eccs-ai-${{ inputs.stage }}-${{ github.run_id }}
+          role-session-name: eccs-ai-staging-${{ github.run_id }}
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
 
       - name: Deploy SST stage
