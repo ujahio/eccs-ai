@@ -64,7 +64,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6.1.0
         with:
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ env.AWS_DEPLOY_REGION }}
           role-session-name: eccs-ai-staging-${{ github.run_id }}
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           retry-max-attempts: 2
