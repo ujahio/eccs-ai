@@ -32,6 +32,7 @@ jobs:
       ECCS_EMAIL_SENDER: ${{ vars.ECCS_EMAIL_SENDER }}
       NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      AWS_DEPLOY_REGION: ${{ vars.AWS_DEPLOY_REGION }}
 
     steps:
       - name: Validate stage configuration
