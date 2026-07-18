@@ -14,6 +14,5 @@ export default $config({
 		await import("./infra/tables");
 		await import("./infra/case-archive");
 		await import("./infra/jobs");
-		await import("./infra/nextjs-client");
 	},
 });

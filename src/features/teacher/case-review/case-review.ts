@@ -5,6 +5,7 @@ import {
 	DynamoDBDocumentClient,
 	GetCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { awsClientConfig } from "@/lib/aws/client-config";
 import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query-core";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import { requireTeacherSession } from "@/lib/auth/session";
@@ -139,7 +140,9 @@ export class DynamoTeacherCaseReviewRepository
 	constructor(
 		private readonly teacherCaseTableName: string,
 		private readonly studentCaseCompletionTableName: string,
-		documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({})),
+		documentClient = DynamoDBDocumentClient.from(
+			new DynamoDBClient(awsClientConfig()),
+		),
 	) {
 		this.documentClient = documentClient;
 	}

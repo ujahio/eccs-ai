@@ -5,6 +5,7 @@ import {
 	type CreateScheduleCommandInput,
 } from "@aws-sdk/client-scheduler";
 import "server-only";
+import { awsClientConfig } from "@/lib/aws/client-config";
 import { getActiveCaseArchiveScheduleResources } from "@/lib/aws/resources";
 
 export type ActiveCaseArchiveSchedulePayload = {
@@ -35,7 +36,7 @@ export class EventBridgeActiveCaseArchiveScheduler
 	constructor(
 		private readonly config: ActiveCaseArchiveScheduleConfig,
 		private readonly client: Pick<SchedulerClient, "send"> =
-			new SchedulerClient({}),
+			new SchedulerClient(awsClientConfig()),
 	) {}
 
 	async scheduleArchive(payload: ActiveCaseArchiveSchedulePayload) {

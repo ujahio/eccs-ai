@@ -43,3 +43,15 @@ new aws.iam.RolePolicy("ActiveCaseArchiveSchedulerRolePolicy", {
 });
 
 export const archiveSchedulerRoleArn = archiveSchedulerRole.arn;
+
+export const activeCaseArchiveSchedule = new sst.Linkable(
+	"ActiveCaseArchiveSchedule",
+	{
+		properties: {
+			groupName: activeCaseArchiveScheduleGroupName,
+			roleArn: archiveSchedulerRoleArn,
+			scheduleName: activeCaseArchiveScheduleName,
+			targetArn: archiveFunction.arn,
+		},
+	},
+);

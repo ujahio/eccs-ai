@@ -1,5 +1,6 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { awsClientConfig } from "@/lib/aws/client-config";
 import { getE2EAuthStore } from "@/lib/e2e/in-memory-auth";
 import { teacherCaseRecordType } from "./case-lifecycle";
 
@@ -58,7 +59,9 @@ export class DynamoTeacherCaseArchiveRepository
 
 	constructor(
 		private readonly teacherCaseTableName: string,
-		documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({})),
+		documentClient = DynamoDBDocumentClient.from(
+			new DynamoDBClient(awsClientConfig()),
+		),
 	) {
 		this.documentClient = documentClient;
 	}

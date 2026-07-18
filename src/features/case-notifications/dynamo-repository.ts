@@ -4,6 +4,7 @@ import {
 	UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import type { AppProfileRecord } from "@/features/auth/registration/repository";
+import { awsClientConfig } from "@/lib/aws/client-config";
 import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query-core";
 import { deadlineReminderLeadTimeMs } from "./service";
 import type { CaseLifecycleNotificationRepository } from "./service";
@@ -23,7 +24,9 @@ export class DynamoCaseLifecycleNotificationRepository
 		private readonly userProfileTableName: string,
 		private readonly teacherCaseTableName: string,
 		private readonly studentCertificateTableName: string,
-		documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({})),
+		documentClient = DynamoDBDocumentClient.from(
+			new DynamoDBClient(awsClientConfig()),
+		),
 	) {
 		this.documentClient = documentClient;
 	}

@@ -46,6 +46,7 @@ import {
 	hasCognitoGroupForRole
 } from "@/lib/auth/cognito-groups";
 import type { AppRole } from "@/lib/auth/roles";
+import { awsClientConfig } from "./client-config";
 
 export class CognitoAuthAdapter
 	implements
@@ -59,7 +60,7 @@ export class CognitoAuthAdapter
 	constructor(
 		private readonly userPoolId: string,
 		private readonly userPoolClientId: string,
-		client = new CognitoIdentityProviderClient({})
+		client = new CognitoIdentityProviderClient(awsClientConfig())
 	) {
 		this.client = client;
 	}

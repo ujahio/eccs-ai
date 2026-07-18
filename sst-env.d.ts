@@ -10,6 +10,13 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Function"
     }
+    "ActiveCaseArchiveSchedule": {
+      "groupName": string
+      "roleArn": string
+      "scheduleName": string
+      "targetArn": string
+      "type": "sst.sst.Linkable"
+    }
     "AuthUserPool": {
       "id": string
       "type": "sst.aws.CognitoUserPool"
@@ -54,10 +61,6 @@ declare module "sst" {
     "UserProfileTable": {
       "name": string
       "type": "sst.aws.Dynamo"
-    }
-    "eccsfeweb": {
-      "type": "sst.aws.Nextjs"
-      "url": string
     }
   }
 }

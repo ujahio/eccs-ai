@@ -10,6 +10,7 @@ import {
 	sortArchivedTeacherCases,
 	type TeacherCaseLifecycle,
 } from "@/features/teacher/cases/case-lifecycle";
+import { awsClientConfig } from "@/lib/aws/client-config";
 import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query-core";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import { requireTeacherSession } from "@/lib/auth/session";
@@ -64,7 +65,9 @@ export class DynamoTeacherCaseLibraryRepository {
 
 	constructor(
 		private readonly teacherCaseTableName: string,
-		documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({})),
+		documentClient = DynamoDBDocumentClient.from(
+			new DynamoDBClient(awsClientConfig()),
+		),
 	) {
 		this.documentClient = documentClient;
 	}

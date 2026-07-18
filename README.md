@@ -8,8 +8,8 @@ The product UI source of truth is [DESIGN.md](./DESIGN.md). Implementation work 
 
 Use `ailocal` as the local SST stage name.
 
-Run the Next.js app through SST dev so local resource links and environment
-bindings come from SST:
+Run the Next.js app outside `sst dev`, wrapped with `sst shell` so local
+resource links and environment bindings still come from SST:
 
 ```sh
 bun run dev
@@ -35,9 +35,10 @@ bun run test:e2e
 bun run build
 ```
 
-The dev script runs `sst dev --stage ailocal` and starts Next.js as the child app
-on `http://localhost:3001`.
-Do not run `next dev` by itself for normal local development.
+The dev script runs `sst shell --stage ailocal -- bunx next dev -p 3001` with
+explicit Ohio region variables, and starts Next.js on `http://localhost:3001`.
+Do not run `next dev` by itself for normal local development unless `.env.local`
+contains the full web runtime contract.
 
 Dependencies should be pinned to exact versions when they are added.
 

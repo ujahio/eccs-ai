@@ -5,9 +5,11 @@
 	"type": "module",
 	"packageManager": "bun@1.3.10",
 	"scripts": {
-		"dev": "bunx sst dev --stage ailocal",
-		"dev:e2e": "AUTH_E2E_MODE=memory bunx sst dev --stage ailocal",
+		"dev": "AWS_REGION=us-east-2 AWS_DEFAULT_REGION=us-east-2 AWS_SDK_LOAD_CONFIG=1 bunx sst shell --stage ailocal -- bunx next dev -p 3001",
+		"dev:e2e": "AUTH_E2E_MODE=memory AWS_REGION=us-east-2 AWS_DEFAULT_REGION=us-east-2 bunx next dev -p 3001",
 		"build": "bunx next build --webpack",
+		"build:web": "bun run build",
+		"docker:build:web": "docker build -f Dockerfile.web -t eccs-ai-web:local .",
 		"start": "bunx next start",
 		"lint": "bunx eslint .",
 		"typecheck": "bunx tsc --noEmit --incremental false",

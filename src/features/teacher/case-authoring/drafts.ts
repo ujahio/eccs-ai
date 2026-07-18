@@ -14,6 +14,7 @@ import {
 	deleteStoredAttachments,
 	storeDraftAttachments,
 } from "@/features/case-materials/storage";
+import { awsClientConfig } from "@/lib/aws/client-config";
 import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query-core";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import {
@@ -177,7 +178,9 @@ export class DynamoTeacherCaseDraftRepository
 
 	constructor(
 		private readonly tableName: string,
-		documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({})),
+		documentClient = DynamoDBDocumentClient.from(
+			new DynamoDBClient(awsClientConfig()),
+		),
 	) {
 		this.documentClient = documentClient;
 	}

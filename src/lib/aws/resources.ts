@@ -14,6 +14,12 @@ export type LinkedResources = {
 	StudentQuizAttemptTable: { name: string };
 	ResendApiKey: { value: string };
 	BetterAuthSecret: { value: string };
+	ActiveCaseArchiveSchedule: {
+		groupName: string;
+		roleArn: string;
+		scheduleName: string;
+		targetArn: string;
+	};
 };
 
 const linkedResources = Resource as unknown as Partial<LinkedResources>;
@@ -34,21 +40,39 @@ function linkedValue(read: () => string | undefined) {
 	}
 }
 
+function envOrLinked(
+	envName: string,
+	readLinked: () => string | undefined,
+	label: string,
+) {
+	return required(
+		process.env[envName] ?? linkedValue(readLinked),
+		`${envName} or ${label}`,
+	);
+}
+
 export function getAuthResources() {
+	const e2eMode = isE2EMode();
 	const sessionResources = getSessionAuthResources();
 
 	return {
 		...sessionResources,
-		registrationWorkflowTableName: required(
-			linkedValue(() => linkedResources.RegistrationWorkflowTable?.name),
-			"RegistrationWorkflowTable.name",
-		),
+		registrationWorkflowTableName: e2eMode
+			? "e2e-registration-workflow-table"
+			: envOrLinked(
+					"REGISTRATION_WORKFLOW_TABLE_NAME",
+					() => linkedResources.RegistrationWorkflowTable?.name,
+					"RegistrationWorkflowTable.name",
+				),
 		emailSender:
 			process.env.ECCS_EMAIL_SENDER ?? "no-reply@contact.eccs-online.xyz",
-		resendApiKey: required(
-			linkedValue(() => linkedResources.ResendApiKey?.value),
-			"ResendApiKey.value",
-		),
+		resendApiKey: e2eMode
+			? "e2e-resend-api-key"
+			: envOrLinked(
+					"RESEND_API_KEY",
+					() => linkedResources.ResendApiKey?.value,
+					"ResendApiKey.value",
+				),
 	};
 }
 
@@ -58,50 +82,71 @@ export function getCaseNotificationResources() {
 	return {
 		userProfileTableName: e2eMode
 			? "e2e-user-profile-table"
-			: required(
-					linkedValue(() => linkedResources.UserProfileTable?.name),
+			: envOrLinked(
+					"USER_PROFILE_TABLE_NAME",
+					() => linkedResources.UserProfileTable?.name,
 					"UserProfileTable.name",
 				),
 		teacherCaseTableName: e2eMode
 			? "e2e-teacher-case-table"
-			: required(
-					linkedValue(() => linkedResources.TeacherCaseTable?.name),
+			: envOrLinked(
+					"TEACHER_CASE_TABLE_NAME",
+					() => linkedResources.TeacherCaseTable?.name,
 					"TeacherCaseTable.name",
 				),
 		studentCertificateTableName: e2eMode
 			? "e2e-student-certificate-table"
-			: required(
-					linkedValue(() => linkedResources.StudentCertificateTable?.name),
+			: envOrLinked(
+					"STUDENT_CERTIFICATE_TABLE_NAME",
+					() => linkedResources.StudentCertificateTable?.name,
 					"StudentCertificateTable.name",
 				),
 		emailSender:
 			process.env.ECCS_EMAIL_SENDER ?? "no-reply@contact.eccs-online.xyz",
-		resendApiKey: required(
-			linkedValue(() => linkedResources.ResendApiKey?.value),
-			"ResendApiKey.value",
-		),
+		resendApiKey: e2eMode
+			? "e2e-resend-api-key"
+			: envOrLinked(
+					"RESEND_API_KEY",
+					() => linkedResources.ResendApiKey?.value,
+					"ResendApiKey.value",
+				),
 		appBaseUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001",
 	};
 }
 
 export function getActiveCaseArchiveScheduleResources() {
 	// EventBridge Scheduler schedule metadata comes from raw aws.* resources in
-	// infra/case-archive.ts, so the Next server receives these values as
-	// deployment-time env vars instead of SST Resource links.
+	// infra/case-archive.ts, so the Next server receives these values as either
+	// explicit deployment env vars or an SST custom linkable in local sst shell.
+	const e2eMode = isE2EMode();
+
 	return {
-		groupName: process.env.CASE_ARCHIVE_SCHEDULE_GROUP_NAME ?? "default",
-		roleArn: required(
-			process.env.CASE_ARCHIVE_SCHEDULER_ROLE_ARN,
-			"CASE_ARCHIVE_SCHEDULER_ROLE_ARN",
-		),
-		scheduleName: required(
-			process.env.CASE_ARCHIVE_SCHEDULE_NAME,
-			"CASE_ARCHIVE_SCHEDULE_NAME",
-		),
-		targetArn: required(
-			process.env.CASE_ARCHIVE_TARGET_ARN,
-			"CASE_ARCHIVE_TARGET_ARN",
-		),
+		groupName: e2eMode
+			? "default"
+			: process.env.CASE_ARCHIVE_SCHEDULE_GROUP_NAME ??
+				linkedValue(() => linkedResources.ActiveCaseArchiveSchedule?.groupName) ??
+				"default",
+		roleArn: e2eMode
+			? "arn:aws:iam::000000000000:role/e2e-active-case-archive"
+			: envOrLinked(
+					"CASE_ARCHIVE_SCHEDULER_ROLE_ARN",
+					() => linkedResources.ActiveCaseArchiveSchedule?.roleArn,
+					"ActiveCaseArchiveSchedule.roleArn",
+				),
+		scheduleName: e2eMode
+			? "e2e-active-case-archive"
+			: envOrLinked(
+					"CASE_ARCHIVE_SCHEDULE_NAME",
+					() => linkedResources.ActiveCaseArchiveSchedule?.scheduleName,
+					"ActiveCaseArchiveSchedule.scheduleName",
+				),
+		targetArn: e2eMode
+			? "arn:aws:lambda:us-east-2:000000000000:function:e2e-active-case-archive"
+			: envOrLinked(
+					"CASE_ARCHIVE_TARGET_ARN",
+					() => linkedResources.ActiveCaseArchiveSchedule?.targetArn,
+					"ActiveCaseArchiveSchedule.targetArn",
+				),
 	};
 }
 
@@ -111,8 +156,9 @@ export function getTeacherCaseArchiveResources() {
 	return {
 		teacherCaseTableName: e2eMode
 			? "e2e-teacher-case-table"
-			: required(
-					linkedValue(() => linkedResources.TeacherCaseTable?.name),
+			: envOrLinked(
+					"TEACHER_CASE_TABLE_NAME",
+					() => linkedResources.TeacherCaseTable?.name,
 					"TeacherCaseTable.name",
 				),
 	};
@@ -124,59 +170,67 @@ export function getSessionAuthResources() {
 	return {
 		userPoolId: e2eMode
 			? "e2e-auth-user-pool"
-			: required(
-					linkedValue(() => linkedResources.AuthUserPool?.id),
+			: envOrLinked(
+					"AUTH_USER_POOL_ID",
+					() => linkedResources.AuthUserPool?.id,
 					"AuthUserPool.id",
 				),
 		userPoolClientId: e2eMode
 			? "e2e-auth-user-pool-client"
-			: required(
-					linkedValue(() => linkedResources.AuthUserPoolClient?.id),
+			: envOrLinked(
+					"AUTH_USER_POOL_CLIENT_ID",
+					() => linkedResources.AuthUserPoolClient?.id,
 					"AuthUserPoolClient.id",
 				),
 		userProfileTableName: e2eMode
 			? "e2e-user-profile-table"
-			: required(
-					linkedValue(() => linkedResources.UserProfileTable?.name),
+			: envOrLinked(
+					"USER_PROFILE_TABLE_NAME",
+					() => linkedResources.UserProfileTable?.name,
 					"UserProfileTable.name",
 				),
 		teacherCaseTableName: e2eMode
 			? "e2e-teacher-case-table"
-			: required(
-					linkedValue(() => linkedResources.TeacherCaseTable?.name),
+			: envOrLinked(
+					"TEACHER_CASE_TABLE_NAME",
+					() => linkedResources.TeacherCaseTable?.name,
 					"TeacherCaseTable.name",
 				),
 		studentCertificateTableName: e2eMode
 			? "e2e-student-certificate-table"
-			: required(
-					linkedValue(() => linkedResources.StudentCertificateTable?.name),
+			: envOrLinked(
+					"STUDENT_CERTIFICATE_TABLE_NAME",
+					() => linkedResources.StudentCertificateTable?.name,
 					"StudentCertificateTable.name",
 				),
 		studentCaseCompletionTableName: e2eMode
 			? "e2e-student-case-completion-table"
-			: required(
-					linkedValue(() => linkedResources.StudentCaseCompletionTable?.name),
+			: envOrLinked(
+					"STUDENT_CASE_COMPLETION_TABLE_NAME",
+					() => linkedResources.StudentCaseCompletionTable?.name,
 					"StudentCaseCompletionTable.name",
 				),
 		studentQuizAttemptTableName: e2eMode
 			? "e2e-student-quiz-attempt-table"
-			: required(
-					linkedValue(() => linkedResources.StudentQuizAttemptTable?.name),
+			: envOrLinked(
+					"STUDENT_QUIZ_ATTEMPT_TABLE_NAME",
+					() => linkedResources.StudentQuizAttemptTable?.name,
 					"StudentQuizAttemptTable.name",
 				),
 		caseMaterialBucketName: e2eMode
 			? "e2e-case-material-bucket"
-			: required(
-					linkedValue(() => linkedResources.CaseMaterialBucket?.name),
+			: envOrLinked(
+					"CASE_MATERIAL_BUCKET_NAME",
+					() => linkedResources.CaseMaterialBucket?.name,
 					"CaseMaterialBucket.name",
 				),
-		betterAuthSecret: required(
-			linkedValue(() => linkedResources.BetterAuthSecret?.value) ??
-				(e2eMode
-					? "eccs-e2e-better-auth-secret-for-local-tests-only"
-					: undefined),
-			"BetterAuthSecret.value",
-		),
+		betterAuthSecret: e2eMode
+			? "eccs-e2e-better-auth-secret-for-local-tests-only"
+			: envOrLinked(
+					"BETTER_AUTH_SECRET",
+					() => linkedResources.BetterAuthSecret?.value,
+					"BetterAuthSecret.value",
+				),
 		betterAuthUrl:
 			process.env.BETTER_AUTH_URL ??
 			process.env.NEXT_PUBLIC_APP_URL ??

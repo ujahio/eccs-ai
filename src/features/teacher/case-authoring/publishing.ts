@@ -20,6 +20,7 @@ import {
 	getActiveCaseArchiveScheduler,
 	type ActiveCaseArchiveScheduler,
 } from "@/features/teacher/cases/active-case-archive-scheduler";
+import { awsClientConfig } from "@/lib/aws/client-config";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import {
 	deleteE2ETeacherCaseDraftRecord,
@@ -160,7 +161,9 @@ export class DynamoTeacherCasePublisher implements TeacherCasePublisher {
 
 	constructor(
 		private readonly tableName: string,
-		documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({})),
+		documentClient = DynamoDBDocumentClient.from(
+			new DynamoDBClient(awsClientConfig()),
+		),
 		private readonly archiveScheduler: ActiveCaseArchiveScheduler,
 	) {
 		this.documentClient = documentClient;

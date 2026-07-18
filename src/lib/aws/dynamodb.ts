@@ -27,6 +27,7 @@ import {
 	VerificationResendLimitExceededError,
 	VerificationTokenAlreadyConsumedError
 } from "@/features/auth/registration/repository";
+import { awsClientConfig } from "./client-config";
 
 export class DynamoAuthRepository
 	implements
@@ -41,7 +42,9 @@ export class DynamoAuthRepository
 	constructor(
 		private readonly registrationTableName: string,
 		private readonly profileTableName: string,
-		documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({}))
+		documentClient = DynamoDBDocumentClient.from(
+			new DynamoDBClient(awsClientConfig())
+		)
 	) {
 		this.documentClient = documentClient;
 	}

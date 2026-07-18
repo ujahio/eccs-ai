@@ -9,6 +9,7 @@ import {
 	UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { isActiveTeacherCase } from "@/features/teacher/cases/case-lifecycle";
+import { awsClientConfig } from "@/lib/aws/client-config";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import {
 	getE2EAuthStore,
@@ -562,7 +563,9 @@ export class DynamoStudentCaseRepository implements StudentCaseRepository {
 		studentCertificateTableName: string,
 		studentCaseCompletionTableName: string,
 		studentQuizAttemptTableName: string,
-		documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({})),
+		documentClient = DynamoDBDocumentClient.from(
+			new DynamoDBClient(awsClientConfig()),
+		),
 	) {
 		this.studentCaseCompletionTableName = studentCaseCompletionTableName;
 		this.studentCertificateTableName = studentCertificateTableName;

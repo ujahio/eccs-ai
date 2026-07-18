@@ -8,6 +8,7 @@ import {
 	S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { awsClientConfig } from "@/lib/aws/client-config";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import {
 	deleteE2ECaseMaterial,
@@ -48,7 +49,7 @@ export type StoredDraftAttachments = {
 };
 
 const signedReadUrlTtlSeconds = 5 * 60;
-const s3Client = new S3Client({});
+const s3Client = new S3Client(awsClientConfig());
 
 export function getCaseMaterialStorage(): CaseMaterialStorage {
 	if (isE2EMode()) {

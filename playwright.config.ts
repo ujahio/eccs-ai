@@ -10,6 +10,8 @@ const webServerCommand =
 
 const webServerEnv = isMemoryMode
 	? {
+			AWS_DEFAULT_REGION: "us-east-2",
+			AWS_REGION: "us-east-2",
 			AUTH_E2E_MODE: "memory",
 			BETTER_AUTH_URL: process.env.BETTER_AUTH_URL ?? baseURL,
 			NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? baseURL,

@@ -2,6 +2,7 @@ import "server-only";
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { awsClientConfig } from "@/lib/aws/client-config";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import { getE2ETeacherCaseStore, isE2EMode } from "@/lib/e2e/in-memory-auth";
 import {
@@ -57,7 +58,9 @@ export class DynamoTeacherDashboardRepository {
 
 	constructor(
 		private readonly teacherCaseTableName: string,
-		documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({})),
+		documentClient = DynamoDBDocumentClient.from(
+			new DynamoDBClient(awsClientConfig()),
+		),
 	) {
 		this.documentClient = documentClient;
 	}
