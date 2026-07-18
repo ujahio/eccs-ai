@@ -68,10 +68,7 @@ jobs:
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           action-timeout-s: 120
 
-      - name: Unlock stage
-        run: bunx sst unlock --stage staging
-
       - name: Deploy SST stage
         env:
           SST_PRINT_LOGS: "1"
-        run: bunx sst remove --stage staging --verbose --print-logs
+        run: bunx sst deploy --stage staging --verbose --print-logs
