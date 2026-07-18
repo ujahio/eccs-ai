@@ -67,7 +67,6 @@ jobs:
           aws-region: ${{ env.AWS_DEPLOY_REGION }}
           role-session-name: eccs-ai-staging-${{ github.run_id }}
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
-          retry-max-attempts: 2
           action-timeout-s: 120
 
       - name: Deploy SST stage
