@@ -2,11 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-	type FormEvent,
-	useState,
-	useSyncExternalStore,
-} from "react";
+import { type FormEvent, useState, useSyncExternalStore } from "react";
 import { ArrowRightIcon } from "@/components/ui/arrow-right-icon";
 import { Button } from "@/components/ui/button";
 import {
@@ -351,12 +347,12 @@ export function LoginForm({ initialState }: LoginFormProps) {
 				<CompletePasswordStatusMessage state={completePasswordState} />
 
 				<Button
-					className="relative mt-7 w-full px-5 hover:!bg-action-hover"
+					className="relative mt-7 w-full px-5 hover:bg-action-hover!"
 					data-testid="teacher-first-login-password-submit"
 					disabled={isCompletingPassword}
 					type="submit"
 				>
-					<span>{isCompletingPassword ? "Saving..." : "Set password"}</span>
+					<span>{isCompletingPassword ? "Saving.." : "Set password"}</span>
 					<span aria-hidden="true" className="absolute right-5">
 						<ArrowRightIcon />
 					</span>
@@ -408,10 +404,7 @@ export function LoginForm({ initialState }: LoginFormProps) {
 						type="email"
 					/>
 					{emailError ? (
-						<FieldError
-							id="login-email-error"
-							testId="login-email-error"
-						>
+						<FieldError id="login-email-error" testId="login-email-error">
 							{emailError}
 						</FieldError>
 					) : null}
@@ -447,10 +440,7 @@ export function LoginForm({ initialState }: LoginFormProps) {
 						/>
 					</span>
 					{passwordError ? (
-						<FieldError
-							id="login-password-error"
-							testId="login-password-error"
-						>
+						<FieldError id="login-password-error" testId="login-password-error">
 							{passwordError}
 						</FieldError>
 					) : null}
@@ -468,12 +458,12 @@ export function LoginForm({ initialState }: LoginFormProps) {
 			</Link>
 
 			<Button
-				className="relative mt-7 w-full px-5 hover:!bg-action-hover"
+				className="relative mt-7 w-full px-5 hover:bg-action-hover!"
 				data-testid="login-submit"
 				disabled={isPending}
 				type="submit"
 			>
-				<span>{isPending ? "Signing in..." : "Sign in"}</span>
+				<span>{isPending ? "Signing in.." : "Sign in"}</span>
 				<span aria-hidden="true" className="absolute right-5">
 					<ArrowRightIcon />
 				</span>
