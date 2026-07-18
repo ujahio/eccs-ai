@@ -74,4 +74,4 @@ jobs:
       - name: Deploy SST stage
         env:
           SST_PRINT_LOGS: "1"
-        run: bunx sst deploy --stage staging --verbose --print-logs
+        run: bunx sst remove --stage staging --verbose --print-logs
