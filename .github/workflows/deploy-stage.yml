@@ -72,4 +72,6 @@ jobs:
         run: bunx sst unlock --stage staging
 
       - name: Deploy SST stage
-        run: bunx sst deploy --stage staging
+        env:
+          SST_PRINT_LOGS: "1"
+        run: bunx sst deploy --stage staging --verbose --print-logs
