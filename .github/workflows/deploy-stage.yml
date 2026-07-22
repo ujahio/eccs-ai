@@ -81,6 +81,38 @@ jobs:
       - name: Deploy SST stage
         run: bunx sst deploy --stage staging --verbose --print-logs
 
+      - name: Smoke image optimizer
+        shell: bash
+        run: |
+          set +e
+
+          image_url="${NEXT_PUBLIC_APP_URL%/}/_next/image?url=%2Fimages%2Flogo.png&w=256&q=75"
+          echo "Requesting ${image_url}"
+          status="$(curl -sS -o /tmp/image-optimizer-response -w "%{http_code}" "${image_url}")"
+          echo "Image optimizer HTTP status: ${status}"
+          echo "Image optimizer response body:"
+          head -c 4000 /tmp/image-optimizer-response || true
+          echo
+
+          sleep 8
+
+          function_name="$(aws lambda list-functions \
+            --query 'Functions[?contains(FunctionName, `eccsfewebImageOptimizer`)].FunctionName | [0]' \
+            --output text)"
+
+          if [[ -z "${function_name}" || "${function_name}" == "None" ]]; then
+            echo "::warning::Could not resolve image optimizer Lambda function name."
+          else
+            log_group="/aws/lambda/${function_name}"
+            echo "Image optimizer Lambda: ${function_name}"
+            echo "Recent image optimizer logs from ${log_group}:"
+            aws logs tail "${log_group}" --since 10m --format short || true
+          fi
+
+          if [[ "${status}" -lt 200 || "${status}" -ge 400 ]]; then
+            exit 1
+          fi
+
       # - name: Save Bun & Next.js cache
       #   uses: actions/cache@v5
       #   with:
