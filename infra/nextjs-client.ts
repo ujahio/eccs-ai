@@ -11,7 +11,7 @@ const appHostname = appUrl.startsWith("https://")
 
 export const client = new sst.aws.Nextjs("eccsfeweb", {
 	path: ".",
-	openNextVersion: "3.10.2",
+	openNextVersion: "4.1.0",
 	domain: appHostname ? { name: appHostname } : undefined,
 	environment: {
 		AUTH_E2E_MODE: process.env.AUTH_E2E_MODE ?? "",
