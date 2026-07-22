@@ -79,7 +79,7 @@ jobs:
           action-timeout-s: 120
 
       - name: Deploy SST stage
-        run: bunx sst deploy --stage staging
+        run: bunx sst deploy --stage staging --verbose --print-logs
 
       # - name: Save Bun & Next.js cache
       #   uses: actions/cache@v5
