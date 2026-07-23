@@ -35,8 +35,8 @@ export function StudentNavLinks() {
 							[
 								item.className,
 								isActive
-									? "text-brand-teal"
-									: "transition hover:text-brand-teal",
+									? "text-brand-teal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-teal"
+									: "transition hover:text-brand-teal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-teal",
 							]
 								.filter(Boolean)
 								.join(" ")

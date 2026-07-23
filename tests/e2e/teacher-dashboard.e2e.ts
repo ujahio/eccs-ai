@@ -184,6 +184,11 @@ test.describe("Teacher dashboard", () => {
 		await expect(
 			page.getByTestId("teacher-dashboard-no-active-case"),
 		).toBeHidden();
+
+		await page.getByTestId("teacher-cases-link").click();
+		await expect(page).toHaveURL(/\/teacher\/cases$/);
+		await page.getByTestId("teacher-shell-logo").click();
+		await expect(page).toHaveURL(/\/teacher$/);
 	});
 
 	test("shows the no-active-case empty state for a verified teacher when no case is seeded", async ({
