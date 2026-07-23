@@ -34,7 +34,7 @@ const parsedInput = {
 	firstName: "Jordan",
 	lastName: "Adebayo",
 	email: "jordan@example.com",
-	password: "casework1"
+	password: "Casework1!"
 };
 
 const previousState: RegistrationFormState = {

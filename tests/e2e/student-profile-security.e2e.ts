@@ -14,9 +14,9 @@ function uniqueEmail(prefix: string) {
 const validRegistration = {
 	firstName: "Jordan",
 	lastName: "Adebayo",
-	password: "casework1",
+	password: "Casework1!",
 };
-const changedPassword = "newcase1";
+const changedPassword = "Newcase1!";
 const verificationEmailSentMessage =
 	"We just sent a verification link to your inbox. Click the link in that email to confirm your account.";
 

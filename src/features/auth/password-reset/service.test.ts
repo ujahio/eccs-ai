@@ -181,15 +181,15 @@ describe("PasswordResetService", () => {
 		const result = await service.confirmPasswordReset({
 			email: "student@example.com",
 			code: "123456",
-			password: "newcase1",
-			confirmPassword: "newcase1"
+			password: "Newcase1!",
+			confirmPassword: "Newcase1!"
 		});
 
 		expect(identity.confirms).toEqual([
 			{
 				emailNormalized: "student@example.com",
 				code: "123456",
-				newPassword: "newcase1"
+				newPassword: "Newcase1!"
 			}
 		]);
 		expect(identity.globalSignOuts).toEqual(["student@example.com"]);
@@ -213,8 +213,8 @@ describe("PasswordResetService", () => {
 		const result = await service.confirmPasswordReset({
 			email: "student@example.com",
 			code: "bad-code",
-			password: "newcase1",
-			confirmPassword: "newcase1"
+			password: "Newcase1!",
+			confirmPassword: "Newcase1!"
 		});
 
 		expect(result).toEqual({
@@ -224,7 +224,7 @@ describe("PasswordResetService", () => {
 		});
 	});
 
-	it("validates matching Cognito password policy requirements before confirm", async () => {
+	it("validates matching permanent password requirements before confirm", async () => {
 		const { identity, service } = createHarness();
 
 		const result = await service.confirmPasswordReset({
@@ -238,7 +238,8 @@ describe("PasswordResetService", () => {
 		expect(result).toMatchObject({
 			status: "validation_error",
 			fieldErrors: {
-				password: "Password is missing: at least 8 characters, at least one number.",
+				password:
+					"Password is missing: at least 8 characters, at least one uppercase letter, at least one number, at least one symbol.",
 				confirmPassword: "Passwords do not match."
 			}
 		});

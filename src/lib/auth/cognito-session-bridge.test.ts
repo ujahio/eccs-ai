@@ -183,7 +183,7 @@ describe("cognitoSessionBridge", () => {
 
 		const response = await postSignIn(auth, {
 			email: "student@example.com",
-			password: "casework1",
+			password: "Casework1!",
 		});
 		const body = await response.json();
 
@@ -203,7 +203,7 @@ describe("cognitoSessionBridge", () => {
 			auth,
 			new URLSearchParams({
 				email: "student@example.com",
-				password: "casework1",
+				password: "Casework1!",
 			}),
 		);
 
@@ -228,7 +228,7 @@ describe("cognitoSessionBridge", () => {
 
 		const response = await postSignIn(auth, {
 			email: "teacher@example.com",
-			password: "casework1",
+			password: "Casework1!",
 		});
 		const body = await response.json();
 
@@ -250,7 +250,7 @@ describe("cognitoSessionBridge", () => {
 
 		const response = await postSignIn(auth, {
 			email: "teacher@example.com",
-			password: "temporary1",
+			password: "Temporary1!",
 		});
 		const body = await response.json();
 
@@ -279,8 +279,8 @@ describe("cognitoSessionBridge", () => {
 
 		const response = await postCompleteNewPassword(auth, {
 			email: "teacher@example.com",
-			password: "newcase1",
-			confirmPassword: "newcase1",
+			password: "Newcase1!",
+			confirmPassword: "Newcase1!",
 			challengeSession: "challenge-session",
 		});
 		const body = await response.json();
@@ -300,7 +300,7 @@ describe("cognitoSessionBridge", () => {
 
 		const response = await postSignIn(auth, {
 			email: "student@example.com",
-			password: "casework1",
+			password: "Casework1!",
 		});
 		const body = await response.json();
 
@@ -317,7 +317,7 @@ describe("cognitoSessionBridge", () => {
 			auth,
 			new URLSearchParams({
 				email: "student@example.com",
-				password: "casework1",
+				password: "Casework1!",
 			}),
 		);
 
@@ -334,7 +334,7 @@ describe("cognitoSessionBridge", () => {
 
 		const response = await postSignIn(auth, {
 			email: "student@example.com",
-			password: "casework1",
+			password: "Casework1!",
 		});
 		const body = await response.json();
 
@@ -354,7 +354,7 @@ describe("cognitoSessionBridge", () => {
 
 		const response = await postSignIn(auth, {
 			email: "student@example.com",
-			password: "casework1",
+			password: "Casework1!",
 		});
 		const body = await response.json();
 
@@ -374,7 +374,7 @@ describe("cognitoSessionBridge", () => {
 
 		const response = await postSignIn(auth, {
 			email: "student@example.com",
-			password: "casework1",
+			password: "Casework1!",
 		});
 		const body = await response.json();
 
@@ -394,7 +394,7 @@ describe("cognitoSessionBridge", () => {
 
 		const response = await postSignIn(auth, {
 			email: "student@example.com",
-			password: "casework1",
+			password: "Casework1!",
 		});
 		const body = await response.json();
 

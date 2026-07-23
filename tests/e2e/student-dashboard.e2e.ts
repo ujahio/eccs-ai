@@ -3,7 +3,7 @@ import { expect, test, type APIRequestContext, type Page } from "@playwright/tes
 import { formatDubaiDate } from "@/lib/date-format";
 
 const dayInMilliseconds = 24 * 60 * 60 * 1000;
-const password = "casework1";
+const password = "Casework1!";
 const certificateBranding = {
 	organizationName: "E-Clinical Case Solutions",
 	shortName: "ECCS",

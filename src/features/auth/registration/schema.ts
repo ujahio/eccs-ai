@@ -12,7 +12,7 @@ export type RegistrationFieldErrors = Partial<
 >;
 
 export type PasswordRequirement = {
-	id: "minimumLength" | "lowercase" | "number";
+	id: "minimumLength" | "lowercase" | "uppercase" | "number" | "symbol";
 	label: string;
 	isMet: (password: string) => boolean;
 };
@@ -28,6 +28,13 @@ export type ParsedRegistrationInput =
 	  };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const COGNITO_PASSWORD_SYMBOLS = "^$*.[]{}()?\"!@#%&/\\,><':;|_~`=+-";
+
+function hasCognitoPasswordSymbol(password: string) {
+	return Array.from(password).some((character) =>
+		COGNITO_PASSWORD_SYMBOLS.includes(character)
+	);
+}
 
 export const PASSWORD_REQUIREMENTS: PasswordRequirement[] = [
 	{
@@ -41,9 +48,19 @@ export const PASSWORD_REQUIREMENTS: PasswordRequirement[] = [
 		isMet: (password) => /[a-z]/.test(password)
 	},
 	{
+		id: "uppercase",
+		label: "At least one uppercase letter",
+		isMet: (password) => /[A-Z]/.test(password)
+	},
+	{
 		id: "number",
 		label: "At least one number",
 		isMet: (password) => /\d/.test(password)
+	},
+	{
+		id: "symbol",
+		label: "At least one symbol",
+		isMet: hasCognitoPasswordSymbol
 	}
 ];
 

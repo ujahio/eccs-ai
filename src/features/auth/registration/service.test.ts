@@ -237,7 +237,7 @@ const validInput = {
 	firstName: "Jordan",
 	lastName: "Adebayo",
 	email: "Jordan@Example.COM",
-	password: "casework1"
+	password: "Casework1!"
 };
 
 describe("RegistrationService", () => {
@@ -284,7 +284,7 @@ describe("RegistrationService", () => {
 			firstName: "Changed",
 			lastName: "Name",
 			email: "jordan@example.com",
-			password: "different1"
+			password: "Different1!"
 		});
 
 		expect(result.status).toBe("verification_sent");

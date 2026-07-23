@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	getExistingTeacherReconciliationBlocker,
 	getSingleTeacherIdentityBlocker,
+	getTemporaryPasswordValidationError,
 	type CognitoUserState,
 	type TeacherProfileRecord,
 } from "./bootstrap-teacher";
@@ -138,5 +139,53 @@ describe("bootstrap teacher existing-user policy", () => {
 		});
 
 		expect(blocker).toBeNull();
+	});
+});
+
+describe("bootstrap teacher temporary password validation", () => {
+	it("requires a Cognito-compliant temporary password", () => {
+		expect(
+			getTemporaryPasswordValidationError("Teacher1!", "TEACHER_TEMP_PASSWORD"),
+		).toBeNull();
+	});
+
+	it("requires the full Cognito policy before sending the temporary password to Cognito", () => {
+		const missingNumber = getTemporaryPasswordValidationError(
+			"Longenough!",
+			"TEACHER_TEMP_PASSWORD",
+		);
+		const missingLowercase = getTemporaryPasswordValidationError(
+			"PASSWORD1!",
+			"TEACHER_TEMP_PASSWORD",
+		);
+		const missingUppercase = getTemporaryPasswordValidationError(
+			"password1!",
+			"TEACHER_TEMP_PASSWORD",
+		);
+		const missingSymbol = getTemporaryPasswordValidationError(
+			"Password1",
+			"TEACHER_TEMP_PASSWORD",
+		);
+		const tooShort = getTemporaryPasswordValidationError(
+			"Sho1!",
+			"TEACHER_TEMP_PASSWORD",
+		);
+
+		expect(missingNumber).toContain("at least one number");
+		expect(missingLowercase).toContain("at least one lowercase letter");
+		expect(missingUppercase).toContain("at least one uppercase letter");
+		expect(missingSymbol).toContain("at least one symbol");
+		expect(tooShort).toContain("at least 8 characters");
+	});
+
+	it("explains that temporary passwords follow the repo Cognito password policy", () => {
+		const validationError = getTemporaryPasswordValidationError(
+			"teacher1",
+			"TEACHER_TEMP_PASSWORD",
+		);
+
+		expect(validationError).toContain("Cognito password policy used in this repo");
+		expect(validationError).toContain("at least one uppercase letter");
+		expect(validationError).toContain("at least one symbol");
 	});
 });

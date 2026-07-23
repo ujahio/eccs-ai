@@ -43,7 +43,7 @@ async function updateE2EStudentEligibility(
 const validRegistration = {
 	firstName: "Jordan",
 	lastName: "Adebayo",
-	password: "casework1",
+	password: "Casework1!",
 };
 const verificationEmailSentMessage =
 	"We just sent a verification link to your inbox. Click the link in that email to confirm your account.";
@@ -165,7 +165,7 @@ test.describe("Student registration and email verification", () => {
 			"Enter your email address.",
 		);
 		await expect(page.getByTestId("register-password-error")).toHaveText(
-			"Password is missing: at least 8 characters, at least one lowercase letter, at least one number.",
+			"Password is missing: at least 8 characters, at least one lowercase letter, at least one uppercase letter, at least one number, at least one symbol.",
 		);
 	});
 
@@ -199,7 +199,7 @@ test.describe("Student registration and email verification", () => {
 		});
 
 		await expect(page.getByTestId("register-password-error")).toHaveText(
-			"Password is missing: at least 8 characters, at least one number.",
+			"Password is missing: at least 8 characters, at least one uppercase letter, at least one number, at least one symbol.",
 		);
 		await expect(
 			page.getByTestId("register-password-requirement-minimumLength"),
@@ -210,6 +210,12 @@ test.describe("Student registration and email verification", () => {
 		await expect(
 			page.getByTestId("register-password-requirement-number"),
 		).toHaveText("Required: At least one number");
+		await expect(
+			page.getByTestId("register-password-requirement-uppercase"),
+		).toHaveText("Required: At least one uppercase letter");
+		await expect(
+			page.getByTestId("register-password-requirement-symbol"),
+		).toHaveText("Required: At least one symbol");
 	});
 
 	test("shows validation error for password without lowercase letter", async ({
@@ -219,7 +225,7 @@ test.describe("Student registration and email verification", () => {
 
 		await submitRegistrationForm(page, {
 			email: uniqueEmail(),
-			password: "PASSWORD1",
+			password: "PASSWORD1!",
 		});
 
 		await expect(page.getByTestId("register-password-error")).toHaveText(
@@ -234,7 +240,7 @@ test.describe("Student registration and email verification", () => {
 
 		await submitRegistrationForm(page, {
 			email: uniqueEmail(),
-			password: "casework",
+			password: "Casework!",
 		});
 
 		await expect(page.getByTestId("register-password-error")).toHaveText(
