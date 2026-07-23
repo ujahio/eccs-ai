@@ -81,12 +81,14 @@ export const userPool = new sst.aws.CognitoUserPool("AuthUserPool", {
 			args.adminCreateUserConfig = {
 				allowAdminCreateUserOnly: true,
 			};
+			// Cognito applies this policy to admin-created temporary passwords too.
+			// Teacher bootstrap passwords must be readable but still compliant.
 			args.passwordPolicy = {
 				minimumLength: 8,
 				requireLowercase: true,
 				requireNumbers: true,
-				requireSymbols: false,
-				requireUppercase: false,
+				requireSymbols: true,
+				requireUppercase: true,
 				temporaryPasswordValidityDays: 1,
 			};
 		},

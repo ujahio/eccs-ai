@@ -7,7 +7,7 @@ import {
 	uniqueEmail,
 } from "./teacher-helpers";
 
-const studentPassword = "casework1";
+const studentPassword = "Casework1!";
 
 async function seedTeacherCaseReview(request: APIRequestContext) {
 	const now = Date.now();

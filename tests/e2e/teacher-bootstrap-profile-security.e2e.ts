@@ -11,9 +11,9 @@ function uniqueEmail(prefix: string) {
 		.slice(2, 8)}@example.com`;
 }
 
-const temporaryPassword = "temporary1";
-const permanentPassword = "permanent1";
-const changedPassword = "newcase1";
+const temporaryPassword = "Temporary1!";
+const permanentPassword = "Permanent1!";
+const changedPassword = "Newcase1!";
 
 async function bootstrapTeacher(
 	request: APIRequestContext,

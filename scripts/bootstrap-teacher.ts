@@ -23,6 +23,10 @@ import {
 	QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { Resource } from "sst";
+import {
+	failedPasswordRequirements,
+	passwordRequirementMessage,
+} from "../src/features/auth/registration/schema";
 
 type BootstrapResources = {
 	AuthUserPool: { id: string };
@@ -425,7 +429,7 @@ function buildPlan(args: {
 			`Create Cognito user ${desired.emailNormalized} with email_verified=true and the teacher name attributes.`,
 		);
 		actions.push(
-			`Require a temporary password from $${args.passwordEnv}; Cognito will force a password change on first login.`,
+			`Require a Cognito-compliant temporary password from $${args.passwordEnv}; Cognito will force a password change on first login.`,
 		);
 	} else {
 		actions.push(
@@ -448,7 +452,7 @@ function buildPlan(args: {
 
 		if (args.resetTemporaryPassword) {
 			actions.push(
-				`Reset a temporary password from $${args.passwordEnv} and put the user back into Cognito's first-login password-change flow.`,
+				`Reset a Cognito-compliant temporary password from $${args.passwordEnv} and put the user back into Cognito's first-login password-change flow.`,
 			);
 		} else if (isFirstLoginPasswordChangeRequired(existingUser)) {
 			actions.push("Leave the existing temporary password challenge in place.");
@@ -755,13 +759,26 @@ function readTemporaryPassword(envName: string) {
 		);
 	}
 
-	if (value.length < 8 || !/\d/.test(value)) {
-		fail(
-			`${envName} must satisfy the Cognito password policy used in this repo: at least 8 characters and at least one number.`,
-		);
+	const validationError = getTemporaryPasswordValidationError(value, envName);
+
+	if (validationError) {
+		fail(validationError);
 	}
 
 	return value;
+}
+
+export function getTemporaryPasswordValidationError(
+	value: string,
+	envName = DEFAULT_PASSWORD_ENV,
+) {
+	const missingRequirements = failedPasswordRequirements(value);
+
+	if (missingRequirements.length > 0) {
+		return `${envName} must satisfy the Cognito password policy used in this repo: ${passwordRequirementMessage(missingRequirements)}`;
+	}
+
+	return null;
 }
 
 function validateRequired(label: string, value: string) {
@@ -829,6 +846,9 @@ Options:
   --reset-temporary-password  For an existing teacher user, set a fresh temporary password and require first-login password change again.
   --password-env NAME         Environment variable that holds the temporary password. Default: ${DEFAULT_PASSWORD_ENV}
   --help, -h                  Show this help text.
+
+Temporary password pre-check:
+  The bootstrap script requires the same Cognito password policy as permanent account passwords because Cognito also applies the user-pool policy to admin-created temporary passwords.
 `);
 }
 

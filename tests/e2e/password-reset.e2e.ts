@@ -9,9 +9,9 @@ function uniqueEmail() {
 const validRegistration = {
 	firstName: "Jordan",
 	lastName: "Adebayo",
-	password: "casework1"
+	password: "Casework1!"
 };
-const newPassword = "newcase1";
+const newPassword = "Newcase1!";
 const verificationEmailSentMessage =
 	"We just sent a verification link to your inbox. Click the link in that email to confirm your account.";
 const resetRequestedMessage =
@@ -199,7 +199,7 @@ test.describe("Student password reset", () => {
 		await expect(
 			page.getByTestId("reset-password-new-password-error")
 		).toHaveText(
-			"Password is missing: at least 8 characters, at least one number."
+			"Password is missing: at least 8 characters, at least one uppercase letter, at least one number, at least one symbol."
 		);
 		await expect(
 			page.getByTestId("reset-password-confirm-password-error")

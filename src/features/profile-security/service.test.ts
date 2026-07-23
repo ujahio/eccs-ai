@@ -516,9 +516,9 @@ describe("ProfileSecurityService", () => {
 			profile: baseProfile,
 			currentSessionToken: "current-token",
 			input: {
-				currentPassword: "casework1",
-				password: "newcase1",
-				confirmPassword: "newcase1",
+				currentPassword: "Casework1!",
+				password: "Newcase1!",
+				confirmPassword: "Newcase1!",
 			},
 		});
 
@@ -529,13 +529,13 @@ describe("ProfileSecurityService", () => {
 		expect(identity.authentications).toEqual([
 			{
 				emailNormalized: "student@example.com",
-				password: "casework1",
+				password: "Casework1!",
 			},
 		]);
 		expect(identity.passwordUpdates).toEqual([
 			{
 				emailNormalized: "student@example.com",
-				password: "newcase1",
+				password: "Newcase1!",
 			},
 		]);
 		expect(identity.globalSignOuts).toEqual(["student@example.com"]);
@@ -561,8 +561,8 @@ describe("ProfileSecurityService", () => {
 			currentSessionToken: "current-token",
 			input: {
 				currentPassword: "wrongpass1",
-				password: "newcase1",
-				confirmPassword: "newcase1",
+				password: "Newcase1!",
+				confirmPassword: "Newcase1!",
 			},
 		});
 
