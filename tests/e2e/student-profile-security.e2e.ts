@@ -52,6 +52,13 @@ async function fetchEmailChangeVerificationUrl(
 	return body.verificationUrl;
 }
 
+function sameOriginUrl(page: Page, value: string) {
+	const target = new URL(value);
+	const current = new URL(page.url());
+
+	return `${current.origin}${target.pathname}${target.search}`;
+}
+
 async function expectPasswordChangedEmail(
 	request: APIRequestContext,
 	email: string,
@@ -189,7 +196,7 @@ test.describe("Student profile security", () => {
 			request,
 			newEmail,
 		);
-		await page.goto(emailChangeUrl);
+		await page.goto(sameOriginUrl(page, emailChangeUrl));
 		await expect(page).toHaveURL(/\/student\/profile\?email=verified$/);
 		await expect(page.getByTestId("student-email-verified-message")).toHaveText(
 			"Your email address has been updated.",

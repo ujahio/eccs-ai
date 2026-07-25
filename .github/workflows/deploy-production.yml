@@ -1,28 +1,28 @@
-name: Deploy Staging
+name: Deploy Production
 
 on:
   push:
     branches:
-      - staging
+      - production
 
-run-name: Deploy staging from ${{ github.ref_name }} by @${{ github.actor }}
+run-name: Deploy production from ${{ github.ref_name }} by @${{ github.actor }}
 
 permissions:
   contents: read
 
 concurrency:
-  group: deploy-staging
+  group: deploy-production
   cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Deploy staging
+    name: Deploy production
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     permissions:
       contents: read
       id-token: write
-    environment: staging
+    environment: production
     env:
       AUTH_E2E_MODE: ""
       AWS_REGION: ${{ vars.AWS_REGION }}
@@ -34,7 +34,7 @@ jobs:
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
 
     steps:
-      - name: Validate stage configuration
+      - name: Validate production configuration
         shell: bash
         run: |
           missing=()
@@ -45,9 +45,21 @@ jobs:
           done
 
           if (( ${#missing[@]} > 0 )); then
-            echo "::error::Missing required GitHub Environment configuration for 'staging': ${missing[*]}"
+            echo "::error::Missing required GitHub Environment configuration for 'production': ${missing[*]}"
             exit 1
           fi
+
+          for name in BETTER_AUTH_URL NEXT_PUBLIC_APP_URL; do
+            value="${!name}"
+            if [[ "$value" != https://* ]]; then
+              echo "::error::$name must use an https:// production URL."
+              exit 1
+            fi
+            if [[ "$value" == *localhost* || "$value" == *127.0.0.1* ]]; then
+              echo "::error::$name must not point at localhost for production."
+              exit 1
+            fi
+          done
 
       - name: Checkout
         uses: actions/checkout@v6
@@ -74,12 +86,12 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v6.1.0
         with:
           aws-region: ${{ env.AWS_REGION }}
-          role-session-name: eccs-ai-staging-${{ github.run_id }}
+          role-session-name: eccs-ai-production-${{ github.run_id }}
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           action-timeout-s: 120
 
-      - name: Deploy SST stage
-        run: bunx sst deploy --stage staging
+      - name: Deploy SST production stage
+        run: bunx sst deploy --stage production
 
       - name: Write deployment artifact
         if: ${{ always() }}
@@ -87,7 +99,7 @@ jobs:
         run: |
           mkdir -p artifacts
           {
-            echo "# Staging Deployment"
+            echo "# Production Deployment"
             echo
             echo "- Workflow: $GITHUB_WORKFLOW"
             echo "- Run: $GITHUB_RUN_ID"
@@ -95,19 +107,19 @@ jobs:
             echo "- Event: $GITHUB_EVENT_NAME"
             echo "- Ref: ${GITHUB_REF_NAME:-unknown}"
             echo "- Requested deploy ref: $GITHUB_REF"
-            echo "- Stage: staging"
+            echo "- Stage: production"
             echo "- Reason: push-${GITHUB_REF_NAME:-unknown}"
             echo "- App URL: $NEXT_PUBLIC_APP_URL"
-          } > artifacts/staging-deploy-summary.md
+          } > artifacts/production-deploy-summary.md
 
       - name: Upload deployment artifact
         if: ${{ always() }}
         uses: actions/upload-artifact@v5
         with:
-          name: staging-deploy-summary
-          path: artifacts/staging-deploy-summary.md
+          name: production-deploy-summary
+          path: artifacts/production-deploy-summary.md
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 30
 
       - name: Save Bun & Next.js cache
         uses: actions/cache@v5

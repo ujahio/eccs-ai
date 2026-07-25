@@ -5,6 +5,7 @@ const e2ePort = process.env.E2E_PORT ?? "3001";
 const baseURL =
 	process.env.PLAYWRIGHT_BASE_URL ?? `http://${e2eHost}:${e2ePort}`;
 const isMemoryMode = process.env.AUTH_E2E_MODE === "memory";
+const isRealInfraSmoke = process.env.REAL_INFRA_SMOKE === "1";
 const webServerCommand =
 	isMemoryMode ? `bunx next dev -H ${e2eHost} -p ${e2ePort}` : "bun run dev";
 
@@ -21,11 +22,18 @@ export default defineConfig({
 	testMatch: "**/*.e2e.ts",
 	forbidOnly: !!process.env.CI,
 	retries: process.env.CI ? 1 : 0,
-	workers: isMemoryMode ? 1 : undefined,
+	workers: isMemoryMode || isRealInfraSmoke ? 1 : undefined,
 	use: {
 		baseURL,
+		...(isRealInfraSmoke
+			? {
+					screenshot: "off" as const,
+					trace: "off" as const,
+					video: "off" as const,
+				}
+			: {}),
 	},
-	webServer: process.env.PLAYWRIGHT_BASE_URL
+	webServer: process.env.PLAYWRIGHT_BASE_URL || isRealInfraSmoke
 		? undefined
 		: {
 				command: webServerCommand,

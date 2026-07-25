@@ -1,58 +1,68 @@
-# name: PR Checks
+name: PR Checks
 
-# on:
-#   pull_request:
-#     branches:
-#       - main
-#       - staging
+on:
+  pull_request:
+    branches:
+      - staging
+      - production
 
-# permissions:
-#   contents: read
+permissions:
+  contents: read
 
-# jobs:
-#   checks:
-#     name: Lint, Test, Build
-#     runs-on: ubuntu-latest
-#     timeout-minutes: 30
-#     env:
-#       AUTH_E2E_MODE: memory
-#       BETTER_AUTH_URL: http://127.0.0.1:3001
-#       NEXT_PUBLIC_APP_URL: http://127.0.0.1:3001
-#     steps:
-#       - name: Checkout
-#         uses: actions/checkout@v6
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
 
-#       - name: Setup Bun
-#         uses: oven-sh/setup-bun@v2
-#         with:
-#           bun-version: "1.3.10"
+jobs:
+  checks:
+    name: Lint, Typecheck, Test, Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      AUTH_E2E_MODE: memory
+      BETTER_AUTH_URL: http://127.0.0.1:3001
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3001
 
-#       - name: Install dependencies
-#         run: bun install --frozen-lockfile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
 
-#       - name: Install SST platform
-#         run: bunx sst install
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.10"
 
-#       - name: Run lint
-#         run: bun run lint
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
-#       - name: Run unit tests
-#         run: bun run test
+      - name: Install SST platform
+        run: bunx sst install
 
-#       - name: Build app
-#         run: bun run build
+      - name: Run lint
+        run: bun run lint
 
-#       - name: Install Playwright browsers
-#         run: bunx playwright install --with-deps chromium
+      - name: Run typecheck
+        run: bun run typecheck
 
-#       - name: Run smoke and integration tests
-#         run: bun run test:e2e:memory
+      - name: Run unit tests
+        run: bun run test
 
-#       - name: Upload Playwright report
-#         if: ${{ failure() }}
-#         uses: actions/upload-artifact@v5
-#         with:
-#           name: pr-checks-playwright-report
-#           path: playwright-report/
-#           if-no-files-found: ignore
-#           retention-days: 7
+      - name: Build app
+        run: bun run build
+
+      - name: Install Playwright browsers
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run memory e2e smoke and integration tests
+        run: bun run test:e2e:memory
+
+      - name: Upload Playwright report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: pr-checks-playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
