@@ -12,7 +12,7 @@ type EmailLinkKind = "registration" | "password_reset";
 
 type RealInfraSmokeConfig = {
 	appBaseUrl: string;
-	studentEmailDomain: string;
+	smokeMailbox: string;
 	teacherEmail: string;
 	teacherTemporaryPassword?: string;
 	teacherPassword: string;
@@ -137,12 +137,8 @@ test.describe("Production smoke @production-smoke", () => {
 function realInfraSmokeConfig(): RealInfraSmokeConfig {
 	return {
 		appBaseUrl: requiredEnv("PLAYWRIGHT_BASE_URL"),
-		studentEmailDomain:
-			envValue("SMOKE_EMAIL_DOMAIN") ??
-			requiredEnv("PRODUCTION_SMOKE_STUDENT_EMAIL_DOMAIN"),
-		teacherEmail:
-			envValue("SMOKE_TEACHER_EMAIL") ??
-			requiredEnv("PRODUCTION_SMOKE_TEACHER_EMAIL"),
+		smokeMailbox: requiredEnv("SMOKE_TEST_MAILBOX"),
+		teacherEmail: requiredEnv("SMOKE_TEACHER_EMAIL"),
 		teacherTemporaryPassword:
 			envValue("SMOKE_TEACHER_TEMP_PASSWORD") ??
 			envValue("PRODUCTION_SMOKE_TEACHER_TEMP_PASSWORD"),
@@ -168,6 +164,27 @@ function envValue(name: string) {
 
 function smokePassword(prefix: string) {
 	return `${prefix}${randomBytes(18).toString("base64url")}aA1!`;
+}
+
+function plusAddress(mailbox: string, tag: string) {
+	if (!/^[^\s@,\x00-\x1F\x7F]+@[^\s@,/\x00-\x1F\x7F]+$/.test(mailbox)) {
+		throw new Error("SMOKE_TEST_MAILBOX must be a single email address.");
+	}
+
+	const atIndex = mailbox.indexOf("@");
+	const localPart = mailbox.slice(0, atIndex);
+	const domain = mailbox.slice(atIndex + 1);
+	const normalizedTag = tag
+		.toLowerCase()
+		.replaceAll(/[^a-z0-9]+/g, "-")
+		.replaceAll(/^-+|-+$/g, "");
+
+	if (!normalizedTag) {
+		throw new Error("Smoke email plus-address tag must not be empty.");
+	}
+	const separator = localPart.includes("+") ? "-" : "+";
+
+	return `${localPart}${separator}${normalizedTag}@${domain}`;
 }
 
 async function registerVerifiedStudent(page: Page, email: string) {
@@ -487,7 +504,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function uniqueStudentEmail(prefix: string) {
-	return `eccs-smoke-${prefix}-${uniqueRunId()}@${smokeConfig.studentEmailDomain}`;
+	return plusAddress(
+		smokeConfig.smokeMailbox,
+		`student-${prefix}-${uniqueRunId()}`,
+	);
 }
 
 function uniqueRunId() {

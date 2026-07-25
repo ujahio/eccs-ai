@@ -34,8 +34,8 @@ Configure these values on the matching environment:
 | `NEXT_PUBLIC_APP_URL` | Variable | `production`, `staging` | Public app URL. Must be HTTPS outside local stages. |
 | `PRODUCTION_SMOKE_BASE_DOMAIN` | Variable | `production-smoke` | Base domain for temporary production PR smoke stages, for example `smoke.eccs-online.com`. The workflow derives `PRODUCTION_SMOKE_APP_URL=https://production-pr-<pull-request-number>.<base-domain>` and uses it for `BETTER_AUTH_URL`, `NEXT_PUBLIC_APP_URL`, and Playwright `baseURL` during smoke. |
 | `ECCS_EMAIL_SENDER` | Variable | `production`, `production-smoke`, `staging` | Verified Resend sender for application email. |
-| `RESEND_API_KEY` | Secret | `production`, `production-smoke`, `staging` | Resend API key. Use a smoke-scoped key or sender/domain for `production-smoke` where available. |
-| `SMOKE_EMAIL_DOMAIN` | Variable | `production-smoke` | Domain used for unique smoke student accounts and the smoke teacher account. |
+| `RESEND_API_KEY` | Secret | `production`, `production-smoke`, `staging` | Resend API key used to inspect outbound smoke emails sent to `SMOKE_TEST_MAILBOX` plus-addresses. |
+| `SMOKE_TEST_MAILBOX` | Variable | `production-smoke` | Single controlled smoke mailbox, for example `smoke-tests@eccs-online.com`. The workflow and tests derive unique plus-addressed recipients from this mailbox, such as `smoke-tests+teacher-production-pr-42@eccs-online.com`. |
 | `SMOKE_TEACHER_TEMP_PASSWORD` | Secret | `production-smoke` | Temporary password used by `scripts/bootstrap-teacher.ts` when creating the smoke teacher. |
 | `SMOKE_TEACHER_PASSWORD` | Secret | `production-smoke` | Permanent teacher password set through the first-login change flow and used on retry when the teacher already completed first login. |
 
@@ -64,7 +64,7 @@ Protect `production` so it does not allow direct pushes. The only allowed produc
 5. `Production PR Readiness / Require staging source` rejects any production PR that is not from same-repository `staging`.
 6. `Production PR Readiness` validates required `production-smoke` environment values.
 7. The workflow deploys a PR-specific SST stage named `production-pr-<pull-request-number>`.
-8. The workflow bootstraps the smoke teacher with `scripts/bootstrap-teacher.ts`.
+8. The workflow derives the smoke teacher email as a plus-addressed recipient from `SMOKE_TEST_MAILBOX`, then bootstraps that teacher with `scripts/bootstrap-teacher.ts`.
 9. The workflow derives `PRODUCTION_SMOKE_APP_URL` from `SST_STAGE` and `PRODUCTION_SMOKE_BASE_DOMAIN`, then runs `REAL_INFRA_SMOKE=1 bun run test:e2e:production-smoke` against `PLAYWRIGHT_BASE_URL=$PRODUCTION_SMOKE_APP_URL`.
 10. The workflow always runs `bunx sst remove --stage production-pr-<pull-request-number>` after a successful smoke-stage deployment, including when smoke fails.
 11. After the staging promotion PR is merged, the push to `production` triggers `Deploy Production`.
@@ -80,6 +80,7 @@ The smoke suite should be self-contained and fail closed. It must:
 - Use real Cognito and Resend behavior.
 - Exercise only the four first-pass smoke flows listed above.
 - Create uniquely prefixed test data.
+- Use `SMOKE_TEST_MAILBOX` plus-addressing for all generated smoke recipients; no additional email domains or inboxes are created by the workflow.
 - Avoid memory-only `/api/e2e/*` helpers.
 - Disable Playwright trace, screenshots, and video for real-infra smoke so email verification and reset links are not retained in CI artifacts.
 
