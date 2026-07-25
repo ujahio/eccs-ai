@@ -60,15 +60,15 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Restore Bun & Next.js cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.bun/install/cache
-            ${{ github.workspace }}/.next/cache
-          key: ${{ runner.os }}-bun-nextjs-${{ hashFiles('**/bun.lockb') }}-${{ hashFiles('**/*.{js,jsx,ts,tsx}') }}-v1
-          restore-keys: |
-            ${{ runner.os }}-bun-nextjs-
+      # - name: Restore Bun & Next.js cache
+      #   uses: actions/cache@v5
+      #   with:
+      #     path: |
+      #       ~/.bun/install/cache
+      #       ${{ github.workspace }}/.next/cache
+      #     key: ${{ runner.os }}-bun-nextjs-${{ hashFiles('**/bun.lockb') }}-${{ hashFiles('**/*.{js,jsx,ts,tsx}') }}-v1
+      #     restore-keys: |
+      #       ${{ runner.os }}-bun-nextjs-
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6.1.0
@@ -79,40 +79,42 @@ jobs:
           action-timeout-s: 120
 
       - name: Deploy SST stage
-        run: bunx sst deploy --stage staging
+        run: bunx sst unlock --stage staging
+      # - name: Deploy SST stage
+      #   run: bunx sst deploy --stage staging
 
-      - name: Write deployment artifact
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          mkdir -p artifacts
-          {
-            echo "# Staging Deployment"
-            echo
-            echo "- Workflow: $GITHUB_WORKFLOW"
-            echo "- Run: $GITHUB_RUN_ID"
-            echo "- Actor: $GITHUB_ACTOR"
-            echo "- Event: $GITHUB_EVENT_NAME"
-            echo "- Ref: ${GITHUB_REF_NAME:-unknown}"
-            echo "- Requested deploy ref: $GITHUB_REF"
-            echo "- Stage: staging"
-            echo "- Reason: push-${GITHUB_REF_NAME:-unknown}"
-            echo "- App URL: $NEXT_PUBLIC_APP_URL"
-          } > artifacts/staging-deploy-summary.md
+      # - name: Write deployment artifact
+      #   if: ${{ always() }}
+      #   shell: bash
+      #   run: |
+      #     mkdir -p artifacts
+      #     {
+      #       echo "# Staging Deployment"
+      #       echo
+      #       echo "- Workflow: $GITHUB_WORKFLOW"
+      #       echo "- Run: $GITHUB_RUN_ID"
+      #       echo "- Actor: $GITHUB_ACTOR"
+      #       echo "- Event: $GITHUB_EVENT_NAME"
+      #       echo "- Ref: ${GITHUB_REF_NAME:-unknown}"
+      #       echo "- Requested deploy ref: $GITHUB_REF"
+      #       echo "- Stage: staging"
+      #       echo "- Reason: push-${GITHUB_REF_NAME:-unknown}"
+      #       echo "- App URL: $NEXT_PUBLIC_APP_URL"
+      #     } > artifacts/staging-deploy-summary.md
 
-      - name: Upload deployment artifact
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v5
-        with:
-          name: staging-deploy-summary
-          path: artifacts/staging-deploy-summary.md
-          if-no-files-found: ignore
-          retention-days: 14
+      # - name: Upload deployment artifact
+      #   if: ${{ always() }}
+      #   uses: actions/upload-artifact@v5
+      #   with:
+      #     name: staging-deploy-summary
+      #     path: artifacts/staging-deploy-summary.md
+      #     if-no-files-found: ignore
+      #     retention-days: 14
 
-      - name: Save Bun & Next.js cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.bun/install/cache
-            ${{ github.workspace }}/.next/cache
-          key: ${{ runner.os }}-bun-nextjs-${{ hashFiles('**/bun.lockb') }}-${{ hashFiles('**/*.{js,jsx,ts,tsx}') }}-v1
+      # - name: Save Bun & Next.js cache
+      #   uses: actions/cache@v5
+      #   with:
+      #     path: |
+      #       ~/.bun/install/cache
+      #       ${{ github.workspace }}/.next/cache
+      #     key: ${{ runner.os }}-bun-nextjs-${{ hashFiles('**/bun.lockb') }}-${{ hashFiles('**/*.{js,jsx,ts,tsx}') }}-v1
