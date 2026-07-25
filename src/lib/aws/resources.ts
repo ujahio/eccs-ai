@@ -44,7 +44,7 @@ export function getAuthResources() {
 			"RegistrationWorkflowTable.name",
 		),
 		emailSender:
-			process.env.ECCS_EMAIL_SENDER ?? "no-reply@contact.eccs-online.xyz",
+			process.env.ECCS_EMAIL_SENDER ?? "no-reply@contact.eccs-online.com",
 		resendApiKey: required(
 			linkedValue(() => linkedResources.ResendApiKey?.value),
 			"ResendApiKey.value",
@@ -75,7 +75,7 @@ export function getCaseNotificationResources() {
 					"StudentCertificateTable.name",
 				),
 		emailSender:
-			process.env.ECCS_EMAIL_SENDER ?? "no-reply@contact.eccs-online.xyz",
+			process.env.ECCS_EMAIL_SENDER ?? "no-reply@contact.eccs-online.com",
 		resendApiKey: required(
 			linkedValue(() => linkedResources.ResendApiKey?.value),
 			"ResendApiKey.value",
