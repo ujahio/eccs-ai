@@ -8,9 +8,9 @@ Use the `gh` CLI for issue operations with the currently authenticated GitHub se
 
 - **Create an issue**: `gh issue create --title "..." --body-file <path> --label "ready-for-agent"` or `--label "ready-for-human"`.
 - **Issue before branch**: create or identify the GitHub issue before creating an implementation branch.
-- **Branch base**: create implementation branches from `main` unless the user explicitly requests a different base.
+- **Branch base**: create implementation branches from `staging` unless the user explicitly requests a different base.
 - **Branch from issue title**: after the issue exists, create or switch to a dedicated branch named from the issue number and title. Use a three-digit issue number plus a short slug from the title, for example `003-student-registration-verification` for issue 3, "Student registration and 24-hour email verification".
-- **Branch scope**: do not implement issue work directly on `main`. Keep one implementation branch focused on one issue unless the user explicitly asks otherwise.
+- **Branch scope**: do not implement issue work directly on `staging`. Keep one implementation branch focused on one issue unless the user explicitly asks otherwise.
 - **Read an issue**: `gh issue view <number> --json number,title,body,state,comments,labels,url`. Use this explicit JSON field list to avoid the broken default query that requests deprecated `projectCards`.
 - **List issues**: `gh issue list --state open --json number,title,body,labels,comments`.
 - **Comment on an issue**: first check whether the issue is open. If it is open, run `gh issue comment <number> --body "..."`. If it is closed, do not add the comment.

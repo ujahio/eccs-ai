@@ -15,6 +15,7 @@
 		"test:e2e": "bunx playwright test",
 		"test:e2e:memory": "AUTH_E2E_MODE=memory bunx playwright test",
 		"test:e2e:local": "bun run test:e2e:memory",
+		"test:e2e:production-smoke": "REAL_INFRA_SMOKE=1 bunx playwright test --grep @production-smoke",
 		"cleanup:e2e-registrations": "bunx sst shell --stage ailocal -- bun scripts/cleanup-e2e-registrations.ts",
 		"sst:dev": "bun run dev",
 		"sst:deploy:staging": "bunx sst deploy --stage staging",

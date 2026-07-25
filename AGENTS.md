@@ -102,7 +102,7 @@ SST dev locally after authenticating to AWS.
 
 ### Branch, PR, And Issue Closeout Workflow
 
-- Create issue implementation branches from `main` unless the user explicitly requests a different base.
+- Create issue implementation branches from `staging` unless the user explicitly requests a different base.
 - Follow the branch, PR, and issue closeout conventions in `docs/agents/issue-tracker.md`.
 
 ## SST
