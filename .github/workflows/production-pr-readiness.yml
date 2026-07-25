@@ -33,9 +33,69 @@ jobs:
             exit 1
           fi
 
+  pr_checks_gate:
+    name: Wait for successful PR Checks
+    needs: production_source_gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: ${{ github.event.pull_request.draft == false }}
+    permissions:
+      actions: read
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Wait for PR Checks workflow
+        shell: bash
+        run: |
+          deadline=$((SECONDS + 50 * 60))
+
+          while (( SECONDS < deadline )); do
+            runs_json="$(gh api --method GET "/repos/${REPOSITORY}/actions/workflows/pr-checks.yml/runs?event=pull_request&head_sha=${HEAD_SHA}&per_page=20")"
+            matching_run="$(
+              echo "$runs_json" |
+                jq -c --argjson pr_number "$PR_NUMBER" '
+                  .workflow_runs
+                  | map(select(any(.pull_requests[]?; .number == $pr_number)))
+                  | sort_by(.created_at)
+                  | reverse
+                  | .[0] // empty
+                '
+            )"
+
+            if [[ -z "$matching_run" || "$matching_run" == "null" ]]; then
+              echo "Waiting for PR Checks to start for PR #${PR_NUMBER} at ${HEAD_SHA}..."
+              sleep 15
+              continue
+            fi
+
+            status="$(echo "$matching_run" | jq -r '.status')"
+            conclusion="$(echo "$matching_run" | jq -r '.conclusion // ""')"
+            run_url="$(echo "$matching_run" | jq -r '.html_url')"
+
+            if [[ "$status" == "completed" ]]; then
+              if [[ "$conclusion" == "success" ]]; then
+                echo "PR Checks passed: $run_url"
+                exit 0
+              fi
+
+              echo "::error::PR Checks completed with conclusion '${conclusion}': $run_url"
+              exit 1
+            fi
+
+            echo "PR Checks status is '${status}' for $run_url. Waiting..."
+            sleep 15
+          done
+
+          echo "::error::Timed out waiting for successful PR Checks for PR #${PR_NUMBER} at ${HEAD_SHA}."
+          exit 1
+
   production_smoke:
     name: Deploy, Smoke, And Teardown Production PR Candidate
-    needs: production_source_gate
+    needs: pr_checks_gate
     runs-on: ubuntu-latest
     timeout-minutes: 120
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
