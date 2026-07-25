@@ -14,38 +14,32 @@ const customSenderKey = new aws.kms.Key("CognitoCustomSenderKey", {
 					{
 						type: "AWS",
 						identifiers: [
-							account.accountId.apply(
-								(id) => `arn:aws:iam::${id}:root`
-							)
-						]
-					}
-				]
+							account.accountId.apply((id) => `arn:aws:iam::${id}:root`),
+						],
+					},
+				],
 			},
 			{
 				sid: "AllowCognitoToEncryptSenderCodes",
-				actions: [
-					"kms:DescribeKey",
-					"kms:Encrypt",
-					"kms:GenerateDataKey"
-				],
+				actions: ["kms:DescribeKey", "kms:Encrypt", "kms:GenerateDataKey"],
 				resources: ["*"],
 				principals: [
 					{
 						type: "Service",
-						identifiers: ["cognito-idp.amazonaws.com"]
-					}
-				]
-			}
-		]
-	}).json
+						identifiers: ["cognito-idp.amazonaws.com"],
+					},
+				],
+			},
+		],
+	}).json,
 });
 
 export const customSenderKeyAlias = new aws.kms.Alias(
 	"CognitoCustomSenderKeyAlias",
 	{
 		name: `alias/${$app.name}/${$app.stage}/cognito-custom-sender`,
-		targetKeyId: customSenderKey.keyId
-	}
+		targetKeyId: customSenderKey.keyId,
+	},
 );
 
 export const userPool = new sst.aws.CognitoUserPool("AuthUserPool", {
@@ -57,24 +51,23 @@ export const userPool = new sst.aws.CognitoUserPool("AuthUserPool", {
 			environment: {
 				COGNITO_CUSTOM_SENDER_KEY_ARN: customSenderKey.arn,
 				ECCS_EMAIL_SENDER:
-					process.env.ECCS_EMAIL_SENDER ??
-					"no-reply@contact.eccs-online.xyz",
+					process.env.ECCS_EMAIL_SENDER ?? "no-reply@contact.eccs-online.com",
 				NEXT_PUBLIC_APP_URL:
-					process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001"
+					process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001",
 			},
 			link: [resendApiKey],
 			nodejs: {
 				install: {
-					"@aws-crypto/client-node": "5.0.0"
-				}
+					"@aws-crypto/client-node": "5.0.0",
+				},
 			},
 			permissions: [
 				{
 					actions: ["kms:Decrypt"],
-					resources: [customSenderKey.arn]
-				}
-			]
-		}
+					resources: [customSenderKey.arn],
+				},
+			],
+		},
 	},
 	transform: {
 		userPool(args) {
