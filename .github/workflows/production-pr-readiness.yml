@@ -48,10 +48,8 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION }}
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
-      BETTER_AUTH_URL: ${{ vars.PRODUCTION_SMOKE_APP_URL }}
       ECCS_EMAIL_SENDER: ${{ vars.ECCS_EMAIL_SENDER }}
-      NEXT_PUBLIC_APP_URL: ${{ vars.PRODUCTION_SMOKE_APP_URL }}
-      PLAYWRIGHT_BASE_URL: ${{ vars.PRODUCTION_SMOKE_APP_URL }}
+      PRODUCTION_SMOKE_BASE_DOMAIN: ${{ vars.PRODUCTION_SMOKE_BASE_DOMAIN }}
       REAL_INFRA_SMOKE: "1"
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       SMOKE_EMAIL_DOMAIN: ${{ vars.SMOKE_EMAIL_DOMAIN }}
@@ -61,11 +59,41 @@ jobs:
       SST_STAGE: production-pr-${{ github.event.pull_request.number || github.run_id }}
 
     steps:
+      - name: Configure production smoke URL
+        shell: bash
+        run: |
+          if [[ -z "$PRODUCTION_SMOKE_BASE_DOMAIN" ]]; then
+            echo "::error::Missing required GitHub Environment configuration for production smoke: PRODUCTION_SMOKE_BASE_DOMAIN"
+            exit 1
+          fi
+
+          smoke_base_domain="${PRODUCTION_SMOKE_BASE_DOMAIN#https://}"
+          smoke_base_domain="${smoke_base_domain#http://}"
+          smoke_base_domain="${smoke_base_domain%%/}"
+
+          if [[ -z "$smoke_base_domain" ]]; then
+            echo "::error::PRODUCTION_SMOKE_BASE_DOMAIN must be a domain, for example smoke.eccs-online.com."
+            exit 1
+          fi
+          if [[ "$smoke_base_domain" == */* ]]; then
+            echo "::error::PRODUCTION_SMOKE_BASE_DOMAIN must not include a path."
+            exit 1
+          fi
+
+          smoke_app_url="https://${SST_STAGE}.${smoke_base_domain}"
+
+          {
+            echo "BETTER_AUTH_URL=$smoke_app_url"
+            echo "NEXT_PUBLIC_APP_URL=$smoke_app_url"
+            echo "PLAYWRIGHT_BASE_URL=$smoke_app_url"
+            echo "PRODUCTION_SMOKE_APP_URL=$smoke_app_url"
+          } >> "$GITHUB_ENV"
+
       - name: Validate production smoke configuration
         shell: bash
         run: |
           missing=()
-          for name in AWS_ROLE_ARN AWS_REGION BETTER_AUTH_SECRET BETTER_AUTH_URL ECCS_EMAIL_SENDER NEXT_PUBLIC_APP_URL PLAYWRIGHT_BASE_URL RESEND_API_KEY SMOKE_EMAIL_DOMAIN SMOKE_TEACHER_EMAIL SMOKE_TEACHER_PASSWORD SMOKE_TEACHER_TEMP_PASSWORD SST_STAGE; do
+          for name in AWS_ROLE_ARN AWS_REGION BETTER_AUTH_SECRET BETTER_AUTH_URL ECCS_EMAIL_SENDER NEXT_PUBLIC_APP_URL PLAYWRIGHT_BASE_URL PRODUCTION_SMOKE_BASE_DOMAIN PRODUCTION_SMOKE_APP_URL RESEND_API_KEY SMOKE_EMAIL_DOMAIN SMOKE_TEACHER_EMAIL SMOKE_TEACHER_PASSWORD SMOKE_TEACHER_TEMP_PASSWORD SST_STAGE; do
             if [[ -z "${!name}" ]]; then
               missing+=("$name")
             fi

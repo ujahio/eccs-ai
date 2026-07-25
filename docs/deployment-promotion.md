@@ -32,7 +32,7 @@ Configure these values on the matching environment:
 | `BETTER_AUTH_SECRET` | Secret | `production`, `production-smoke`, `staging` | better-auth signing secret. Use a separate value for `production-smoke`. |
 | `BETTER_AUTH_URL` | Variable | `production`, `staging` | Canonical app auth URL. Must be HTTPS outside local stages. |
 | `NEXT_PUBLIC_APP_URL` | Variable | `production`, `staging` | Public app URL. Must be HTTPS outside local stages. |
-| `PRODUCTION_SMOKE_APP_URL` | Variable | `production-smoke` | Public HTTPS URL routed to the temporary production PR smoke stage. Used for `BETTER_AUTH_URL`, `NEXT_PUBLIC_APP_URL`, and Playwright `baseURL` during smoke. |
+| `PRODUCTION_SMOKE_BASE_DOMAIN` | Variable | `production-smoke` | Base domain for temporary production PR smoke stages, for example `smoke.eccs-online.com`. The workflow derives `PRODUCTION_SMOKE_APP_URL=https://production-pr-<pull-request-number>.<base-domain>` and uses it for `BETTER_AUTH_URL`, `NEXT_PUBLIC_APP_URL`, and Playwright `baseURL` during smoke. |
 | `ECCS_EMAIL_SENDER` | Variable | `production`, `production-smoke`, `staging` | Verified Resend sender for application email. |
 | `RESEND_API_KEY` | Secret | `production`, `production-smoke`, `staging` | Resend API key. Use a smoke-scoped key or sender/domain for `production-smoke` where available. |
 | `SMOKE_EMAIL_DOMAIN` | Variable | `production-smoke` | Domain used for unique smoke student accounts and the smoke teacher account. |
@@ -65,7 +65,7 @@ Protect `production` so it does not allow direct pushes. The only allowed produc
 6. `Production PR Readiness` validates required `production-smoke` environment values.
 7. The workflow deploys a PR-specific SST stage named `production-pr-<pull-request-number>`.
 8. The workflow bootstraps the smoke teacher with `scripts/bootstrap-teacher.ts`.
-9. The workflow runs `REAL_INFRA_SMOKE=1 bun run test:e2e:production-smoke` against `PLAYWRIGHT_BASE_URL=$PRODUCTION_SMOKE_APP_URL`.
+9. The workflow derives `PRODUCTION_SMOKE_APP_URL` from `SST_STAGE` and `PRODUCTION_SMOKE_BASE_DOMAIN`, then runs `REAL_INFRA_SMOKE=1 bun run test:e2e:production-smoke` against `PLAYWRIGHT_BASE_URL=$PRODUCTION_SMOKE_APP_URL`.
 10. The workflow always runs `bunx sst remove --stage production-pr-<pull-request-number>` after a successful smoke-stage deployment, including when smoke fails.
 11. After the staging promotion PR is merged, the push to `production` triggers `Deploy Production`.
 12. `Deploy Production` deploys the real SST `production` stage with `bunx sst deploy --stage production`.
