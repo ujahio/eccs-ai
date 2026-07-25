@@ -69,9 +69,10 @@ Protect `production` so it does not allow direct pushes. The only allowed produc
 9. The workflow deploys a PR-specific SST stage named `production-pr-<pull-request-number>`.
 10. The workflow derives the smoke teacher email as a plus-addressed recipient from `SMOKE_TEST_MAILBOX`, then bootstraps that teacher with `scripts/bootstrap-teacher.ts`.
 11. The workflow derives `PRODUCTION_SMOKE_APP_URL` from `SST_STAGE` and `PRODUCTION_SMOKE_BASE_DOMAIN`, then runs `REAL_INFRA_SMOKE=1 bun run test:e2e:production-smoke` against `PLAYWRIGHT_BASE_URL=$PRODUCTION_SMOKE_APP_URL`.
-12. The workflow always runs `bunx sst remove --stage production-pr-<pull-request-number>` after a successful smoke-stage deployment, including when smoke fails.
-13. After the staging promotion PR is merged, the push to `production` triggers `Deploy Production`.
-14. `Deploy Production` deploys the real SST `production` stage with `bunx sst deploy --stage production`.
+12. If the smoke suite passes, the workflow runs `bunx sst remove --stage production-pr-<pull-request-number>` to remove the temporary smoke stage.
+13. If the smoke suite fails after the smoke stage deployed, the workflow fails and intentionally retains `production-pr-<pull-request-number>` for debugging or reruns.
+14. After the staging promotion PR is merged, the push to `production` triggers `Deploy Production`.
+15. `Deploy Production` deploys the real SST `production` stage with `bunx sst deploy --stage production`.
 
 Production is configured in `sst.config.ts` with retained, protected resources. The production PR smoke workflow uses the `production-smoke` GitHub Environment and must not run `sst remove --stage production`; it removes only the temporary `production-pr-*` smoke stage. It must not deploy or invoke the `staging` branch.
 

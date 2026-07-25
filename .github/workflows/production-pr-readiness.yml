@@ -244,6 +244,7 @@ jobs:
         run: bunx playwright install --with-deps chromium
 
       - name: Run compact production smoke suite
+        id: smoke_tests
         run: bun run test:e2e:production-smoke
 
       - name: Write smoke deployment artifact
@@ -276,7 +277,7 @@ jobs:
 
       - name: Remove SST smoke stage
         id: teardown
-        if: ${{ always() && steps.deploy.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.deploy.outcome == 'success' && steps.smoke_tests.outcome == 'success' }}
         run: bunx sst remove --stage "$SST_STAGE"
 
       - name: Write teardown artifact
@@ -291,6 +292,7 @@ jobs:
             echo "- Run: $GITHUB_RUN_ID"
             echo "- Stage: $SST_STAGE"
             echo "- Deploy step: ${{ steps.deploy.outcome }}"
+            echo "- Smoke test step: ${{ steps.smoke_tests.outcome }}"
             echo "- Teardown step: ${{ steps.teardown.outcome }}"
           } > artifacts/production-smoke-teardown.md
 
