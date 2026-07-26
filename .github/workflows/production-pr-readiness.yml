@@ -334,7 +334,7 @@ jobs:
 
       - name: Remove SST smoke stage
         id: teardown
-        if: ${{ !cancelled() && steps.deploy.outcome == 'success' && steps.smoke_tests.outcome == 'success' }}
+        # if: ${{ !cancelled() && steps.deploy.outcome == 'success' && steps.smoke_tests.outcome == 'success' }}
         run: bunx sst remove --stage "$SST_STAGE"
 
       # - name: Write teardown artifact
