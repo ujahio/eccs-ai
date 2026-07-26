@@ -112,6 +112,26 @@ const DEFAULT_PERMANENT_PASSWORD_ENV = "TEACHER_PASSWORD";
 const DEFAULT_TEST_TEACHER_MAILBOX_ENV = "SMOKE_TEST_MAILBOX";
 const FIRST_LOGIN_PASSWORD_CHANGE_STATUS = "FORCE_CHANGE_PASSWORD";
 
+/**
+ * Flag behavior overview:
+ *
+ * The script always builds and prints a plan first. Without --apply, it exits
+ * after that dry run. With --apply, any planned smoke-teacher cleanup runs
+ * before the normal bootstrap flow creates or reconciles the teacher identity.
+ *
+ * --replace-existing-test-teacher is intentionally narrow. It only works when
+ * the desired teacher email and all deleted teacher identities are generated
+ * from the controlled smoke mailbox (SMOKE_TEST_MAILBOX by default, overridden
+ * with --test-teacher-mailbox-env). It refuses to proceed if the stage contains
+ * a non-smoke teacher identity. In dry-run mode, the cleanup is simulated so
+ * the printed plan shows the post-replacement create/reconcile actions.
+ *
+ * --reset-temporary-password only affects an existing Cognito user that remains
+ * after optional smoke-teacher replacement. Newly created users receive their
+ * temporary password through AdminCreateUser. --set-permanent-password applies
+ * the real password after the UserProfileTable record is upserted, leaving the
+ * Cognito account ready for direct login instead of first-login password change.
+ */
 export async function main(argv = process.argv.slice(2)) {
 	const args = parseArgs(argv);
 
@@ -140,6 +160,8 @@ export async function main(argv = process.argv.slice(2)) {
 	const testTeacherUsers = testTeacherMailbox
 		? await listTestTeacherUsers(context, testTeacherMailbox)
 		: [];
+	// Replacement is evaluated before the single-teacher guard so old generated
+	// smoke teachers do not block the new PR-specific smoke teacher.
 	const replacementTargets = args.replaceExistingTestTeacher
 		? getTestTeacherReplacementTargets({
 				existingUser: state.existingUser,
@@ -164,6 +186,8 @@ export async function main(argv = process.argv.slice(2)) {
 	}
 
 	if (hasTestTeacherReplacementTargets(replacementTargets)) {
+		// Dry-run mode uses this simulated state; --apply repeats the same
+		// replacement against Cognito/DynamoDB before continuing.
 		state = removeTestTeacherReplacementTargets(state, replacementTargets);
 	}
 
@@ -247,6 +271,8 @@ export async function main(argv = process.argv.slice(2)) {
 	}
 
 	if (hasTestTeacherReplacementTargets(replacementTargets)) {
+		// Real deletion happens only after the user reviewed the plan and opted in
+		// with --apply.
 		await deleteTestTeacherReplacementTargets(context, replacementTargets);
 		state = await loadBootstrapState(context, desired.emailNormalized);
 		({
