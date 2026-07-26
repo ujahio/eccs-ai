@@ -293,7 +293,7 @@ jobs:
 
       - name: Deploy SST smoke stage
         id: deploy
-        run: bunx sst unlock --stage "$SST_STAGE"
+        run: bunx sst deploy --stage "$SST_STAGE"
 
       - name: Bootstrap smoke teacher
         run: bunx sst shell --stage "$SST_STAGE" -- bun scripts/seed-smoke-teacher.ts --email "$SMOKE_TEACHER_EMAIL" --apply
