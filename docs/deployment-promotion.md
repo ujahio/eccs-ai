@@ -70,7 +70,7 @@ Protect `production` so it does not allow direct pushes. The only allowed produc
 9. If `Deploy Staging` fails, is cancelled, or times out, `Production PR Readiness` stops before deploying any real infrastructure smoke stage.
 10. `Production PR Readiness` validates required `production-smoke` environment values.
 11. The workflow deploys a PR-specific SST stage named `production-pr-<pull-request-number>`.
-12. The workflow derives the smoke teacher email as a plus-addressed recipient from `SMOKE_TEST_MAILBOX`, then bootstraps that teacher with `scripts/bootstrap-teacher.ts`. Bootstrap creates or resets the temporary password, applies the permanent teacher password, and leaves Cognito ready for direct sign-in.
+12. The workflow derives the smoke teacher email as a plus-addressed recipient from `SMOKE_TEST_MAILBOX`, then bootstraps that teacher with `scripts/bootstrap-teacher.ts`. Bootstrap first deletes any existing generated smoke teacher identity in the stage, refusing to proceed if a non-smoke teacher exists. It then creates the new teacher, applies the permanent teacher password, and leaves Cognito ready for direct sign-in.
 13. The workflow derives `PRODUCTION_SMOKE_APP_URL` from `SST_STAGE` and `PRODUCTION_SMOKE_BASE_DOMAIN`, then runs `REAL_INFRA_SMOKE=1 bun run test:e2e:production-smoke` against `PLAYWRIGHT_BASE_URL=$PRODUCTION_SMOKE_APP_URL`.
 14. If the smoke suite passes, the workflow runs `bunx sst remove --stage production-pr-<pull-request-number>` to remove the temporary smoke stage.
 15. If the smoke suite fails after the smoke stage deployed, the workflow fails and intentionally retains `production-pr-<pull-request-number>` for debugging or reruns.

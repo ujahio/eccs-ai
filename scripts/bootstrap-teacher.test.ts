@@ -3,7 +3,10 @@ import {
 	getExistingTeacherReconciliationBlocker,
 	getPermanentPasswordValidationError,
 	getSingleTeacherIdentityBlocker,
+	getTestTeacherReplacementBlocker,
+	getTestTeacherReplacementTargets,
 	getTemporaryPasswordValidationError,
+	isTestTeacherEmail,
 	type CognitoUserState,
 	type TeacherProfileRecord,
 } from "./bootstrap-teacher";
@@ -140,6 +143,123 @@ describe("bootstrap teacher existing-user policy", () => {
 		});
 
 		expect(blocker).toBeNull();
+	});
+});
+
+describe("bootstrap teacher smoke replacement policy", () => {
+	it("recognizes generated production smoke teacher emails only", () => {
+		expect(
+			isTestTeacherEmail(
+				"smoke-tests+teacher-production-pr-74@eccs-online.com",
+				"smoke-tests@eccs-online.com",
+			),
+		).toBe(true);
+		expect(
+			isTestTeacherEmail(
+				"smoke+tests-teacher-production-pr-74@eccs-online.com",
+				"smoke+tests@eccs-online.com",
+			),
+		).toBe(true);
+		expect(
+			isTestTeacherEmail("teacher@example.com", "smoke-tests@eccs-online.com"),
+		).toBe(false);
+		expect(
+			isTestTeacherEmail(
+				"smoke-tests+teacher-staging@eccs-online.com",
+				"smoke-tests@eccs-online.com",
+			),
+		).toBe(false);
+		expect(
+			isTestTeacherEmail(
+				"jane-teacher-production-pr-74@eccs-online.com",
+				"smoke-tests@eccs-online.com",
+			),
+		).toBe(false);
+		expect(
+			isTestTeacherEmail(
+				"smoke-tests+teacher-production-pr-74@example.com",
+				"smoke-tests@eccs-online.com",
+			),
+		).toBe(false);
+	});
+
+	it("blocks replacement unless the desired teacher is a generated smoke teacher", () => {
+		const blocker = getTestTeacherReplacementBlocker({
+			desiredEmailNormalized: "teacher@example.com",
+			testTeacherMailbox: "smoke-tests@eccs-online.com",
+			testTeacherUsers: [],
+			teacherProfiles: [],
+			teacherUsers: [],
+		});
+
+		expect(blocker).toContain("not a generated smoke teacher email");
+	});
+
+	it("blocks replacement when a non-test teacher identity exists", () => {
+		const blocker = getTestTeacherReplacementBlocker({
+			desiredEmailNormalized:
+				"smoke-tests+teacher-production-pr-74@eccs-online.com",
+			testTeacherMailbox: "smoke-tests@eccs-online.com",
+			testTeacherUsers: [],
+			teacherProfiles: [teacherProfile()],
+			teacherUsers: [],
+		});
+
+		expect(blocker).toContain("non-test teacher identity");
+		expect(blocker).toContain("teacher@example.com");
+	});
+
+	it("targets only generated smoke teacher users and profiles for replacement", () => {
+		const email = "smoke-tests+teacher-production-pr-72@eccs-online.com";
+		const existingUser = cognitoUser({
+			username: email,
+			sub: "old-smoke-sub",
+			attributes: {
+				sub: "old-smoke-sub",
+				email,
+			},
+			groups: ["teacher"],
+		});
+		const targets = getTestTeacherReplacementTargets({
+			existingUser,
+			testTeacherMailbox: "smoke-tests@eccs-online.com",
+			testTeacherUsers: [],
+			teacherProfiles: [
+				teacherProfile({
+					profileId: "old-smoke-sub",
+					emailNormalized: email,
+				}),
+			],
+			teacherUsers: [existingUser],
+		});
+
+		expect(targets.cognitoUsers).toHaveLength(1);
+		expect(targets.cognitoUsers[0]?.username).toBe(email);
+		expect(targets.profiles).toHaveLength(1);
+		expect(targets.profiles[0]?.profileId).toBe("old-smoke-sub");
+	});
+
+	it("targets generated smoke teacher users even before group assignment completes", () => {
+		const email = "smoke-tests+teacher-production-pr-72@eccs-online.com";
+		const partialUser = cognitoUser({
+			username: email,
+			sub: "partial-smoke-sub",
+			attributes: {
+				sub: "partial-smoke-sub",
+				email,
+			},
+			groups: [],
+		});
+		const targets = getTestTeacherReplacementTargets({
+			existingUser: null,
+			testTeacherMailbox: "smoke-tests@eccs-online.com",
+			testTeacherUsers: [partialUser],
+			teacherProfiles: [],
+			teacherUsers: [],
+		});
+
+		expect(targets.cognitoUsers).toHaveLength(1);
+		expect(targets.cognitoUsers[0]?.sub).toBe("partial-smoke-sub");
 	});
 });
 
