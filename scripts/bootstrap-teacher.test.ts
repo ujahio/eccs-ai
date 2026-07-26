@@ -9,7 +9,13 @@ import {
 	isTestTeacherEmail,
 	type CognitoUserState,
 	type TeacherProfileRecord,
-} from "./bootstrap-teacher";
+} from "./teacher-bootstrap-core";
+import { parseAdminTeacherBootstrapArgs } from "./bootstrap-admin-teacher";
+import {
+	DEFAULT_SMOKE_TEACHER_PASSWORD_ENV,
+	DEFAULT_SMOKE_TEACHER_TEMP_PASSWORD_ENV,
+	parseSmokeTeacherSeedArgs,
+} from "./seed-smoke-teacher";
 
 function teacherProfile(
 	overrides: Partial<TeacherProfileRecord> = {},
@@ -42,6 +48,75 @@ function cognitoUser(overrides: Partial<CognitoUserState> = {}): CognitoUserStat
 		...overrides,
 	};
 }
+
+describe("admin teacher bootstrap CLI", () => {
+	it("keeps the admin script focused on temporary-password setup", () => {
+		const args = parseAdminTeacherBootstrapArgs([
+			"--email",
+			"teacher@example.com",
+			"--first-name",
+			"Taylor",
+			"--last-name",
+			"Smith",
+			"--apply",
+		]);
+
+		expect(args).toMatchObject({
+			email: "teacher@example.com",
+			firstName: "Taylor",
+			lastName: "Smith",
+			apply: true,
+			temporaryPasswordEnv: "TEACHER_TEMP_PASSWORD",
+		});
+	});
+
+	it("does not expose CI-only smoke replacement or permanent password flags", () => {
+		expect(() =>
+			parseAdminTeacherBootstrapArgs(["--replace-existing-test-teacher"]),
+		).toThrow("Unknown argument");
+		expect(() =>
+			parseAdminTeacherBootstrapArgs(["--set-permanent-password"]),
+		).toThrow("Unknown argument");
+	});
+});
+
+describe("smoke teacher seed CLI", () => {
+	it("defaults to the CI smoke teacher rules", () => {
+		const args = parseSmokeTeacherSeedArgs([
+			"--email",
+			"smoke-tests+teacher-production-pr-72@eccs-online.com",
+		]);
+
+		expect(args).toMatchObject({
+			email: "smoke-tests+teacher-production-pr-72@eccs-online.com",
+			firstName: "Smoke",
+			lastName: "Teacher",
+			apply: false,
+			temporaryPasswordEnv: DEFAULT_SMOKE_TEACHER_TEMP_PASSWORD_ENV,
+			permanentPasswordEnv: DEFAULT_SMOKE_TEACHER_PASSWORD_ENV,
+			testTeacherMailboxEnv: "SMOKE_TEST_MAILBOX",
+		});
+	});
+
+	it("allows CI to override the explicit environment variable names", () => {
+		const args = parseSmokeTeacherSeedArgs([
+			"--email",
+			"smoke-tests+teacher-production-pr-72@eccs-online.com",
+			"--temporary-password-env",
+			"CI_TEMP_PASSWORD",
+			"--permanent-password-env",
+			"CI_TEACHER_PASSWORD",
+			"--test-teacher-mailbox-env",
+			"CI_SMOKE_MAILBOX",
+			"--apply",
+		]);
+
+		expect(args.temporaryPasswordEnv).toBe("CI_TEMP_PASSWORD");
+		expect(args.permanentPasswordEnv).toBe("CI_TEACHER_PASSWORD");
+		expect(args.testTeacherMailboxEnv).toBe("CI_SMOKE_MAILBOX");
+		expect(args.apply).toBe(true);
+	});
+});
 
 describe("bootstrap teacher single-teacher policy", () => {
 	it("blocks bootstrapping a different email when a teacher profile already exists", () => {

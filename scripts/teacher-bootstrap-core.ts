@@ -1,5 +1,3 @@
-import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
 	AdminAddUserToGroupCommand,
 	AdminCreateUserCommand,
@@ -54,7 +52,7 @@ export type TeacherProfileRecord = {
 	sessionInvalidationExemptToken?: string;
 };
 
-type ParsedArgs = {
+export type BootstrapTeacherOptions = {
 	email: string;
 	firstName: string;
 	lastName: string;
@@ -64,7 +62,6 @@ type ParsedArgs = {
 	passwordEnv: string;
 	permanentPasswordEnv: string | null;
 	testTeacherMailboxEnv: string;
-	help: boolean;
 };
 
 export type CognitoUserState = {
@@ -107,39 +104,31 @@ type TestTeacherReplacementTargets = {
 
 const TEACHER_GROUP = "teacher";
 const STUDENT_GROUP = "student";
-const DEFAULT_PASSWORD_ENV = "TEACHER_TEMP_PASSWORD";
-const DEFAULT_PERMANENT_PASSWORD_ENV = "TEACHER_PASSWORD";
-const DEFAULT_TEST_TEACHER_MAILBOX_ENV = "SMOKE_TEST_MAILBOX";
+export const DEFAULT_TEACHER_TEMP_PASSWORD_ENV = "TEACHER_TEMP_PASSWORD";
+export const DEFAULT_TEACHER_PASSWORD_ENV = "TEACHER_PASSWORD";
+export const DEFAULT_TEST_TEACHER_MAILBOX_ENV = "SMOKE_TEST_MAILBOX";
 const FIRST_LOGIN_PASSWORD_CHANGE_STATUS = "FORCE_CHANGE_PASSWORD";
 
 /**
- * Flag behavior overview:
+ * Shared teacher bootstrap behavior overview:
  *
- * The script always builds and prints a plan first. Without --apply, it exits
- * after that dry run. With --apply, any planned smoke-teacher cleanup runs
- * before the normal bootstrap flow creates or reconciles the teacher identity.
+ * The caller always gets a printed plan first. Without apply, this exits after
+ * that dry run. With apply, any planned smoke-teacher cleanup runs before the
+ * normal bootstrap flow creates or reconciles the teacher identity.
  *
- * --replace-existing-test-teacher is intentionally narrow. It only works when
- * the desired teacher email and all deleted teacher identities are generated
- * from the controlled smoke mailbox (SMOKE_TEST_MAILBOX by default, overridden
- * with --test-teacher-mailbox-env). It refuses to proceed if the stage contains
- * a non-smoke teacher identity. In dry-run mode, the cleanup is simulated so
- * the printed plan shows the post-replacement create/reconcile actions.
+ * replaceExistingTestTeacher is intentionally narrow. It only works when the
+ * desired teacher email and all deleted teacher identities are generated from
+ * the controlled smoke mailbox. It refuses to proceed if the stage contains a
+ * non-smoke teacher identity. In dry-run mode, the cleanup is simulated so the
+ * printed plan shows the post-replacement create/reconcile actions.
  *
- * --reset-temporary-password only affects an existing Cognito user that remains
+ * resetTemporaryPassword only affects an existing Cognito user that remains
  * after optional smoke-teacher replacement. Newly created users receive their
- * temporary password through AdminCreateUser. --set-permanent-password applies
- * the real password after the UserProfileTable record is upserted, leaving the
+ * temporary password through AdminCreateUser. permanentPasswordEnv applies the
+ * real password after the UserProfileTable record is upserted, leaving the
  * Cognito account ready for direct login instead of first-login password change.
  */
-export async function main(argv = process.argv.slice(2)) {
-	const args = parseArgs(argv);
-
-	if (args.help) {
-		printHelp();
-		process.exit(0);
-	}
-
+export async function bootstrapTeacher(args: BootstrapTeacherOptions) {
 	const desired = {
 		emailNormalized: normalizeEmail(args.email),
 		firstName: args.firstName.trim(),
@@ -1353,14 +1342,14 @@ function readPassword(envName: string, label: "temporary" | "permanent") {
 
 export function getTemporaryPasswordValidationError(
 	value: string,
-	envName = DEFAULT_PASSWORD_ENV,
+	envName = DEFAULT_TEACHER_TEMP_PASSWORD_ENV,
 ) {
 	return getTeacherPasswordValidationError(value, envName);
 }
 
 export function getPermanentPasswordValidationError(
 	value: string,
-	envName = DEFAULT_PERMANENT_PASSWORD_ENV,
+	envName = DEFAULT_TEACHER_PASSWORD_ENV,
 ) {
 	return getTeacherPasswordValidationError(value, envName);
 }
@@ -1381,115 +1370,6 @@ function validateRequired(label: string, value: string) {
 	}
 }
 
-function parseArgs(argv: string[]): ParsedArgs {
-	const parsed: ParsedArgs = {
-		email: "",
-		firstName: "",
-		lastName: "",
-		apply: false,
-		replaceExistingTestTeacher: false,
-		resetTemporaryPassword: false,
-		passwordEnv: DEFAULT_PASSWORD_ENV,
-		permanentPasswordEnv: null,
-		testTeacherMailboxEnv: DEFAULT_TEST_TEACHER_MAILBOX_ENV,
-		help: false,
-	};
-
-	for (let index = 0; index < argv.length; index += 1) {
-		const arg = argv[index];
-
-		switch (arg) {
-			case "--email":
-				parsed.email = argv[++index] ?? "";
-				break;
-			case "--first-name":
-				parsed.firstName = argv[++index] ?? "";
-				break;
-			case "--last-name":
-				parsed.lastName = argv[++index] ?? "";
-				break;
-			case "--apply":
-				parsed.apply = true;
-				break;
-			case "--replace-existing-test-teacher":
-				parsed.replaceExistingTestTeacher = true;
-				break;
-			case "--reset-temporary-password":
-				parsed.resetTemporaryPassword = true;
-				break;
-			case "--set-permanent-password":
-				parsed.permanentPasswordEnv ??= DEFAULT_PERMANENT_PASSWORD_ENV;
-				break;
-			case "--permanent-password-env":
-				parsed.permanentPasswordEnv = readRequiredOptionValue(
-					argv,
-					++index,
-					"--permanent-password-env",
-				);
-				break;
-			case "--password-env":
-				parsed.passwordEnv = argv[++index] ?? DEFAULT_PASSWORD_ENV;
-				break;
-			case "--test-teacher-mailbox-env":
-				parsed.testTeacherMailboxEnv = readRequiredOptionValue(
-					argv,
-					++index,
-					"--test-teacher-mailbox-env",
-				);
-				break;
-			case "--help":
-			case "-h":
-				parsed.help = true;
-				break;
-			default:
-				fail(`Unknown argument: ${arg}`);
-		}
-	}
-
-	return parsed;
-}
-
-function readRequiredOptionValue(
-	argv: string[],
-	index: number,
-	optionName: string,
-) {
-	const value = argv[index];
-
-	if (!value || value.startsWith("--")) {
-		fail(`Missing required value for ${optionName}.`);
-	}
-
-	return value;
-}
-
-function printHelp() {
-	console.log(`One-time teacher bootstrap script
-
-Usage:
-  bunx sst shell --stage ailocal -- bun scripts/bootstrap-teacher.ts \\
-    --email teacher@example.com \\
-    --first-name Taylor \\
-    --last-name Smith
-
-Options:
-  --apply                     Execute Cognito and DynamoDB writes. Without this flag the script is a dry run.
-  --replace-existing-test-teacher
-                              Delete existing generated smoke teacher identities before bootstrapping this teacher. Only works for teacher-production-pr-<number> emails.
-  --reset-temporary-password  For an existing teacher user, set a fresh temporary password and require first-login password change again.
-  --password-env NAME         Environment variable that holds the temporary password. Default: ${DEFAULT_PASSWORD_ENV}
-  --set-permanent-password    Set a permanent password after the teacher profile is ready. Reads ${DEFAULT_PERMANENT_PASSWORD_ENV} unless --permanent-password-env is provided.
-  --permanent-password-env NAME
-                              Environment variable that holds the permanent teacher password. Implies --set-permanent-password.
-  --test-teacher-mailbox-env NAME
-                              Environment variable that holds the controlled smoke test mailbox. Used only with --replace-existing-test-teacher. Default: ${DEFAULT_TEST_TEACHER_MAILBOX_ENV}
-  --help, -h                  Show this help text.
-
-Temporary password pre-check:
-  The bootstrap script validates both temporary and permanent passwords against the Cognito password policy configured in this repo.
-`);
-}
-
 function fail(message: string): never {
 	console.error(message);
 	process.exit(1);
@@ -1497,14 +1377,4 @@ function fail(message: string): never {
 
 function errorName(error: unknown) {
 	return error instanceof Error ? error.name : undefined;
-}
-
-function isMainModule() {
-	return process.argv[1]
-		? fileURLToPath(import.meta.url) === resolve(process.argv[1])
-		: false;
-}
-
-if (isMainModule()) {
-	await main();
 }

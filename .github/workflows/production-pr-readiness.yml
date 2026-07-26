@@ -296,8 +296,7 @@ jobs:
         run: bunx sst deploy --stage "$SST_STAGE"
 
       - name: Bootstrap smoke teacher
-        run: |
-          TEACHER_TEMP_PASSWORD="$SMOKE_TEACHER_TEMP_PASSWORD" TEACHER_PASSWORD="$SMOKE_TEACHER_PASSWORD" bunx sst shell --stage "$SST_STAGE" -- bun scripts/bootstrap-teacher.ts --email "$SMOKE_TEACHER_EMAIL" --first-name Smoke --last-name Teacher --replace-existing-test-teacher --reset-temporary-password --set-permanent-password --apply
+        run: bunx sst shell --stage "$SST_STAGE" -- bun scripts/seed-smoke-teacher.ts --email "$SMOKE_TEACHER_EMAIL" --apply
 
       - name: Install Playwright browsers
         run: bunx playwright install --with-deps chromium
