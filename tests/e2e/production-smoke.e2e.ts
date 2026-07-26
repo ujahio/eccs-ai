@@ -1,6 +1,19 @@
 import { randomBytes } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 
+function envValue(name: string) {
+	return process.env[name]?.trim() || undefined;
+}
+
+function secretEnvValue(name: string) {
+	const value = process.env[name];
+	return value && value.length > 0 ? value : undefined;
+}
+
+function smokePassword(prefix: string) {
+	return `${prefix}${randomBytes(18).toString("base64url")}aA1!`;
+}
+
 const studentPassword = smokePassword("Student");
 const resetPassword = smokePassword("Reset");
 const dayInMilliseconds = 24 * 60 * 60 * 1000;
@@ -36,7 +49,7 @@ test.describe("Production smoke @production-smoke", () => {
 	}) => {
 		const email = uniqueStudentEmail("registration");
 
-		await registerVerifiedStudent(page, email);
+		await registerVerifiedStudent(page, email, studentPassword);
 		await login(page, email, studentPassword, /\/student$/);
 
 		await expect(page.getByTestId("student-dashboard-root")).toBeVisible();
@@ -64,7 +77,7 @@ test.describe("Production smoke @production-smoke", () => {
 			caseTitle,
 		);
 
-		await registerVerifiedStudent(page, studentEmail);
+		await registerVerifiedStudent(page, studentEmail, studentPassword);
 		await login(page, studentEmail, studentPassword, /\/student$/);
 		await expect(page.getByTestId("student-active-case-title")).toContainText(
 			caseTitle,
@@ -82,9 +95,9 @@ test.describe("Production smoke @production-smoke", () => {
 
 		await page.getByTestId("student-case-certificate-history").click();
 		await expect(page).toHaveURL(/\/student\/certificates$/);
-		await expect(page.getByTestId("student-certificate-history-card")).toContainText(
-			caseTitle,
-		);
+		await expect(
+			page.getByTestId("student-certificate-history-card"),
+		).toContainText(caseTitle);
 	});
 
 	test("student can reset password and log in with the new password @production-smoke", async ({
@@ -92,14 +105,16 @@ test.describe("Production smoke @production-smoke", () => {
 	}) => {
 		const email = uniqueStudentEmail("password-reset");
 
-		await registerVerifiedStudent(page, email);
+		await registerVerifiedStudent(page, email, studentPassword);
 		await login(page, email, studentPassword, /\/student$/);
 
 		const resetRequestedAt = Date.now();
 		await page.goto("/forgot-password");
 		await page.getByTestId("forgot-password-email").fill(email);
 		await page.getByTestId("forgot-password-submit").click();
-		await expect(page.getByTestId("forgot-password-success-message")).toHaveText(
+		await expect(
+			page.getByTestId("forgot-password-success-message"),
+		).toHaveText(
 			"If this account exists and has a verified email, a reset link has been sent. If you do not receive one, verify your email or contact support.",
 		);
 
@@ -163,19 +178,6 @@ function requiredSecretEnv(name: string) {
 	return value;
 }
 
-function envValue(name: string) {
-	return process.env[name]?.trim() || undefined;
-}
-
-function secretEnvValue(name: string) {
-	const value = process.env[name];
-	return value && value.length > 0 ? value : undefined;
-}
-
-function smokePassword(prefix: string) {
-	return `${prefix}${randomBytes(18).toString("base64url")}aA1!`;
-}
-
 function plusAddress(mailbox: string, tag: string) {
 	if (!/^[^\s@,\x00-\x1F\x7F]+@[^\s@,/\x00-\x1F\x7F]+$/.test(mailbox)) {
 		throw new Error("SMOKE_TEST_MAILBOX must be a single email address.");
@@ -197,14 +199,18 @@ function plusAddress(mailbox: string, tag: string) {
 	return `${localPart}${separator}${normalizedTag}@${domain}`;
 }
 
-async function registerVerifiedStudent(page: Page, email: string) {
+async function registerVerifiedStudent(
+	page: Page,
+	email: string,
+	password: string,
+) {
 	const registrationRequestedAt = Date.now();
 
 	await page.goto("/register");
 	await page.getByTestId("register-first-name").fill("Jordan");
 	await page.getByTestId("register-last-name").fill("Adebayo");
 	await page.getByTestId("register-email").fill(email);
-	await page.getByTestId("register-password").fill(studentPassword);
+	await page.getByTestId("register-password").fill(password);
 	await page.getByTestId("register-submit").click();
 
 	await expect(page).toHaveURL(/\/login\?registration=verification_sent$/);
@@ -349,9 +355,9 @@ async function publishCaseWithAttachment(page: Page, caseTitle: string) {
 	}
 
 	await page.getByTestId("teacher-case-section-review").click();
-	await expect(page.getByTestId("teacher-case-publish-readiness")).toContainText(
-		"Ready to publish",
-	);
+	await expect(
+		page.getByTestId("teacher-case-publish-readiness"),
+	).toContainText("Ready to publish");
 	await expect(page.getByTestId("teacher-case-header-publish")).toBeEnabled();
 
 	const [publishResponse] = await Promise.all([
@@ -404,16 +410,15 @@ async function completeStudentCase(page: Page) {
 	await page.getByTestId("student-case-submit-feedback").click();
 	await expect(page.getByTestId("student-case-certificate-step")).toBeVisible();
 	await expect(page.getByTestId("student-certificate-preview")).toBeVisible();
-	await expect(page.getByTestId("student-case-certificate-download")).toHaveAttribute(
-		"href",
-		/\/student\/certificates\/cert_.*\/download/,
-	);
+	await expect(
+		page.getByTestId("student-case-certificate-download"),
+	).toHaveAttribute("href", /\/student\/certificates\/cert_.*\/download/);
 }
 
 async function waitForEmailLink(input: {
-		email: string;
-		kind: EmailLinkKind;
-		sentAfterMs: number;
+	email: string;
+	kind: EmailLinkKind;
+	sentAfterMs: number;
 }) {
 	let resolvedLink = "";
 
