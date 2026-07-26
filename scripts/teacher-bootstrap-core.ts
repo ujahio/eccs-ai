@@ -1,14 +1,14 @@
-import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
 	AdminAddUserToGroupCommand,
 	AdminCreateUserCommand,
+	AdminDeleteUserCommand,
 	AdminEnableUserCommand,
 	AdminGetUserCommand,
 	AdminListGroupsForUserCommand,
 	AdminSetUserPasswordCommand,
 	AdminUpdateUserAttributesCommand,
 	CognitoIdentityProviderClient,
+	paginateListUsers,
 	paginateListUsersInGroup,
 	type AdminGetUserCommandOutput,
 	type AttributeType,
@@ -16,6 +16,7 @@ import {
 } from "@aws-sdk/client-cognito-identity-provider";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
+	DeleteCommand,
 	DynamoDBDocumentClient,
 	GetCommand,
 	paginateQuery,
@@ -51,14 +52,16 @@ export type TeacherProfileRecord = {
 	sessionInvalidationExemptToken?: string;
 };
 
-type ParsedArgs = {
+export type BootstrapTeacherOptions = {
 	email: string;
 	firstName: string;
 	lastName: string;
 	apply: boolean;
+	replaceExistingTestTeacher: boolean;
 	resetTemporaryPassword: boolean;
 	passwordEnv: string;
-	help: boolean;
+	permanentPasswordEnv: string | null;
+	testTeacherMailboxEnv: string;
 };
 
 export type CognitoUserState = {
@@ -84,19 +87,48 @@ type BootstrapContext = {
 	dynamo: DynamoDBDocumentClient;
 };
 
+type BootstrapState = {
+	existingUser: CognitoUserState | null;
+	existingProfilesForEmail: TeacherProfileRecord[];
+	duplicateProfilesForEmail: TeacherProfileRecord[];
+	existingProfile: TeacherProfileRecord | null;
+	teacherProfiles: TeacherProfileRecord[];
+	teacherUsers: CognitoUserState[];
+	mismatchedEmailProfiles: TeacherProfileRecord[];
+};
+
+type TestTeacherReplacementTargets = {
+	cognitoUsers: CognitoUserState[];
+	profiles: TeacherProfileRecord[];
+};
+
 const TEACHER_GROUP = "teacher";
 const STUDENT_GROUP = "student";
-const DEFAULT_PASSWORD_ENV = "TEACHER_TEMP_PASSWORD";
+export const DEFAULT_TEACHER_TEMP_PASSWORD_ENV = "TEACHER_TEMP_PASSWORD";
+export const DEFAULT_TEACHER_PASSWORD_ENV = "TEACHER_PASSWORD";
+export const DEFAULT_TEST_TEACHER_MAILBOX_ENV = "SMOKE_TEST_MAILBOX";
 const FIRST_LOGIN_PASSWORD_CHANGE_STATUS = "FORCE_CHANGE_PASSWORD";
 
-export async function main(argv = process.argv.slice(2)) {
-	const args = parseArgs(argv);
-
-	if (args.help) {
-		printHelp();
-		process.exit(0);
-	}
-
+/**
+ * Shared teacher bootstrap behavior overview:
+ *
+ * The caller always gets a printed plan first. Without apply, this exits after
+ * that dry run. With apply, any planned smoke-teacher cleanup runs before the
+ * normal bootstrap flow creates or reconciles the teacher identity.
+ *
+ * replaceExistingTestTeacher is intentionally narrow. It only works when the
+ * desired teacher email and all deleted teacher identities are generated from
+ * the controlled smoke mailbox. It refuses to proceed if the stage contains a
+ * non-smoke teacher identity. In dry-run mode, the cleanup is simulated so the
+ * printed plan shows the post-replacement create/reconcile actions.
+ *
+ * resetTemporaryPassword only affects an existing Cognito user that remains
+ * after optional smoke-teacher replacement. Newly created users receive their
+ * temporary password through AdminCreateUser. permanentPasswordEnv applies the
+ * real password after the UserProfileTable record is upserted, leaving the
+ * Cognito account ready for direct login instead of first-login password change.
+ */
+export async function bootstrapTeacher(args: BootstrapTeacherOptions) {
 	const desired = {
 		emailNormalized: normalizeEmail(args.email),
 		firstName: args.firstName.trim(),
@@ -109,25 +141,53 @@ export async function main(argv = process.argv.slice(2)) {
 	validateRequired("last-name", desired.lastName);
 
 	const context = createBootstrapContext();
-
-	const existingUser = await getCognitoUser(context, desired.emailNormalized);
-	const existingProfilesForEmail = await getProfilesByEmail(
-		context,
-		desired.emailNormalized,
-	);
-	const duplicateProfilesForEmail = existingProfilesForEmail.filter(
-		(profile) => profile.emailNormalized === desired.emailNormalized,
-	);
-	const existingProfile = existingUser?.sub
-		? await getProfileById(context, existingUser.sub)
+	const testTeacherMailbox = args.replaceExistingTestTeacher
+		? readTestTeacherMailbox(args.testTeacherMailboxEnv)
 		: null;
-	const teacherProfiles = await getTeacherProfiles(context);
-	const teacherUsers = await listTeacherUsers(context);
-	const mismatchedEmailProfiles = existingUser
-		? duplicateProfilesForEmail.filter(
-				(profile) => profile.profileId !== existingUser.sub,
-			)
+
+	let state = await loadBootstrapState(context, desired.emailNormalized);
+	const testTeacherUsers = testTeacherMailbox
+		? await listTestTeacherUsers(context, testTeacherMailbox)
 		: [];
+	// Replacement is evaluated before the single-teacher guard so old generated
+	// smoke teachers do not block the new PR-specific smoke teacher.
+	const replacementTargets = args.replaceExistingTestTeacher
+		? getTestTeacherReplacementTargets({
+				existingUser: state.existingUser,
+				testTeacherMailbox,
+				testTeacherUsers,
+				teacherProfiles: state.teacherProfiles,
+				teacherUsers: state.teacherUsers,
+			})
+		: emptyTestTeacherReplacementTargets();
+	const replacementBlocker = args.replaceExistingTestTeacher
+			? getTestTeacherReplacementBlocker({
+					desiredEmailNormalized: desired.emailNormalized,
+					testTeacherMailbox,
+					testTeacherUsers,
+					teacherProfiles: state.teacherProfiles,
+					teacherUsers: state.teacherUsers,
+				})
+		: null;
+
+	if (replacementBlocker) {
+		fail(replacementBlocker);
+	}
+
+	if (hasTestTeacherReplacementTargets(replacementTargets)) {
+		// Dry-run mode uses this simulated state; --apply repeats the same
+		// replacement against Cognito/DynamoDB before continuing.
+		state = removeTestTeacherReplacementTargets(state, replacementTargets);
+	}
+
+	let {
+		existingUser,
+		duplicateProfilesForEmail,
+		existingProfile,
+		teacherProfiles,
+		teacherUsers,
+		mismatchedEmailProfiles,
+	} = state;
 
 	const singleTeacherBlocker = getSingleTeacherIdentityBlocker({
 		desiredEmailNormalized: desired.emailNormalized,
@@ -178,13 +238,17 @@ export async function main(argv = process.argv.slice(2)) {
 		fail(existingTeacherBlocker);
 	}
 
-	const plan = buildPlan({
-		desired,
-		existingUser,
-		existingProfile,
-		resetTemporaryPassword: args.resetTemporaryPassword,
-		passwordEnv: args.passwordEnv,
-	});
+	const plan = [
+		...buildTestTeacherReplacementPlan(replacementTargets),
+		...buildPlan({
+			desired,
+			existingUser,
+			existingProfile,
+			resetTemporaryPassword: args.resetTemporaryPassword,
+			passwordEnv: args.passwordEnv,
+			permanentPasswordEnv: args.permanentPasswordEnv,
+		}),
+	];
 
 	printPlan(plan, args.apply);
 
@@ -195,12 +259,30 @@ export async function main(argv = process.argv.slice(2)) {
 		process.exit(0);
 	}
 
+	if (hasTestTeacherReplacementTargets(replacementTargets)) {
+		// Real deletion happens only after the user reviewed the plan and opted in
+		// with --apply.
+		await deleteTestTeacherReplacementTargets(context, replacementTargets);
+		state = await loadBootstrapState(context, desired.emailNormalized);
+		({
+			existingUser,
+			duplicateProfilesForEmail,
+			existingProfile,
+			teacherProfiles,
+			teacherUsers,
+			mismatchedEmailProfiles,
+		} = state);
+	}
+
 	const needsTemporaryPassword = !existingUser || args.resetTemporaryPassword;
 	const existingFirstLoginChallenge = existingUser
 		? isFirstLoginPasswordChangeRequired(existingUser)
 		: false;
 	const temporaryPassword = needsTemporaryPassword
 		? readTemporaryPassword(args.passwordEnv)
+		: null;
+	const permanentPassword = args.permanentPasswordEnv
+		? readPermanentPassword(args.permanentPasswordEnv)
 		: null;
 
 	let finalUser = existingUser;
@@ -241,7 +323,7 @@ export async function main(argv = process.argv.slice(2)) {
 		console.log(`Reconciled Cognito attributes for ${finalUser.username}.`);
 	}
 
-	if (args.resetTemporaryPassword && temporaryPassword) {
+	if (existingUser && args.resetTemporaryPassword && temporaryPassword) {
 		await context.cognito.send(
 			new AdminSetUserPasswordCommand({
 				UserPoolId: context.userPoolId,
@@ -266,14 +348,14 @@ export async function main(argv = process.argv.slice(2)) {
 		console.log(`Added ${finalUser.username} to the ${TEACHER_GROUP} group.`);
 	}
 
-	const refreshedUser = await requireCognitoUser(
+	const profileUser = await requireCognitoUser(
 		context,
 		desired.emailNormalized,
 	);
 	const nextProfile = buildProfileRecord({
 		desired,
 		existingProfile,
-		cognitoSub: refreshedUser.sub,
+		cognitoSub: profileUser.sub,
 	});
 
 	await context.dynamo.send(
@@ -283,19 +365,388 @@ export async function main(argv = process.argv.slice(2)) {
 		}),
 	);
 
+	if (permanentPassword) {
+		await context.cognito.send(
+			new AdminSetUserPasswordCommand({
+				UserPoolId: context.userPoolId,
+				Username: profileUser.username,
+				Password: permanentPassword,
+				Permanent: true,
+			}),
+		);
+		console.log(
+			`Set the permanent password for ${profileUser.username}; Cognito first-login password change is not required.`,
+		);
+	}
+
+	const refreshedUser = await requireCognitoUser(
+		context,
+		desired.emailNormalized,
+	);
+
+	if (permanentPassword && isFirstLoginPasswordChangeRequired(refreshedUser)) {
+		fail(
+			`Permanent password was set for ${refreshedUser.username}, but Cognito still reports ${FIRST_LOGIN_PASSWORD_CHANGE_STATUS}.`,
+		);
+	}
+
+	const passwordEvidence = passwordEvidenceLines({
+		needsTemporaryPassword,
+		temporaryPasswordEnv: args.passwordEnv,
+		permanentPasswordEnv: args.permanentPasswordEnv,
+		existingFirstLoginChallenge,
+	});
+	const signInGuidance = permanentPassword
+		? "Teacher should sign in on /login with the permanent password."
+		: "Teacher should sign in on /login and complete the Cognito first-login password change before accessing /teacher.";
+
 	console.log(
 		[
 			"",
 			`Upserted teacher profile ${nextProfile.profileId} in ${context.userProfileTableName}.`,
 			`Cognito status: ${refreshedUser.status ?? "unknown"}; enabled: ${String(refreshedUser.enabled)}; groups: ${refreshedUser.groups.join(", ") || "(none)"}`,
-			needsTemporaryPassword
-				? `Temporary password was read from ${args.passwordEnv} and was not echoed. Clear that environment variable from your shell now.`
-				: existingFirstLoginChallenge
-					? "Existing Cognito first-login password-change challenge was left in place."
-					: "Existing password was left unchanged.",
-			"Teacher should sign in on /login and complete the Cognito first-login password change before accessing /teacher.",
+			...passwordEvidence,
+			signInGuidance,
 		].join("\n"),
 	);
+}
+
+async function loadBootstrapState(
+	context: BootstrapContext,
+	desiredEmailNormalized: string,
+): Promise<BootstrapState> {
+	const existingUser = await getCognitoUser(context, desiredEmailNormalized);
+	const existingProfilesForEmail = await getProfilesByEmail(
+		context,
+		desiredEmailNormalized,
+	);
+	const duplicateProfilesForEmail = existingProfilesForEmail.filter(
+		(profile) => profile.emailNormalized === desiredEmailNormalized,
+	);
+	const existingProfile = existingUser?.sub
+		? await getProfileById(context, existingUser.sub)
+		: null;
+	const teacherProfiles = await getTeacherProfiles(context);
+	const teacherUsers = await listTeacherUsers(context);
+	const mismatchedEmailProfiles = existingUser
+		? duplicateProfilesForEmail.filter(
+				(profile) => profile.profileId !== existingUser.sub,
+			)
+		: [];
+
+	return {
+		existingUser,
+		existingProfilesForEmail,
+		duplicateProfilesForEmail,
+		existingProfile,
+		teacherProfiles,
+		teacherUsers,
+		mismatchedEmailProfiles,
+	};
+}
+
+type ParsedTestTeacherMailbox = {
+	domain: string;
+	localPrefix: string;
+};
+
+export function isTestTeacherEmail(email: string, mailbox: string) {
+	const parsedMailbox = parseTestTeacherMailbox(mailbox);
+
+	if (!parsedMailbox) {
+		return false;
+	}
+
+	const [localPart, domain, ...extraParts] = normalizeEmail(email).split("@");
+	const prNumber = localPart?.slice(parsedMailbox.localPrefix.length) ?? "";
+
+	return (
+		Boolean(localPart) &&
+		Boolean(domain) &&
+		extraParts.length === 0 &&
+		domain === parsedMailbox.domain &&
+		localPart.startsWith(parsedMailbox.localPrefix) &&
+		/^[0-9]+$/.test(prNumber)
+	);
+}
+
+export function getTestTeacherReplacementBlocker(args: {
+	desiredEmailNormalized: string;
+	testTeacherMailbox: string | null;
+	testTeacherUsers: CognitoUserState[];
+	teacherProfiles: TeacherProfileRecord[];
+	teacherUsers: CognitoUserState[];
+}) {
+	if (!args.testTeacherMailbox || !parseTestTeacherMailbox(args.testTeacherMailbox)) {
+		return `Refusing to replace an existing test teacher because ${DEFAULT_TEST_TEACHER_MAILBOX_ENV} is missing or invalid.`;
+	}
+
+	if (!isTestTeacherEmail(args.desiredEmailNormalized, args.testTeacherMailbox)) {
+		return [
+			`Refusing to replace an existing test teacher because ${args.desiredEmailNormalized} is not a generated smoke teacher email.`,
+			`Only teacher emails derived from ${DEFAULT_TEST_TEACHER_MAILBOX_ENV} can use --replace-existing-test-teacher.`,
+		].join("\n");
+	}
+
+	const nonTestTeacherEvidence = [
+		...args.teacherProfiles
+			.filter(
+				(profile) =>
+					!isReplaceableTestTeacherProfile(profile, args.testTeacherMailbox!),
+			)
+			.map(formatTeacherProfileEvidence),
+		...args.teacherUsers
+			.filter(
+				(user) => !isReplaceableTestTeacherUser(user, args.testTeacherMailbox!),
+			)
+			.map(formatTeacherUserEvidence),
+	];
+	const testTeacherStudentEvidence = args.testTeacherUsers
+		.filter(
+			(user) =>
+				user.groups.includes(STUDENT_GROUP) &&
+				isTestTeacherEmail(getUserEmailNormalized(user), args.testTeacherMailbox!),
+		)
+		.map(formatTeacherUserEvidence);
+
+	if (nonTestTeacherEvidence.length > 0) {
+		return [
+			"Refusing to replace an existing test teacher because this stage has a non-test teacher identity.",
+			"Non-test teacher identity evidence:",
+			...nonTestTeacherEvidence,
+			"Delete only generated smoke teacher accounts with this bootstrap option; remediate real teacher identities manually.",
+		].join("\n");
+	}
+
+	if (testTeacherStudentEvidence.length > 0) {
+		return [
+			"Refusing to replace an existing test teacher because a generated smoke teacher Cognito user is also in the student group.",
+			"Unexpected Cognito group evidence:",
+			...testTeacherStudentEvidence,
+			"Remove the student group membership manually before using this bootstrap option.",
+		].join("\n");
+	}
+
+	return null;
+}
+
+export function getTestTeacherReplacementTargets(args: {
+	existingUser: CognitoUserState | null;
+	testTeacherMailbox: string | null;
+	testTeacherUsers: CognitoUserState[];
+	teacherProfiles: TeacherProfileRecord[];
+	teacherUsers: CognitoUserState[];
+}): TestTeacherReplacementTargets {
+	if (!args.testTeacherMailbox || !parseTestTeacherMailbox(args.testTeacherMailbox)) {
+		return emptyTestTeacherReplacementTargets();
+	}
+
+	const cognitoUsers = uniqueCognitoUsers([
+		...args.testTeacherUsers.filter((user) =>
+			isReplaceableTestTeacherCognitoUser(user, args.testTeacherMailbox!),
+		),
+		...args.teacherUsers.filter((user) =>
+			isReplaceableTestTeacherUser(user, args.testTeacherMailbox!),
+		),
+		...(args.existingUser &&
+		isReplaceableTestTeacherCognitoUser(
+			args.existingUser,
+			args.testTeacherMailbox,
+		)
+			? [args.existingUser]
+			: []),
+	]);
+	const profiles = uniqueTeacherProfiles(
+		args.teacherProfiles.filter((profile) =>
+			isReplaceableTestTeacherProfile(profile, args.testTeacherMailbox!),
+		),
+	);
+
+	return { cognitoUsers, profiles };
+}
+
+function emptyTestTeacherReplacementTargets(): TestTeacherReplacementTargets {
+	return { cognitoUsers: [], profiles: [] };
+}
+
+function hasTestTeacherReplacementTargets(
+	targets: TestTeacherReplacementTargets,
+) {
+	return targets.cognitoUsers.length > 0 || targets.profiles.length > 0;
+}
+
+function buildTestTeacherReplacementPlan(
+	targets: TestTeacherReplacementTargets,
+) {
+	const actions: string[] = [];
+
+	for (const user of targets.cognitoUsers) {
+		actions.push(
+			`Delete existing test teacher Cognito user ${user.username} (${getUserEmailNormalized(user)}).`,
+		);
+	}
+
+	for (const profile of targets.profiles) {
+		actions.push(
+			`Delete existing test teacher UserProfileTable record ${profile.profileId} (${profile.emailNormalized}).`,
+		);
+	}
+
+	return actions;
+}
+
+function removeTestTeacherReplacementTargets(
+	state: BootstrapState,
+	targets: TestTeacherReplacementTargets,
+): BootstrapState {
+	const deletedUserKeys = new Set(
+		targets.cognitoUsers.flatMap((user) => [user.username, user.sub]),
+	);
+	const deletedProfileIds = new Set(
+		targets.profiles.map((profile) => profile.profileId),
+	);
+	const existingUser =
+		state.existingUser &&
+		(deletedUserKeys.has(state.existingUser.username) ||
+			deletedUserKeys.has(state.existingUser.sub))
+			? null
+			: state.existingUser;
+	const existingProfilesForEmail = state.existingProfilesForEmail.filter(
+		(profile) => !deletedProfileIds.has(profile.profileId),
+	);
+	const existingProfile =
+		state.existingProfile &&
+		deletedProfileIds.has(state.existingProfile.profileId)
+			? null
+			: state.existingProfile;
+	const teacherProfiles = state.teacherProfiles.filter(
+		(profile) => !deletedProfileIds.has(profile.profileId),
+	);
+	const teacherUsers = state.teacherUsers.filter(
+		(user) =>
+			!deletedUserKeys.has(user.username) && !deletedUserKeys.has(user.sub),
+	);
+	const duplicateProfilesForEmail = existingProfilesForEmail;
+	const mismatchedEmailProfiles = existingUser
+		? duplicateProfilesForEmail.filter(
+				(profile) => profile.profileId !== existingUser.sub,
+			)
+		: [];
+
+	return {
+		existingUser,
+		existingProfilesForEmail,
+		duplicateProfilesForEmail,
+		existingProfile,
+		teacherProfiles,
+		teacherUsers,
+		mismatchedEmailProfiles,
+	};
+}
+
+async function deleteTestTeacherReplacementTargets(
+	context: BootstrapContext,
+	targets: TestTeacherReplacementTargets,
+) {
+	for (const user of targets.cognitoUsers) {
+		await deleteCognitoUser(context, user);
+	}
+
+	for (const profile of targets.profiles) {
+		await context.dynamo.send(
+			new DeleteCommand({
+				TableName: context.userProfileTableName,
+				Key: { profileId: profile.profileId },
+			}),
+		);
+		console.log(
+			`Deleted existing test teacher UserProfileTable record ${profile.profileId}.`,
+		);
+	}
+}
+
+async function deleteCognitoUser(
+	context: BootstrapContext,
+	user: CognitoUserState,
+) {
+	try {
+		await context.cognito.send(
+			new AdminDeleteUserCommand({
+				UserPoolId: context.userPoolId,
+				Username: user.username,
+			}),
+		);
+		console.log(`Deleted existing test teacher Cognito user ${user.username}.`);
+	} catch (error) {
+		if (errorName(error) !== "UserNotFoundException") {
+			throw error;
+		}
+
+		console.log(
+			`Cognito user ${user.username} was already gone; skipping deletion.`,
+		);
+	}
+}
+
+function isReplaceableTestTeacherProfile(
+	profile: TeacherProfileRecord,
+	mailbox: string,
+) {
+	return (
+		profile.role === TEACHER_GROUP &&
+		isTestTeacherEmail(profile.emailNormalized, mailbox)
+	);
+}
+
+function isReplaceableTestTeacherUser(user: CognitoUserState, mailbox: string) {
+	return (
+		user.groups.includes(TEACHER_GROUP) &&
+		isReplaceableTestTeacherCognitoUser(user, mailbox)
+	);
+}
+
+function isReplaceableTestTeacherCognitoUser(
+	user: CognitoUserState,
+	mailbox: string,
+) {
+	return (
+		!user.groups.includes(STUDENT_GROUP) &&
+		isTestTeacherEmail(getUserEmailNormalized(user), mailbox)
+	);
+}
+
+function uniqueCognitoUsers(users: CognitoUserState[]) {
+	const seen = new Set<string>();
+	const uniqueUsers: CognitoUserState[] = [];
+
+	for (const user of users) {
+		const key = user.sub || user.username;
+
+		if (seen.has(key)) {
+			continue;
+		}
+
+		seen.add(key);
+		uniqueUsers.push(user);
+	}
+
+	return uniqueUsers;
+}
+
+function uniqueTeacherProfiles(profiles: TeacherProfileRecord[]) {
+	const seen = new Set<string>();
+	const uniqueProfiles: TeacherProfileRecord[] = [];
+
+	for (const profile of profiles) {
+		if (seen.has(profile.profileId)) {
+			continue;
+		}
+
+		seen.add(profile.profileId);
+		uniqueProfiles.push(profile);
+	}
+
+	return uniqueProfiles;
 }
 
 export function getSingleTeacherIdentityBlocker(args: {
@@ -420,6 +871,7 @@ function buildPlan(args: {
 	existingProfile: TeacherProfileRecord | null;
 	resetTemporaryPassword: boolean;
 	passwordEnv: string;
+	permanentPasswordEnv: string | null;
 }) {
 	const { desired, existingUser, existingProfile } = args;
 	const actions: string[] = [];
@@ -454,11 +906,20 @@ function buildPlan(args: {
 			actions.push(
 				`Reset a Cognito-compliant temporary password from $${args.passwordEnv} and put the user back into Cognito's first-login password-change flow.`,
 			);
-		} else if (isFirstLoginPasswordChangeRequired(existingUser)) {
+		} else if (
+			isFirstLoginPasswordChangeRequired(existingUser) &&
+			!args.permanentPasswordEnv
+		) {
 			actions.push("Leave the existing temporary password challenge in place.");
-		} else {
+		} else if (!args.permanentPasswordEnv) {
 			actions.push("Leave the existing password unchanged.");
 		}
+	}
+
+	if (args.permanentPasswordEnv) {
+		actions.push(
+			`Set a Cognito-compliant permanent password from $${args.permanentPasswordEnv} so the teacher can sign in without the first-login password-change flow.`,
+		);
 	}
 
 	if (!existingUser?.groups.includes(TEACHER_GROUP)) {
@@ -490,6 +951,37 @@ function printPlan(actions: string[], apply: boolean) {
 	for (const [index, action] of actions.entries()) {
 		console.log(`${index + 1}. ${action}`);
 	}
+}
+
+function passwordEvidenceLines(args: {
+	needsTemporaryPassword: boolean;
+	temporaryPasswordEnv: string;
+	permanentPasswordEnv: string | null;
+	existingFirstLoginChallenge: boolean;
+}) {
+	const lines: string[] = [];
+
+	if (args.needsTemporaryPassword) {
+		lines.push(
+			`Temporary password was read from ${args.temporaryPasswordEnv} and was not echoed. Clear that environment variable from your shell now.`,
+		);
+	}
+
+	if (args.permanentPasswordEnv) {
+		lines.push(
+			`Permanent password was read from ${args.permanentPasswordEnv} and was not echoed. Clear that environment variable from your shell now.`,
+		);
+	}
+
+	if (lines.length > 0) {
+		return lines;
+	}
+
+	return [
+		args.existingFirstLoginChallenge
+			? "Existing Cognito first-login password-change challenge was left in place."
+			: "Existing password was left unchanged.",
+	];
 }
 
 function buildProfileRecord(args: {
@@ -625,12 +1117,16 @@ function mapCognitoUser(user: AdminGetUserCommandOutput, groups: string[]) {
 }
 
 function mapCognitoGroupUser(user: UserType): CognitoUserState {
+	return mapCognitoListUser(user, [TEACHER_GROUP]);
+}
+
+function mapCognitoListUser(user: UserType, groups: string[]): CognitoUserState {
 	const attributes = listToRecord(user.Attributes ?? []);
 	const sub = attributes.sub;
 
 	if (!sub) {
 		throw new Error(
-			"Cognito teacher group user is missing the required sub attribute.",
+			"Cognito user is missing the required sub attribute.",
 		);
 	}
 
@@ -640,7 +1136,7 @@ function mapCognitoGroupUser(user: UserType): CognitoUserState {
 		enabled: user.Enabled ?? true,
 		status: user.UserStatus,
 		attributes,
-		groups: [TEACHER_GROUP],
+		groups,
 	};
 }
 
@@ -726,6 +1222,34 @@ async function listTeacherUsers(context: BootstrapContext) {
 	return users;
 }
 
+async function listTestTeacherUsers(context: BootstrapContext, mailbox: string) {
+	const users: CognitoUserState[] = [];
+
+	for await (const page of paginateListUsers(
+		{ client: context.cognito },
+		{
+			UserPoolId: context.userPoolId,
+		},
+	)) {
+		for (const user of page.Users ?? []) {
+			const attributes = listToRecord(user.Attributes ?? []);
+			const emailNormalized = normalizeEmail(
+				attributes.email ?? user.Username ?? "",
+			);
+
+			if (!isTestTeacherEmail(emailNormalized, mailbox)) {
+				continue;
+			}
+
+			const username = user.Username ?? emailNormalized;
+			const groups = await listUserGroups(context, username);
+			users.push(mapCognitoListUser(user, groups));
+		}
+	}
+
+	return users;
+}
+
 function listToRecord(attributes: AttributeType[]) {
 	return Object.fromEntries(
 		attributes
@@ -750,16 +1274,64 @@ function normalizeEmail(email: string) {
 	return email.trim().toLowerCase();
 }
 
-function readTemporaryPassword(envName: string) {
+function readTestTeacherMailbox(envName: string) {
 	const value = process.env[envName];
 
 	if (!value) {
 		fail(
-			`Missing temporary password. Export ${envName} in your shell before running with --apply.`,
+			`Missing smoke test mailbox. Export ${envName} before running with --replace-existing-test-teacher.`,
 		);
 	}
 
-	const validationError = getTemporaryPasswordValidationError(value, envName);
+	const mailbox = normalizeEmail(value.replace(/^mailto:/i, ""));
+
+	if (!parseTestTeacherMailbox(mailbox)) {
+		fail(
+			`${envName} must be a single smoke test mailbox email address, for example smoke-tests@eccs-online.com.`,
+		);
+	}
+
+	return mailbox;
+}
+
+function parseTestTeacherMailbox(
+	mailbox: string,
+): ParsedTestTeacherMailbox | null {
+	const normalized = normalizeEmail(mailbox.replace(/^mailto:/i, ""));
+
+	if (!/^[^\s@,\x00-\x1F\x7F]+@[^\s@,/\x00-\x1F\x7F]+$/.test(normalized)) {
+		return null;
+	}
+
+	const atIndex = normalized.indexOf("@");
+	const localPart = normalized.slice(0, atIndex);
+	const domain = normalized.slice(atIndex + 1);
+	const separator = localPart.includes("+") ? "-" : "+";
+
+	return {
+		domain,
+		localPrefix: `${localPart}${separator}teacher-production-pr-`,
+	};
+}
+
+function readTemporaryPassword(envName: string) {
+	return readPassword(envName, "temporary");
+}
+
+function readPermanentPassword(envName: string) {
+	return readPassword(envName, "permanent");
+}
+
+function readPassword(envName: string, label: "temporary" | "permanent") {
+	const value = process.env[envName];
+
+	if (!value) {
+		fail(
+			`Missing ${label} password. Export ${envName} in your shell before running with --apply.`,
+		);
+	}
+
+	const validationError = getTeacherPasswordValidationError(value, envName);
 
 	if (validationError) {
 		fail(validationError);
@@ -770,8 +1342,19 @@ function readTemporaryPassword(envName: string) {
 
 export function getTemporaryPasswordValidationError(
 	value: string,
-	envName = DEFAULT_PASSWORD_ENV,
+	envName = DEFAULT_TEACHER_TEMP_PASSWORD_ENV,
 ) {
+	return getTeacherPasswordValidationError(value, envName);
+}
+
+export function getPermanentPasswordValidationError(
+	value: string,
+	envName = DEFAULT_TEACHER_PASSWORD_ENV,
+) {
+	return getTeacherPasswordValidationError(value, envName);
+}
+
+export function getTeacherPasswordValidationError(value: string, envName: string) {
 	const missingRequirements = failedPasswordRequirements(value);
 
 	if (missingRequirements.length > 0) {
@@ -787,71 +1370,6 @@ function validateRequired(label: string, value: string) {
 	}
 }
 
-function parseArgs(argv: string[]): ParsedArgs {
-	const parsed: ParsedArgs = {
-		email: "",
-		firstName: "",
-		lastName: "",
-		apply: false,
-		resetTemporaryPassword: false,
-		passwordEnv: DEFAULT_PASSWORD_ENV,
-		help: false,
-	};
-
-	for (let index = 0; index < argv.length; index += 1) {
-		const arg = argv[index];
-
-		switch (arg) {
-			case "--email":
-				parsed.email = argv[++index] ?? "";
-				break;
-			case "--first-name":
-				parsed.firstName = argv[++index] ?? "";
-				break;
-			case "--last-name":
-				parsed.lastName = argv[++index] ?? "";
-				break;
-			case "--apply":
-				parsed.apply = true;
-				break;
-			case "--reset-temporary-password":
-				parsed.resetTemporaryPassword = true;
-				break;
-			case "--password-env":
-				parsed.passwordEnv = argv[++index] ?? DEFAULT_PASSWORD_ENV;
-				break;
-			case "--help":
-			case "-h":
-				parsed.help = true;
-				break;
-			default:
-				fail(`Unknown argument: ${arg}`);
-		}
-	}
-
-	return parsed;
-}
-
-function printHelp() {
-	console.log(`One-time teacher bootstrap script
-
-Usage:
-  bunx sst shell --stage ailocal -- bun scripts/bootstrap-teacher.ts \\
-    --email teacher@example.com \\
-    --first-name Taylor \\
-    --last-name Smith
-
-Options:
-  --apply                     Execute Cognito and DynamoDB writes. Without this flag the script is a dry run.
-  --reset-temporary-password  For an existing teacher user, set a fresh temporary password and require first-login password change again.
-  --password-env NAME         Environment variable that holds the temporary password. Default: ${DEFAULT_PASSWORD_ENV}
-  --help, -h                  Show this help text.
-
-Temporary password pre-check:
-  The bootstrap script requires the same Cognito password policy as permanent account passwords because Cognito also applies the user-pool policy to admin-created temporary passwords.
-`);
-}
-
 function fail(message: string): never {
 	console.error(message);
 	process.exit(1);
@@ -859,14 +1377,4 @@ function fail(message: string): never {
 
 function errorName(error: unknown) {
 	return error instanceof Error ? error.name : undefined;
-}
-
-function isMainModule() {
-	return process.argv[1]
-		? fileURLToPath(import.meta.url) === resolve(process.argv[1])
-		: false;
-}
-
-if (isMainModule()) {
-	await main();
 }

@@ -14,7 +14,6 @@ type RealInfraSmokeConfig = {
 	appBaseUrl: string;
 	smokeMailbox: string;
 	teacherEmail: string;
-	teacherTemporaryPassword?: string;
 	teacherPassword: string;
 };
 
@@ -49,10 +48,9 @@ test.describe("Production smoke @production-smoke", () => {
 		const caseTitle = `Production Smoke Case ${uniqueRunId()}`;
 		const studentEmail = uniqueStudentEmail("case-completion");
 
-		await loginTeacher(
+		await loginConfirmedTeacher(
 			page,
 			smokeConfig.teacherEmail,
-			smokeConfig.teacherTemporaryPassword ?? smokeConfig.teacherPassword,
 			smokeConfig.teacherPassword,
 		);
 		await expect(page.getByTestId("teacher-dashboard-root")).toBeVisible();
@@ -139,12 +137,9 @@ function realInfraSmokeConfig(): RealInfraSmokeConfig {
 		appBaseUrl: requiredEnv("PLAYWRIGHT_BASE_URL"),
 		smokeMailbox: requiredEnv("SMOKE_TEST_MAILBOX"),
 		teacherEmail: requiredEnv("SMOKE_TEACHER_EMAIL"),
-		teacherTemporaryPassword:
-			envValue("SMOKE_TEACHER_TEMP_PASSWORD") ??
-			envValue("PRODUCTION_SMOKE_TEACHER_TEMP_PASSWORD"),
 		teacherPassword:
-			envValue("SMOKE_TEACHER_PASSWORD") ??
-			requiredEnv("PRODUCTION_SMOKE_TEACHER_PASSWORD"),
+			secretEnvValue("SMOKE_TEACHER_PASSWORD") ??
+			requiredSecretEnv("PRODUCTION_SMOKE_TEACHER_PASSWORD"),
 	};
 }
 
@@ -158,8 +153,23 @@ function requiredEnv(name: string) {
 	return value;
 }
 
+function requiredSecretEnv(name: string) {
+	const value = secretEnvValue(name);
+
+	if (!value) {
+		throw new Error(`${name} is required for production smoke tests.`);
+	}
+
+	return value;
+}
+
 function envValue(name: string) {
 	return process.env[name]?.trim() || undefined;
+}
+
+function secretEnvValue(name: string) {
+	const value = process.env[name];
+	return value && value.length > 0 ? value : undefined;
 }
 
 function smokePassword(prefix: string) {
@@ -226,10 +236,9 @@ async function login(
 	await expect(page).toHaveURL(expectedUrl);
 }
 
-async function loginTeacher(
+async function loginConfirmedTeacher(
 	page: Page,
 	email: string,
-	temporaryPassword: string,
 	password: string,
 ) {
 	await page.goto("/login");
@@ -238,35 +247,53 @@ async function loginTeacher(
 		"true",
 	);
 	await page.getByTestId("login-email").fill(email);
-	await page.getByTestId("login-password").fill(temporaryPassword);
+	await page.getByTestId("login-password").fill(password);
 	await page.getByTestId("login-submit").click();
 
-	if (
-		await page
-			.getByTestId("teacher-first-login-password-form")
-			.isVisible({ timeout: 5_000 })
-			.catch(() => false)
-	) {
-		await page.getByTestId("teacher-first-login-new-password").fill(password);
-		await page
-			.getByTestId("teacher-first-login-confirm-password")
-			.fill(password);
-		await page.getByTestId("teacher-first-login-password-submit").click();
-		await expect(page).toHaveURL(/\/teacher$/);
+	const outcome = await waitForConfirmedTeacherLoginOutcome(page);
+
+	if (outcome === "signed_in") {
 		return;
 	}
 
-	if (
-		await page
-			.getByTestId("login-error-message")
-			.isVisible({ timeout: 1_000 })
-			.catch(() => false)
-	) {
-		await login(page, email, password, /\/teacher$/);
-		return;
+	if (outcome === "first_login_required") {
+		throw new Error(
+			"Smoke teacher is still in Cognito's first-login password-change flow. Bootstrap must set the permanent teacher password before Playwright runs.",
+		);
 	}
 
-	await expect(page).toHaveURL(/\/teacher$/);
+	const loginErrorMessage = await page
+		.getByTestId("login-error-message")
+		.textContent()
+		.catch(() => "");
+
+	throw new Error(
+		`Smoke teacher direct sign-in failed at ${page.url()}${loginErrorMessage?.trim() ? `: ${loginErrorMessage.trim()}` : "."}`,
+	);
+}
+
+async function waitForConfirmedTeacherLoginOutcome(page: Page) {
+	const firstLoginForm = page.getByTestId("teacher-first-login-password-form");
+	const loginError = page.getByTestId("login-error-message");
+	const deadlineMs = Date.now() + 20_000;
+
+	while (Date.now() < deadlineMs) {
+		if (/\/teacher$/.test(page.url())) {
+			return "signed_in" as const;
+		}
+
+		if (await firstLoginForm.isVisible({ timeout: 100 }).catch(() => false)) {
+			return "first_login_required" as const;
+		}
+
+		if (await loginError.isVisible({ timeout: 100 }).catch(() => false)) {
+			return "login_error" as const;
+		}
+
+		await page.waitForTimeout(250);
+	}
+
+	return "timeout" as const;
 }
 
 async function publishCaseWithAttachment(page: Page, caseTitle: string) {
