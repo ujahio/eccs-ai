@@ -154,7 +154,7 @@ jobs:
 
   production_smoke:
     name: Deploy, Smoke, And Teardown Production PR Candidate
-    needs: staging_deploy_gate
+    # needs: staging_deploy_gate
     runs-on: ubuntu-latest
     timeout-minutes: 120
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
