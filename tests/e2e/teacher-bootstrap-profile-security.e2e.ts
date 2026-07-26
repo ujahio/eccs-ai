@@ -11,9 +11,9 @@ function uniqueEmail(prefix: string) {
 		.slice(2, 8)}@example.com`;
 }
 
-const temporaryPassword = "temporary1";
-const permanentPassword = "permanent1";
-const changedPassword = "newcase1";
+const temporaryPassword = "Temporary1!";
+const permanentPassword = "Permanent1!";
+const changedPassword = "Newcase1!";
 
 async function bootstrapTeacher(
 	request: APIRequestContext,
@@ -63,6 +63,13 @@ async function fetchEmailChangeVerificationUrl(
 	const body = await response.json();
 
 	return body.verificationUrl;
+}
+
+function sameOriginUrl(page: Page, value: string) {
+	const target = new URL(value);
+	const current = new URL(page.url());
+
+	return `${current.origin}${target.pathname}${target.search}`;
 }
 
 async function expectPasswordChangedEmail(
@@ -153,7 +160,7 @@ test.describe("Teacher bootstrap and profile security", () => {
 			request,
 			newEmail,
 		);
-		await page.goto(emailChangeUrl);
+		await page.goto(sameOriginUrl(page, emailChangeUrl));
 		await expect(page).toHaveURL(/\/teacher\/profile\?email=verified$/);
 		await expect(page.getByTestId("teacher-email-verified-message")).toHaveText(
 			"Your email address has been updated.",

@@ -14,9 +14,9 @@ function uniqueEmail(prefix: string) {
 const validRegistration = {
 	firstName: "Jordan",
 	lastName: "Adebayo",
-	password: "casework1",
+	password: "Casework1!",
 };
-const changedPassword = "newcase1";
+const changedPassword = "Newcase1!";
 const verificationEmailSentMessage =
 	"We just sent a verification link to your inbox. Click the link in that email to confirm your account.";
 
@@ -50,6 +50,13 @@ async function fetchEmailChangeVerificationUrl(
 	const body = await response.json();
 
 	return body.verificationUrl;
+}
+
+function sameOriginUrl(page: Page, value: string) {
+	const target = new URL(value);
+	const current = new URL(page.url());
+
+	return `${current.origin}${target.pathname}${target.search}`;
 }
 
 async function expectPasswordChangedEmail(
@@ -189,7 +196,7 @@ test.describe("Student profile security", () => {
 			request,
 			newEmail,
 		);
-		await page.goto(emailChangeUrl);
+		await page.goto(sameOriginUrl(page, emailChangeUrl));
 		await expect(page).toHaveURL(/\/student\/profile\?email=verified$/);
 		await expect(page.getByTestId("student-email-verified-message")).toHaveText(
 			"Your email address has been updated.",

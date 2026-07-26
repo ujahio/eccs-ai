@@ -8,7 +8,7 @@ import {
 import { deadlineAtFromDubaiDate } from "@/features/teacher/case-authoring/schema";
 
 const dayInMilliseconds = 24 * 60 * 60 * 1000;
-const password = "casework1";
+const password = "Casework1!";
 
 function uniqueEmail(prefix: string) {
 	return `e2e-${prefix}-${Date.now()}-${Math.random()

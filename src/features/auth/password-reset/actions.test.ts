@@ -48,8 +48,8 @@ const parsedRequestInput = {
 const parsedConfirmInput = {
 	email: "jordan@example.com",
 	code: "123456",
-	password: "newcase1",
-	confirmPassword: "newcase1"
+	password: "Newcase1!",
+	confirmPassword: "Newcase1!"
 };
 
 const previousRequestState: PasswordResetRequestFormState = {

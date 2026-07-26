@@ -66,7 +66,7 @@ describe("CognitoAuthAdapter password reset", () => {
 
 		const result = await adapter.authenticateUser({
 			emailNormalized: "teacher@example.com",
-			password: "temporary1"
+			password: "Temporary1!"
 		});
 
 		expect(client.sent[0]).toBeInstanceOf(InitiateAuthCommand);
@@ -75,7 +75,7 @@ describe("CognitoAuthAdapter password reset", () => {
 			AuthFlow: "USER_PASSWORD_AUTH",
 			AuthParameters: {
 				USERNAME: "teacher@example.com",
-				PASSWORD: "temporary1"
+				PASSWORD: "Temporary1!"
 			}
 		});
 		expect(result).toEqual({
@@ -97,7 +97,7 @@ describe("CognitoAuthAdapter password reset", () => {
 
 		const result = await adapter.completeNewPasswordChallenge({
 			emailNormalized: "teacher@example.com",
-			newPassword: "newcase1",
+			newPassword: "Newcase1!",
 			challengeSession: "challenge-session"
 		});
 
@@ -110,7 +110,7 @@ describe("CognitoAuthAdapter password reset", () => {
 			Session: "challenge-session",
 			ChallengeResponses: {
 				USERNAME: "teacher@example.com",
-				NEW_PASSWORD: "newcase1"
+				NEW_PASSWORD: "Newcase1!"
 			}
 		});
 		expect(result).toEqual({
@@ -177,7 +177,7 @@ describe("CognitoAuthAdapter password reset", () => {
 		await adapter.confirmPasswordReset({
 			emailNormalized: "student@example.com",
 			code: "123456",
-			newPassword: "newcase1"
+			newPassword: "Newcase1!"
 		});
 
 		expect(client.sent[0]).toBeInstanceOf(ConfirmForgotPasswordCommand);
@@ -187,7 +187,7 @@ describe("CognitoAuthAdapter password reset", () => {
 			ClientId: "user-pool-client-id",
 			Username: "student@example.com",
 			ConfirmationCode: "123456",
-			Password: "newcase1"
+			Password: "Newcase1!"
 		});
 	});
 
@@ -199,7 +199,7 @@ describe("CognitoAuthAdapter password reset", () => {
 			adapter.confirmPasswordReset({
 				emailNormalized: "student@example.com",
 				code: "123456",
-				newPassword: "newcase1"
+				newPassword: "Newcase1!"
 			})
 		).rejects.toBeInstanceOf(InvalidPasswordResetCodeError);
 	});
@@ -282,7 +282,7 @@ describe("CognitoAuthAdapter password reset", () => {
 
 		await adapter.setProfilePassword({
 			emailNormalized: "student@example.com",
-			password: "newcase1"
+			password: "Newcase1!"
 		});
 
 		expect(client.sent[1]).toBeInstanceOf(AdminSetUserPasswordCommand);
@@ -291,7 +291,7 @@ describe("CognitoAuthAdapter password reset", () => {
 		).toMatchObject({
 			UserPoolId: "user-pool-id",
 			Username: "student@example.com",
-			Password: "newcase1",
+			Password: "Newcase1!",
 			Permanent: true
 		});
 	});

@@ -4,8 +4,15 @@ const caseMaterials = await import("./case-materials");
 const secrets = await import("./secrets");
 const tables = await import("./tables");
 
+const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001";
+const appHostname = appUrl.startsWith("https://")
+	? new URL(appUrl).hostname
+	: undefined;
+
 export const client = new sst.aws.Nextjs("eccsfeweb", {
 	path: ".",
+	openNextVersion: "4.1.0",
+	domain: appHostname ? { name: appHostname } : undefined,
 	environment: {
 		AUTH_E2E_MODE: process.env.AUTH_E2E_MODE ?? "",
 		BETTER_AUTH_URL:

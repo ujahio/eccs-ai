@@ -45,7 +45,7 @@ export async function handler(event: CognitoCustomEmailSenderEvent) {
 
 	await resend.emails.send({
 		attachments: [eccsLogoAttachment()],
-		from: process.env.ECCS_EMAIL_SENDER ?? "no-reply@contact.eccs-online.xyz",
+		from: process.env.ECCS_EMAIL_SENDER ?? "no-reply@contact.eccs-online.com",
 		to: email,
 		subject: "Reset your ECCS password",
 		html: content.html,

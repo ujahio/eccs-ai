@@ -37,7 +37,7 @@ describe("LoginService", () => {
 
 		const result = await service.login({
 			email: "student@example.com",
-			password: "casework1"
+			password: "Casework1!"
 		});
 
 		expect(result).toEqual({
@@ -73,7 +73,7 @@ describe("LoginService", () => {
 
 		const result = await service.login({
 			email: "teacher@example.com",
-			password: "temporary1",
+			password: "Temporary1!",
 		});
 
 		expect(result).toEqual({

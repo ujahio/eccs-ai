@@ -17,7 +17,12 @@ export default async function TeacherLayout({
 		<main className="min-h-screen bg-app-canvas text-primary-text">
 			<header className="border-b border-border-gray bg-white">
 				<nav className="mx-auto flex min-h-14 w-full max-w-6xl items-center justify-between gap-4 px-4 py-2 sm:min-h-16 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:px-6 sm:py-0">
-					<Link href="/" aria-label="E-Clinical Case Solutions home">
+					<Link
+						aria-label="E-Clinical Case Solutions teacher dashboard"
+						className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-teal"
+						data-testid="teacher-shell-logo"
+						href="/teacher"
+					>
 						<Image
 							alt="E-Clinical Case Solutions"
 							className="h-7 w-auto"
@@ -29,14 +34,14 @@ export default async function TeacherLayout({
 					</Link>
 					<div className="hidden items-center gap-6 text-sm font-medium sm:flex sm:justify-center">
 						<Link
-							className="text-brand-teal"
+							className="text-brand-teal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-teal"
 							data-testid="teacher-dashboard-link"
 							href="/teacher"
 						>
 							Dashboard
 						</Link>
 						<Link
-							className="transition hover:text-brand-teal"
+							className="transition hover:text-brand-teal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-teal"
 							data-testid="teacher-cases-link"
 							href="/teacher/cases"
 						>

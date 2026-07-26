@@ -1,6 +1,8 @@
 import Image from "next/image";
 import { PublicNav } from "@/components/public-nav";
 import { ButtonLink } from "@/components/ui/button";
+import { publicLandingActionForRole } from "@/lib/auth/public-navigation";
+import { getOptionalAppSession } from "@/lib/auth/session";
 
 const introParagraphs = [
 	"e-Clinical Cases Solutions aims to provide category 1 CME in laboratory medicine in the format of interactive clinical cases online. It is suitable for learning for all laboratorians, endocrinologists, rheumatologists, nurses, family and internal medicine physicians, and all users of the clinical laboratory. The cases are authentic, acquired over 20 years of clinical practice. Cases can be accessed online anywhere, and at any time.",
@@ -24,10 +26,13 @@ const workflowSteps = [
 	"Download a verifiable certificate",
 ];
 
-export default function Home() {
+export default async function Home() {
+	const appSession = await getOptionalAppSession();
+	const landingAction = publicLandingActionForRole(appSession?.profile.role);
+
 	return (
 		<main className="min-h-screen bg-app-canvas text-primary-text">
-			<PublicNav activePage="home" />
+			<PublicNav activePage="home" appSession={appSession} />
 
 			<section
 				className="mx-auto grid w-full max-w-7xl items-center gap-14 px-6 py-16 md:grid-cols-[1.05fr_1fr] lg:gap-16 lg:py-24"
@@ -35,7 +40,7 @@ export default function Home() {
 			>
 				<div>
 					<h1
-						className="text-4xl font-bold leading-tight md:text-5xl"
+						className="text-balance text-4xl font-bold leading-tight md:text-5xl"
 						data-testid="home-heading"
 					>
 						Welcome to e-Clinical Cases Solutions
@@ -49,8 +54,11 @@ export default function Home() {
 						))}
 					</div>
 					<div className="mt-8 flex flex-col gap-3 sm:flex-row">
-						<ButtonLink data-testid="home-hero-get-started" href="/register">
-							Get started
+						<ButtonLink
+							data-testid="home-hero-get-started"
+							href={landingAction.href}
+						>
+							{landingAction.label}
 						</ButtonLink>
 					</div>
 				</div>
@@ -97,7 +105,7 @@ export default function Home() {
 				<div className="mx-auto grid w-full max-w-7xl items-center gap-14 px-6 py-16 md:grid-cols-[1.08fr_0.92fr] lg:gap-16">
 					<div>
 						<h2
-							className="text-3xl font-bold leading-tight"
+							className="text-balance text-3xl font-bold leading-tight"
 							data-testid="objectives-heading"
 						>
 							Objectives
@@ -115,9 +123,9 @@ export default function Home() {
 						<ButtonLink
 							className="mt-8"
 							data-testid="objectives-get-started"
-							href="/register"
+							href={landingAction.href}
 						>
-							Get started
+							{landingAction.label}
 						</ButtonLink>
 					</div>
 					<div className="relative hidden min-h-95 overflow-hidden rounded sm:block">
@@ -143,7 +151,7 @@ export default function Home() {
 							How It Works
 						</p>
 						<h2
-							className="mt-3 text-3xl font-bold leading-tight"
+							className="mt-3 text-balance text-3xl font-bold leading-tight"
 							data-testid="workflow-heading"
 						>
 							A static walkthrough of the student learning path

@@ -18,7 +18,12 @@ export default async function StudentLayout({
 		<main className="min-h-screen bg-app-canvas text-primary-text">
 			<header className="border-b border-border-gray bg-white">
 				<nav className="mx-auto flex min-h-14 w-full max-w-6xl items-center justify-between gap-4 px-4 py-2 sm:min-h-16 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:px-6 sm:py-0">
-					<Link href="/" aria-label="E-Clinical Case Solutions home">
+					<Link
+						aria-label="E-Clinical Case Solutions student dashboard"
+						className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-teal"
+						data-testid="student-shell-logo"
+						href="/student"
+					>
 						<Image
 							alt="E-Clinical Case Solutions"
 							className="h-7 w-auto"

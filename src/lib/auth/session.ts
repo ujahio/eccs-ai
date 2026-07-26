@@ -15,34 +15,15 @@ import type {
 } from "@/features/auth/registration/repository";
 
 export async function requireRoleSession(role: AppRole) {
-	const requestHeaders = await headers();
-	const session = await getAuth().api.getSession({
-		headers: requestHeaders,
-	});
+	const result = await getOptionalAppSession();
 
-	if (!session) {
-		redirect("/login");
-	}
-
-	const profile = await getAppProfile(session.user.id);
-
-	if (!profile || profile.role !== role) {
-		redirect("/login");
-	}
-
-	if (isSessionInvalidated(session, profile)) {
-		redirect("/login");
-	}
-
-	const isLoginEligible = await isRoleLoginEligible(profile);
-
-	if (!isLoginEligible) {
+	if (!result || result.profile.role !== role) {
 		redirect("/login");
 	}
 
 	return {
-		session,
-		profile,
+		session: result.session,
+		profile: result.profile,
 	};
 }
 
@@ -61,6 +42,38 @@ export async function requireTeacherSession() {
 	return {
 		session: result.session,
 		profile: result.profile as TeacherProfileRecord,
+	};
+}
+
+export async function getOptionalAppSession() {
+	const requestHeaders = await headers();
+	const session = await getAuth().api.getSession({
+		headers: requestHeaders,
+	});
+
+	if (!session) {
+		return null;
+	}
+
+	const profile = await getAppProfile(session.user.id);
+
+	if (!profile) {
+		return null;
+	}
+
+	if (isSessionInvalidated(session, profile)) {
+		return null;
+	}
+
+	const isLoginEligible = await isRoleLoginEligible(profile);
+
+	if (!isLoginEligible) {
+		return null;
+	}
+
+	return {
+		session,
+		profile,
 	};
 }
 

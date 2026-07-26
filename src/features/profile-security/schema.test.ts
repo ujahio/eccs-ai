@@ -72,19 +72,24 @@ describe("profile security schemas", () => {
 			fieldErrors: {
 				currentPassword: "Enter your current password.",
 				password:
-					"Password is missing: at least 8 characters, at least one number.",
+					"Password is missing: at least 8 characters, at least one uppercase letter, at least one number, at least one symbol.",
 				confirmPassword: "Passwords do not match.",
 			},
-			failedPasswordRequirementIds: ["minimumLength", "number"],
+			failedPasswordRequirementIds: [
+				"minimumLength",
+				"uppercase",
+				"number",
+				"symbol",
+			],
 		});
 	});
 
 	it("rejects reusing the current password", () => {
 		expect(
 			parseProfileSecurityPasswordChangeInput({
-				currentPassword: "casework1",
-				password: "casework1",
-				confirmPassword: "casework1",
+				currentPassword: "Casework1!",
+				password: "Casework1!",
+				confirmPassword: "Casework1!",
 			}),
 		).toMatchObject({
 			success: false,

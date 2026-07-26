@@ -4,7 +4,7 @@ import {
 	type Page,
 } from "@playwright/test";
 
-export const teacherPassword = "teacher1";
+export const teacherPassword = "Teacher1!";
 export const dayInMilliseconds = 24 * 60 * 60 * 1000;
 
 export function uniqueEmail(prefix: string) {

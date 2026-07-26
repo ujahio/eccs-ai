@@ -8,7 +8,7 @@ const validInput = {
 	firstName: "Jordan",
 	lastName: "Adebayo",
 	email: "jordan@example.com",
-	password: "casework1"
+	password: "Casework1!"
 };
 
 describe("registration schema", () => {
@@ -22,20 +22,27 @@ describe("registration schema", () => {
 			success: false,
 			fieldErrors: {
 				password:
-					"Password is missing: at least one lowercase letter, at least one number."
+					"Password is missing: at least one lowercase letter, at least one number, at least one symbol."
 			}
 		});
 	});
 
-	it("matches the Cognito password policy", () => {
-		expect(failedPasswordRequirements("casework1")).toEqual([]);
-		expect(failedPasswordRequirements("CASEWORK1").map(({ id }) => id)).toEqual([
+	it("matches the permanent account password policy", () => {
+		expect(failedPasswordRequirements("Casework1!")).toEqual([]);
+		expect(failedPasswordRequirements("casework1").map(({ id }) => id)).toEqual([
+			"uppercase",
+			"symbol"
+		]);
+		expect(failedPasswordRequirements("CASEWORK1!").map(({ id }) => id)).toEqual([
 			"lowercase"
 		]);
-		expect(failedPasswordRequirements("casework").map(({ id }) => id)).toEqual([
+		expect(failedPasswordRequirements("Casework!").map(({ id }) => id)).toEqual([
 			"number"
 		]);
-		expect(failedPasswordRequirements("case1").map(({ id }) => id)).toEqual([
+		expect(failedPasswordRequirements("Casework1").map(({ id }) => id)).toEqual([
+			"symbol"
+		]);
+		expect(failedPasswordRequirements("Case1!").map(({ id }) => id)).toEqual([
 			"minimumLength"
 		]);
 	});
