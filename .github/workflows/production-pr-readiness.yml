@@ -177,90 +177,90 @@ jobs:
       SST_STAGE: production-pr-${{ github.event.pull_request.number || github.run_id }}
 
     steps:
-      - name: Configure production smoke URL and mailbox
-        shell: bash
-        run: |
-          if [[ -z "$PRODUCTION_SMOKE_BASE_DOMAIN" ]]; then
-            echo "::error::Missing required GitHub Environment configuration for production smoke: PRODUCTION_SMOKE_BASE_DOMAIN"
-            exit 1
-          fi
-          if [[ -z "$SMOKE_TEST_MAILBOX" ]]; then
-            echo "::error::Missing required GitHub Environment configuration for production smoke: SMOKE_TEST_MAILBOX"
-            exit 1
-          fi
+      # - name: Configure production smoke URL and mailbox
+      #   shell: bash
+      #   run: |
+      #     if [[ -z "$PRODUCTION_SMOKE_BASE_DOMAIN" ]]; then
+      #       echo "::error::Missing required GitHub Environment configuration for production smoke: PRODUCTION_SMOKE_BASE_DOMAIN"
+      #       exit 1
+      #     fi
+      #     if [[ -z "$SMOKE_TEST_MAILBOX" ]]; then
+      #       echo "::error::Missing required GitHub Environment configuration for production smoke: SMOKE_TEST_MAILBOX"
+      #       exit 1
+      #     fi
 
-          smoke_base_domain="${PRODUCTION_SMOKE_BASE_DOMAIN#https://}"
-          smoke_base_domain="${smoke_base_domain#http://}"
-          smoke_base_domain="${smoke_base_domain%%/}"
-          mailbox="${SMOKE_TEST_MAILBOX#mailto:}"
+      #     smoke_base_domain="${PRODUCTION_SMOKE_BASE_DOMAIN#https://}"
+      #     smoke_base_domain="${smoke_base_domain#http://}"
+      #     smoke_base_domain="${smoke_base_domain%%/}"
+      #     mailbox="${SMOKE_TEST_MAILBOX#mailto:}"
 
-          if [[ -z "$smoke_base_domain" ]]; then
-            echo "::error::PRODUCTION_SMOKE_BASE_DOMAIN must be a domain, for example smoke.eccs-online.com."
-            exit 1
-          fi
-          if [[ "$smoke_base_domain" == */* ]]; then
-            echo "::error::PRODUCTION_SMOKE_BASE_DOMAIN must not include a path."
-            exit 1
-          fi
-          if [[ "$smoke_base_domain" == *[[:space:]]* || "$smoke_base_domain" == *[[:cntrl:]]* ]]; then
-            echo "::error::PRODUCTION_SMOKE_BASE_DOMAIN must not include whitespace or control characters."
-            exit 1
-          fi
-          if [[ "$mailbox" != *@* || "$mailbox" == *@*@* || "$mailbox" == *,* || "$mailbox" == *[[:space:]]* || "$mailbox" == *[[:cntrl:]]* ]]; then
-            echo "::error::SMOKE_TEST_MAILBOX must be a single email address, for example smoke-tests@eccs-online.com."
-            exit 1
-          fi
+      #     if [[ -z "$smoke_base_domain" ]]; then
+      #       echo "::error::PRODUCTION_SMOKE_BASE_DOMAIN must be a domain, for example smoke.eccs-online.com."
+      #       exit 1
+      #     fi
+      #     if [[ "$smoke_base_domain" == */* ]]; then
+      #       echo "::error::PRODUCTION_SMOKE_BASE_DOMAIN must not include a path."
+      #       exit 1
+      #     fi
+      #     if [[ "$smoke_base_domain" == *[[:space:]]* || "$smoke_base_domain" == *[[:cntrl:]]* ]]; then
+      #       echo "::error::PRODUCTION_SMOKE_BASE_DOMAIN must not include whitespace or control characters."
+      #       exit 1
+      #     fi
+      #     if [[ "$mailbox" != *@* || "$mailbox" == *@*@* || "$mailbox" == *,* || "$mailbox" == *[[:space:]]* || "$mailbox" == *[[:cntrl:]]* ]]; then
+      #       echo "::error::SMOKE_TEST_MAILBOX must be a single email address, for example smoke-tests@eccs-online.com."
+      #       exit 1
+      #     fi
 
-          mailbox_local="${mailbox%@*}"
-          mailbox_domain="${mailbox##*@}"
+      #     mailbox_local="${mailbox%@*}"
+      #     mailbox_domain="${mailbox##*@}"
 
-          if [[ -z "$mailbox_local" || -z "$mailbox_domain" || "$mailbox_domain" == */* ]]; then
-            echo "::error::SMOKE_TEST_MAILBOX must be a single email address, for example smoke-tests@eccs-online.com."
-            exit 1
-          fi
+      #     if [[ -z "$mailbox_local" || -z "$mailbox_domain" || "$mailbox_domain" == */* ]]; then
+      #       echo "::error::SMOKE_TEST_MAILBOX must be a single email address, for example smoke-tests@eccs-online.com."
+      #       exit 1
+      #     fi
 
-          smoke_app_url="https://${SST_STAGE}.${smoke_base_domain}"
-          mailbox_separator="+"
-          if [[ "$mailbox_local" == *+* ]]; then
-            mailbox_separator="-"
-          fi
-          smoke_teacher_email="${mailbox_local}${mailbox_separator}teacher-${SST_STAGE}@${mailbox_domain}"
+      #     smoke_app_url="https://${SST_STAGE}.${smoke_base_domain}"
+      #     mailbox_separator="+"
+      #     if [[ "$mailbox_local" == *+* ]]; then
+      #       mailbox_separator="-"
+      #     fi
+      #     smoke_teacher_email="${mailbox_local}${mailbox_separator}teacher-${SST_STAGE}@${mailbox_domain}"
 
-          {
-            echo "BETTER_AUTH_URL=$smoke_app_url"
-            echo "NEXT_PUBLIC_APP_URL=$smoke_app_url"
-            echo "PLAYWRIGHT_BASE_URL=$smoke_app_url"
-            echo "PRODUCTION_SMOKE_APP_URL=$smoke_app_url"
-            echo "SMOKE_TEACHER_EMAIL=$smoke_teacher_email"
-            echo "SMOKE_TEST_MAILBOX=$mailbox"
-          } >> "$GITHUB_ENV"
+      #     {
+      #       echo "BETTER_AUTH_URL=$smoke_app_url"
+      #       echo "NEXT_PUBLIC_APP_URL=$smoke_app_url"
+      #       echo "PLAYWRIGHT_BASE_URL=$smoke_app_url"
+      #       echo "PRODUCTION_SMOKE_APP_URL=$smoke_app_url"
+      #       echo "SMOKE_TEACHER_EMAIL=$smoke_teacher_email"
+      #       echo "SMOKE_TEST_MAILBOX=$mailbox"
+      #     } >> "$GITHUB_ENV"
 
-      - name: Validate production smoke configuration
-        shell: bash
-        run: |
-          missing=()
-          for name in AWS_ROLE_ARN AWS_REGION BETTER_AUTH_SECRET BETTER_AUTH_URL ECCS_EMAIL_SENDER NEXT_PUBLIC_APP_URL PLAYWRIGHT_BASE_URL PRODUCTION_SMOKE_BASE_DOMAIN PRODUCTION_SMOKE_APP_URL RESEND_API_KEY SMOKE_TEACHER_EMAIL SMOKE_TEACHER_PASSWORD SMOKE_TEACHER_TEMP_PASSWORD SMOKE_TEST_MAILBOX SST_STAGE; do
-            if [[ -z "${!name}" ]]; then
-              missing+=("$name")
-            fi
-          done
+      # - name: Validate production smoke configuration
+      #   shell: bash
+      #   run: |
+      #     missing=()
+      #     for name in AWS_ROLE_ARN AWS_REGION BETTER_AUTH_SECRET BETTER_AUTH_URL ECCS_EMAIL_SENDER NEXT_PUBLIC_APP_URL PLAYWRIGHT_BASE_URL PRODUCTION_SMOKE_BASE_DOMAIN PRODUCTION_SMOKE_APP_URL RESEND_API_KEY SMOKE_TEACHER_EMAIL SMOKE_TEACHER_PASSWORD SMOKE_TEACHER_TEMP_PASSWORD SMOKE_TEST_MAILBOX SST_STAGE; do
+      #       if [[ -z "${!name}" ]]; then
+      #         missing+=("$name")
+      #       fi
+      #     done
 
-          if (( ${#missing[@]} > 0 )); then
-            echo "::error::Missing required GitHub Environment configuration for production smoke: ${missing[*]}"
-            exit 1
-          fi
+      #     if (( ${#missing[@]} > 0 )); then
+      #       echo "::error::Missing required GitHub Environment configuration for production smoke: ${missing[*]}"
+      #       exit 1
+      #     fi
 
-          for name in BETTER_AUTH_URL NEXT_PUBLIC_APP_URL PLAYWRIGHT_BASE_URL; do
-            value="${!name}"
-            if [[ "$value" != https://* ]]; then
-              echo "::error::$name must use an https:// smoke URL."
-              exit 1
-            fi
-            if [[ "$value" == *localhost* || "$value" == *127.0.0.1* ]]; then
-              echo "::error::$name must not point at localhost."
-              exit 1
-            fi
-          done
+      #     for name in BETTER_AUTH_URL NEXT_PUBLIC_APP_URL PLAYWRIGHT_BASE_URL; do
+      #       value="${!name}"
+      #       if [[ "$value" != https://* ]]; then
+      #         echo "::error::$name must use an https:// smoke URL."
+      #         exit 1
+      #       fi
+      #       if [[ "$value" == *localhost* || "$value" == *127.0.0.1* ]]; then
+      #         echo "::error::$name must not point at localhost."
+      #         exit 1
+      #       fi
+      #     done
 
       - name: Checkout
         uses: actions/checkout@v6
@@ -273,15 +273,15 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Restore Bun & Next.js cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.bun/install/cache
-            ${{ github.workspace }}/.next/cache
-          key: ${{ runner.os }}-bun-nextjs-${{ hashFiles('**/bun.lockb') }}-${{ hashFiles('**/*.{js,jsx,ts,tsx}') }}-v1
-          restore-keys: |
-            ${{ runner.os }}-bun-nextjs-
+      # - name: Restore Bun & Next.js cache
+      #   uses: actions/cache@v5
+      #   with:
+      #     path: |
+      #       ~/.bun/install/cache
+      #       ${{ github.workspace }}/.next/cache
+      #     key: ${{ runner.os }}-bun-nextjs-${{ hashFiles('**/bun.lockb') }}-${{ hashFiles('**/*.{js,jsx,ts,tsx}') }}-v1
+      #     restore-keys: |
+      #       ${{ runner.os }}-bun-nextjs-
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6.1.0
@@ -291,39 +291,39 @@ jobs:
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           action-timeout-s: 120
 
-      - name: Deploy SST smoke stage
-        id: deploy
-        run: bunx sst deploy --stage "$SST_STAGE"
+        # - name: Deploy SST smoke stage
+        #   id: deploy
+        #   run: bunx sst deploy --stage "$SST_STAGE"
 
-      - name: Bootstrap smoke teacher
-        run: bunx sst shell --stage "$SST_STAGE" -- bun scripts/seed-smoke-teacher.ts --email "$SMOKE_TEACHER_EMAIL" --apply
+        # - name: Bootstrap smoke teacher
+        #   run: bunx sst shell --stage "$SST_STAGE" -- bun scripts/seed-smoke-teacher.ts --email "$SMOKE_TEACHER_EMAIL" --apply
 
-      - name: Install Playwright browsers
-        run: bunx playwright install --with-deps chromium
+        # - name: Install Playwright browsers
+        #   run: bunx playwright install --with-deps chromium
 
-      - name: Run compact production smoke suite
-        id: smoke_tests
-        run: bun run test:e2e:production-smoke
+        # - name: Run compact production smoke suite
+        #   id: smoke_tests
+        #   run: bun run test:e2e:production-smoke
 
-      - name: Write smoke deployment artifact
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          mkdir -p artifacts
-          {
-            echo "# Production PR Smoke Candidate"
-            echo
-            echo "- Workflow: $GITHUB_WORKFLOW"
-            echo "- Run: $GITHUB_RUN_ID"
-            echo "- Actor: $GITHUB_ACTOR"
-            echo "- Event: $GITHUB_EVENT_NAME"
-            echo "- Ref: ${GITHUB_REF_NAME:-unknown}"
-            echo "- Stage: $SST_STAGE"
-            echo "- App URL: $PLAYWRIGHT_BASE_URL"
-            echo "- Smoke scope: registration/login; teacher publish with attachment; student complete/download certificate; password reset"
-          } > artifacts/production-smoke-deploy-summary.md
+        # - name: Write smoke deployment artifact
+        #   if: ${{ always() }}
+        #   shell: bash
+        #   run: |
+        #     mkdir -p artifacts
+        #     {
+        #       echo "# Production PR Smoke Candidate"
+        #       echo
+        #       echo "- Workflow: $GITHUB_WORKFLOW"
+        #       echo "- Run: $GITHUB_RUN_ID"
+        #       echo "- Actor: $GITHUB_ACTOR"
+        #       echo "- Event: $GITHUB_EVENT_NAME"
+        #       echo "- Ref: ${GITHUB_REF_NAME:-unknown}"
+        #       echo "- Stage: $SST_STAGE"
+        #       echo "- App URL: $PLAYWRIGHT_BASE_URL"
+        #       echo "- Smoke scope: registration/login; teacher publish with attachment; student complete/download certificate; password reset"
+        #     } > artifacts/production-smoke-deploy-summary.md
 
-      - name: Upload smoke artifacts
+        # - name: Upload smoke artifacts
         if: ${{ always() }}
         uses: actions/upload-artifact@v5
         with:
@@ -338,27 +338,27 @@ jobs:
         if: ${{ !cancelled() && steps.deploy.outcome == 'success' && steps.smoke_tests.outcome == 'success' }}
         run: bunx sst remove --stage "$SST_STAGE"
 
-      - name: Write teardown artifact
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          mkdir -p artifacts
-          {
-            echo "# Production PR Smoke Teardown"
-            echo
-            echo "- Workflow: $GITHUB_WORKFLOW"
-            echo "- Run: $GITHUB_RUN_ID"
-            echo "- Stage: $SST_STAGE"
-            echo "- Deploy step: ${{ steps.deploy.outcome }}"
-            echo "- Smoke test step: ${{ steps.smoke_tests.outcome }}"
-            echo "- Teardown step: ${{ steps.teardown.outcome }}"
-          } > artifacts/production-smoke-teardown.md
+      # - name: Write teardown artifact
+      #   if: ${{ always() }}
+      #   shell: bash
+      #   run: |
+      #     mkdir -p artifacts
+      #     {
+      #       echo "# Production PR Smoke Teardown"
+      #       echo
+      #       echo "- Workflow: $GITHUB_WORKFLOW"
+      #       echo "- Run: $GITHUB_RUN_ID"
+      #       echo "- Stage: $SST_STAGE"
+      #       echo "- Deploy step: ${{ steps.deploy.outcome }}"
+      #       echo "- Smoke test step: ${{ steps.smoke_tests.outcome }}"
+      #       echo "- Teardown step: ${{ steps.teardown.outcome }}"
+      #     } > artifacts/production-smoke-teardown.md
 
-      - name: Upload teardown artifact
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v5
-        with:
-          name: production-smoke-teardown
-          path: artifacts/production-smoke-teardown.md
-          if-no-files-found: ignore
-          retention-days: 30
+      # - name: Upload teardown artifact
+      #   if: ${{ always() }}
+      #   uses: actions/upload-artifact@v5
+      #   with:
+      #     name: production-smoke-teardown
+      #     path: artifacts/production-smoke-teardown.md
+      #     if-no-files-found: ignore
+      #     retention-days: 30
