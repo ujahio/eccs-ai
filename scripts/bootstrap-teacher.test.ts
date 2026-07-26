@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	getExistingTeacherReconciliationBlocker,
+	getPermanentPasswordValidationError,
 	getSingleTeacherIdentityBlocker,
 	getTemporaryPasswordValidationError,
 	type CognitoUserState,
@@ -184,6 +185,24 @@ describe("bootstrap teacher temporary password validation", () => {
 			"TEACHER_TEMP_PASSWORD",
 		);
 
+		expect(validationError).toContain("Cognito password policy used in this repo");
+		expect(validationError).toContain("at least one uppercase letter");
+		expect(validationError).toContain("at least one symbol");
+	});
+});
+
+describe("bootstrap teacher permanent password validation", () => {
+	it("requires the permanent password to satisfy the Cognito policy", () => {
+		expect(
+			getPermanentPasswordValidationError("Teacher1!", "TEACHER_PASSWORD"),
+		).toBeNull();
+
+		const validationError = getPermanentPasswordValidationError(
+			"teacher1",
+			"TEACHER_PASSWORD",
+		);
+
+		expect(validationError).toContain("TEACHER_PASSWORD");
 		expect(validationError).toContain("Cognito password policy used in this repo");
 		expect(validationError).toContain("at least one uppercase letter");
 		expect(validationError).toContain("at least one symbol");

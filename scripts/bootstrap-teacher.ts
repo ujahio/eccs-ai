@@ -58,6 +58,7 @@ type ParsedArgs = {
 	apply: boolean;
 	resetTemporaryPassword: boolean;
 	passwordEnv: string;
+	permanentPasswordEnv: string | null;
 	help: boolean;
 };
 
@@ -87,6 +88,7 @@ type BootstrapContext = {
 const TEACHER_GROUP = "teacher";
 const STUDENT_GROUP = "student";
 const DEFAULT_PASSWORD_ENV = "TEACHER_TEMP_PASSWORD";
+const DEFAULT_PERMANENT_PASSWORD_ENV = "TEACHER_PASSWORD";
 const FIRST_LOGIN_PASSWORD_CHANGE_STATUS = "FORCE_CHANGE_PASSWORD";
 
 export async function main(argv = process.argv.slice(2)) {
@@ -184,6 +186,7 @@ export async function main(argv = process.argv.slice(2)) {
 		existingProfile,
 		resetTemporaryPassword: args.resetTemporaryPassword,
 		passwordEnv: args.passwordEnv,
+		permanentPasswordEnv: args.permanentPasswordEnv,
 	});
 
 	printPlan(plan, args.apply);
@@ -201,6 +204,9 @@ export async function main(argv = process.argv.slice(2)) {
 		: false;
 	const temporaryPassword = needsTemporaryPassword
 		? readTemporaryPassword(args.passwordEnv)
+		: null;
+	const permanentPassword = args.permanentPasswordEnv
+		? readPermanentPassword(args.permanentPasswordEnv)
 		: null;
 
 	let finalUser = existingUser;
@@ -241,7 +247,7 @@ export async function main(argv = process.argv.slice(2)) {
 		console.log(`Reconciled Cognito attributes for ${finalUser.username}.`);
 	}
 
-	if (args.resetTemporaryPassword && temporaryPassword) {
+	if (existingUser && args.resetTemporaryPassword && temporaryPassword) {
 		await context.cognito.send(
 			new AdminSetUserPasswordCommand({
 				UserPoolId: context.userPoolId,
@@ -266,14 +272,14 @@ export async function main(argv = process.argv.slice(2)) {
 		console.log(`Added ${finalUser.username} to the ${TEACHER_GROUP} group.`);
 	}
 
-	const refreshedUser = await requireCognitoUser(
+	const profileUser = await requireCognitoUser(
 		context,
 		desired.emailNormalized,
 	);
 	const nextProfile = buildProfileRecord({
 		desired,
 		existingProfile,
-		cognitoSub: refreshedUser.sub,
+		cognitoSub: profileUser.sub,
 	});
 
 	await context.dynamo.send(
@@ -283,17 +289,48 @@ export async function main(argv = process.argv.slice(2)) {
 		}),
 	);
 
+	if (permanentPassword) {
+		await context.cognito.send(
+			new AdminSetUserPasswordCommand({
+				UserPoolId: context.userPoolId,
+				Username: profileUser.username,
+				Password: permanentPassword,
+				Permanent: true,
+			}),
+		);
+		console.log(
+			`Set the permanent password for ${profileUser.username}; Cognito first-login password change is not required.`,
+		);
+	}
+
+	const refreshedUser = await requireCognitoUser(
+		context,
+		desired.emailNormalized,
+	);
+
+	if (permanentPassword && isFirstLoginPasswordChangeRequired(refreshedUser)) {
+		fail(
+			`Permanent password was set for ${refreshedUser.username}, but Cognito still reports ${FIRST_LOGIN_PASSWORD_CHANGE_STATUS}.`,
+		);
+	}
+
+	const passwordEvidence = passwordEvidenceLines({
+		needsTemporaryPassword,
+		temporaryPasswordEnv: args.passwordEnv,
+		permanentPasswordEnv: args.permanentPasswordEnv,
+		existingFirstLoginChallenge,
+	});
+	const signInGuidance = permanentPassword
+		? "Teacher should sign in on /login with the permanent password."
+		: "Teacher should sign in on /login and complete the Cognito first-login password change before accessing /teacher.";
+
 	console.log(
 		[
 			"",
 			`Upserted teacher profile ${nextProfile.profileId} in ${context.userProfileTableName}.`,
 			`Cognito status: ${refreshedUser.status ?? "unknown"}; enabled: ${String(refreshedUser.enabled)}; groups: ${refreshedUser.groups.join(", ") || "(none)"}`,
-			needsTemporaryPassword
-				? `Temporary password was read from ${args.passwordEnv} and was not echoed. Clear that environment variable from your shell now.`
-				: existingFirstLoginChallenge
-					? "Existing Cognito first-login password-change challenge was left in place."
-					: "Existing password was left unchanged.",
-			"Teacher should sign in on /login and complete the Cognito first-login password change before accessing /teacher.",
+			...passwordEvidence,
+			signInGuidance,
 		].join("\n"),
 	);
 }
@@ -420,6 +457,7 @@ function buildPlan(args: {
 	existingProfile: TeacherProfileRecord | null;
 	resetTemporaryPassword: boolean;
 	passwordEnv: string;
+	permanentPasswordEnv: string | null;
 }) {
 	const { desired, existingUser, existingProfile } = args;
 	const actions: string[] = [];
@@ -454,11 +492,20 @@ function buildPlan(args: {
 			actions.push(
 				`Reset a Cognito-compliant temporary password from $${args.passwordEnv} and put the user back into Cognito's first-login password-change flow.`,
 			);
-		} else if (isFirstLoginPasswordChangeRequired(existingUser)) {
+		} else if (
+			isFirstLoginPasswordChangeRequired(existingUser) &&
+			!args.permanentPasswordEnv
+		) {
 			actions.push("Leave the existing temporary password challenge in place.");
-		} else {
+		} else if (!args.permanentPasswordEnv) {
 			actions.push("Leave the existing password unchanged.");
 		}
+	}
+
+	if (args.permanentPasswordEnv) {
+		actions.push(
+			`Set a Cognito-compliant permanent password from $${args.permanentPasswordEnv} so the teacher can sign in without the first-login password-change flow.`,
+		);
 	}
 
 	if (!existingUser?.groups.includes(TEACHER_GROUP)) {
@@ -490,6 +537,37 @@ function printPlan(actions: string[], apply: boolean) {
 	for (const [index, action] of actions.entries()) {
 		console.log(`${index + 1}. ${action}`);
 	}
+}
+
+function passwordEvidenceLines(args: {
+	needsTemporaryPassword: boolean;
+	temporaryPasswordEnv: string;
+	permanentPasswordEnv: string | null;
+	existingFirstLoginChallenge: boolean;
+}) {
+	const lines: string[] = [];
+
+	if (args.needsTemporaryPassword) {
+		lines.push(
+			`Temporary password was read from ${args.temporaryPasswordEnv} and was not echoed. Clear that environment variable from your shell now.`,
+		);
+	}
+
+	if (args.permanentPasswordEnv) {
+		lines.push(
+			`Permanent password was read from ${args.permanentPasswordEnv} and was not echoed. Clear that environment variable from your shell now.`,
+		);
+	}
+
+	if (lines.length > 0) {
+		return lines;
+	}
+
+	return [
+		args.existingFirstLoginChallenge
+			? "Existing Cognito first-login password-change challenge was left in place."
+			: "Existing password was left unchanged.",
+	];
 }
 
 function buildProfileRecord(args: {
@@ -751,15 +829,23 @@ function normalizeEmail(email: string) {
 }
 
 function readTemporaryPassword(envName: string) {
+	return readPassword(envName, "temporary");
+}
+
+function readPermanentPassword(envName: string) {
+	return readPassword(envName, "permanent");
+}
+
+function readPassword(envName: string, label: "temporary" | "permanent") {
 	const value = process.env[envName];
 
 	if (!value) {
 		fail(
-			`Missing temporary password. Export ${envName} in your shell before running with --apply.`,
+			`Missing ${label} password. Export ${envName} in your shell before running with --apply.`,
 		);
 	}
 
-	const validationError = getTemporaryPasswordValidationError(value, envName);
+	const validationError = getTeacherPasswordValidationError(value, envName);
 
 	if (validationError) {
 		fail(validationError);
@@ -772,6 +858,17 @@ export function getTemporaryPasswordValidationError(
 	value: string,
 	envName = DEFAULT_PASSWORD_ENV,
 ) {
+	return getTeacherPasswordValidationError(value, envName);
+}
+
+export function getPermanentPasswordValidationError(
+	value: string,
+	envName = DEFAULT_PERMANENT_PASSWORD_ENV,
+) {
+	return getTeacherPasswordValidationError(value, envName);
+}
+
+export function getTeacherPasswordValidationError(value: string, envName: string) {
 	const missingRequirements = failedPasswordRequirements(value);
 
 	if (missingRequirements.length > 0) {
@@ -795,6 +892,7 @@ function parseArgs(argv: string[]): ParsedArgs {
 		apply: false,
 		resetTemporaryPassword: false,
 		passwordEnv: DEFAULT_PASSWORD_ENV,
+		permanentPasswordEnv: null,
 		help: false,
 	};
 
@@ -817,6 +915,16 @@ function parseArgs(argv: string[]): ParsedArgs {
 			case "--reset-temporary-password":
 				parsed.resetTemporaryPassword = true;
 				break;
+			case "--set-permanent-password":
+				parsed.permanentPasswordEnv ??= DEFAULT_PERMANENT_PASSWORD_ENV;
+				break;
+			case "--permanent-password-env":
+				parsed.permanentPasswordEnv = readRequiredOptionValue(
+					argv,
+					++index,
+					"--permanent-password-env",
+				);
+				break;
 			case "--password-env":
 				parsed.passwordEnv = argv[++index] ?? DEFAULT_PASSWORD_ENV;
 				break;
@@ -832,6 +940,20 @@ function parseArgs(argv: string[]): ParsedArgs {
 	return parsed;
 }
 
+function readRequiredOptionValue(
+	argv: string[],
+	index: number,
+	optionName: string,
+) {
+	const value = argv[index];
+
+	if (!value || value.startsWith("--")) {
+		fail(`Missing required value for ${optionName}.`);
+	}
+
+	return value;
+}
+
 function printHelp() {
 	console.log(`One-time teacher bootstrap script
 
@@ -845,10 +967,13 @@ Options:
   --apply                     Execute Cognito and DynamoDB writes. Without this flag the script is a dry run.
   --reset-temporary-password  For an existing teacher user, set a fresh temporary password and require first-login password change again.
   --password-env NAME         Environment variable that holds the temporary password. Default: ${DEFAULT_PASSWORD_ENV}
+  --set-permanent-password    Set a permanent password after the teacher profile is ready. Reads ${DEFAULT_PERMANENT_PASSWORD_ENV} unless --permanent-password-env is provided.
+  --permanent-password-env NAME
+                              Environment variable that holds the permanent teacher password. Implies --set-permanent-password.
   --help, -h                  Show this help text.
 
 Temporary password pre-check:
-  The bootstrap script requires the same Cognito password policy as permanent account passwords because Cognito also applies the user-pool policy to admin-created temporary passwords.
+  The bootstrap script validates both temporary and permanent passwords against the Cognito password policy configured in this repo.
 `);
 }
 

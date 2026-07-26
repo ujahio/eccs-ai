@@ -93,9 +93,68 @@ jobs:
           echo "::error::Timed out waiting for successful PR Checks for PR #${PR_NUMBER} at ${HEAD_SHA}."
           exit 1
 
+  staging_deploy_gate:
+    name: Wait for successful Deploy Staging
+    needs: pr_checks_gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: ${{ github.event.pull_request.draft == false }}
+    permissions:
+      actions: read
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Wait for Deploy Staging workflow
+        shell: bash
+        run: |
+          deadline=$((SECONDS + 50 * 60))
+
+          while (( SECONDS < deadline )); do
+            runs_json="$(gh api --method GET "/repos/${REPOSITORY}/actions/workflows/deploy-stage.yml/runs?event=push&branch=staging&head_sha=${HEAD_SHA}&per_page=20")"
+            matching_run="$(
+              echo "$runs_json" |
+                jq -c --arg head_sha "$HEAD_SHA" '
+                  .workflow_runs
+                  | map(select(.head_sha == $head_sha))
+                  | sort_by(.created_at)
+                  | reverse
+                  | .[0] // empty
+                '
+            )"
+
+            if [[ -z "$matching_run" || "$matching_run" == "null" ]]; then
+              echo "Waiting for Deploy Staging to start for staging commit ${HEAD_SHA}..."
+              sleep 15
+              continue
+            fi
+
+            status="$(echo "$matching_run" | jq -r '.status')"
+            conclusion="$(echo "$matching_run" | jq -r '.conclusion // ""')"
+            run_url="$(echo "$matching_run" | jq -r '.html_url')"
+
+            if [[ "$status" == "completed" ]]; then
+              if [[ "$conclusion" == "success" ]]; then
+                echo "Deploy Staging passed: $run_url"
+                exit 0
+              fi
+
+              echo "::error::Deploy Staging completed with conclusion '${conclusion}': $run_url"
+              exit 1
+            fi
+
+            echo "Deploy Staging status is '${status}' for $run_url. Waiting..."
+            sleep 15
+          done
+
+          echo "::error::Timed out waiting for successful Deploy Staging for staging commit ${HEAD_SHA}."
+          exit 1
+
   production_smoke:
     name: Deploy, Smoke, And Teardown Production PR Candidate
-    needs: pr_checks_gate
+    needs: staging_deploy_gate
     runs-on: ubuntu-latest
     timeout-minutes: 120
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
@@ -238,7 +297,7 @@ jobs:
 
       - name: Bootstrap smoke teacher
         run: |
-          TEACHER_TEMP_PASSWORD="$SMOKE_TEACHER_TEMP_PASSWORD" bunx sst shell --stage "$SST_STAGE" -- bun scripts/bootstrap-teacher.ts --email "$SMOKE_TEACHER_EMAIL" --first-name Smoke --last-name Teacher --apply
+          TEACHER_TEMP_PASSWORD="$SMOKE_TEACHER_TEMP_PASSWORD" TEACHER_PASSWORD="$SMOKE_TEACHER_PASSWORD" bunx sst shell --stage "$SST_STAGE" -- bun scripts/bootstrap-teacher.ts --email "$SMOKE_TEACHER_EMAIL" --first-name Smoke --last-name Teacher --reset-temporary-password --set-permanent-password --apply
 
       - name: Install Playwright browsers
         run: bunx playwright install --with-deps chromium
