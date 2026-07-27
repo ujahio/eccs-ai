@@ -5,6 +5,7 @@ on:
     branches:
       - staging
       - production
+      - demo
 
 permissions:
   contents: read
