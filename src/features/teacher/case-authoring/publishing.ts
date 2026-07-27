@@ -9,6 +9,8 @@ import {
 	TransactWriteCommand,
 } from "@aws-sdk/lib-dynamodb";
 import {
+	activeCaseLockCaseId,
+	activeCaseLockRecordType,
 	isActiveTeacherCase,
 	teacherCaseRecordType,
 } from "@/features/teacher/cases/case-lifecycle";
@@ -55,9 +57,6 @@ export type PublishTeacherCaseDraftArgs = {
 	now: number;
 	teacherProfileId: string;
 };
-
-const activeCaseLockCaseId = "teacher-case-active-lock";
-const activeCaseLockRecordType = "activeCaseLock";
 
 type StoredTeacherCaseRecord = Omit<PublishedTeacherCaseRecord, "lifecycle"> & {
 	archivedAt?: number;

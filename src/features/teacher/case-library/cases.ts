@@ -1,7 +1,7 @@
 import "server-only";
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import {
 	getTeacherCaseDraftRepository,
 	type TeacherCaseDraftListItem,
@@ -14,8 +14,9 @@ import { queryAllDynamoItems } from "@/lib/aws/dynamodb-query-core";
 import { getSessionAuthResources } from "@/lib/aws/resources";
 import { requireTeacherSession } from "@/lib/auth/session";
 import { getE2ETeacherCaseStore, isE2EMode } from "@/lib/e2e/in-memory-auth";
+import { areDemoCaseLifecycleControlsEnabled } from "@/lib/env/demo-case-lifecycle-controls";
 
-export type TeacherCaseLibraryArchivedCase = {
+type TeacherCaseLibraryCase = {
 	caseId: string;
 	title: string;
 	publishedAt: number;
@@ -25,29 +26,35 @@ export type TeacherCaseLibraryArchivedCase = {
 	feedbackCount: number;
 };
 
+export type TeacherCaseLibraryArchivedCase = TeacherCaseLibraryCase;
+
 export type TeacherCaseLibrarySummary = {
 	draftCases: TeacherCaseDraftListItem[];
 	archivedCases: TeacherCaseLibraryArchivedCase[];
+	demoControlsEnabled: boolean;
 };
 
-type StoredTeacherCaseRecord = TeacherCaseLibraryArchivedCase & {
+type StoredTeacherCaseRecord = TeacherCaseLibraryCase & {
 	lifecycle: TeacherCaseLifecycle;
 };
 
 export async function getTeacherCaseLibrary(): Promise<TeacherCaseLibrarySummary> {
 	const { profile } = await requireTeacherSession();
 	const resources = getSessionAuthResources();
+	const demoControlsEnabled = areDemoCaseLifecycleControlsEnabled();
 	const archivedRepository = isE2EMode()
 		? new InMemoryTeacherCaseLibraryRepository()
 		: new DynamoTeacherCaseLibraryRepository(resources.teacherCaseTableName);
+	const now = Date.now();
 	const [draftCases, archivedCases] = await Promise.all([
 		getTeacherCaseDraftRepository().listDrafts(profile.profileId),
-		archivedRepository.listArchivedCases(Date.now()),
+		archivedRepository.listArchivedCases(now),
 	]);
 
 	return {
 		draftCases,
 		archivedCases,
+		demoControlsEnabled,
 	};
 }
 
@@ -112,23 +119,25 @@ function sortArchivedCases(
 	cases: StoredTeacherCaseRecord[],
 	now: number,
 ): TeacherCaseLibraryArchivedCase[] {
-	return sortArchivedTeacherCases(cases, now).map(
-		({
-			caseId,
-			title,
-			publishedAt,
-			deadlineAt,
-			archivedAt: storedArchivedAt,
-			completionCount,
-			feedbackCount,
-		}) => ({
-			caseId,
-			title,
-			publishedAt,
-			deadlineAt,
-			...(storedArchivedAt ? { archivedAt: storedArchivedAt } : {}),
-			completionCount,
-			feedbackCount,
-		}),
-	);
+	return sortArchivedTeacherCases(cases, now).map(libraryCaseRecord);
+}
+
+function libraryCaseRecord({
+	caseId,
+	title,
+	publishedAt,
+	deadlineAt,
+	archivedAt: storedArchivedAt,
+	completionCount,
+	feedbackCount,
+}: StoredTeacherCaseRecord): TeacherCaseLibraryCase {
+	return {
+		caseId,
+		title,
+		publishedAt,
+		deadlineAt,
+		...(storedArchivedAt ? { archivedAt: storedArchivedAt } : {}),
+		completionCount,
+		feedbackCount,
+	};
 }

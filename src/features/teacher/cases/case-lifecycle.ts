@@ -1,4 +1,6 @@
 export const teacherCaseRecordType = "case";
+export const activeCaseLockCaseId = "teacher-case-active-lock";
+export const activeCaseLockRecordType = "activeCaseLock";
 
 export type TeacherCaseRecordType = typeof teacherCaseRecordType;
 

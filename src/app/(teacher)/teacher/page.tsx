@@ -2,12 +2,7 @@ import { TeacherDashboardReview } from "@/features/teacher/dashboard/teacher-das
 import { getTeacherDashboardSummary } from "@/features/teacher/dashboard/cases";
 
 export default async function TeacherDashboardPage() {
-	const { activeCase, archivedCases } = await getTeacherDashboardSummary();
+	const summary = await getTeacherDashboardSummary();
 
-	return (
-		<TeacherDashboardReview
-			activeCase={activeCase}
-			archivedCases={archivedCases}
-		/>
-	);
+	return <TeacherDashboardReview {...summary} />;
 }
