@@ -1,4 +1,9 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { ButtonLink } from "@/components/ui/button";
+import { patchTeacherCaseLifecycle } from "@/features/teacher/cases/demo-case-lifecycle-client";
 
 type TeacherDashboardCase = {
 	caseId: string;
@@ -13,12 +18,17 @@ type TeacherDashboardCase = {
 type TeacherDashboardReviewProps = {
 	activeCase: TeacherDashboardCase | null;
 	archivedCases: TeacherDashboardCase[];
+	demoControlsEnabled: boolean;
 };
 
 export function TeacherDashboardReview({
 	activeCase,
 	archivedCases,
+	demoControlsEnabled,
 }: TeacherDashboardReviewProps) {
+	const router = useRouter();
+	const [lifecyclePending, setLifecyclePending] = useState(false);
+	const [lifecycleError, setLifecycleError] = useState("");
 	const startCaseLabel = activeCase ? "Start a draft case" : "Start a New Case";
 	const hasActiveCase = activeCase !== null;
 	const summarySurfaceHeight = "min-h-60";
@@ -34,6 +44,26 @@ export function TeacherDashboardReview({
 					"linear-gradient(90deg, rgba(6, 18, 31, 0.66), rgba(6, 47, 55, 0.38)), url('/images/ongoing-case-bg.png')",
 			}
 		: undefined;
+
+	async function archiveActiveCase() {
+		if (!activeCase || !demoControlsEnabled) {
+			return;
+		}
+
+		try {
+			setLifecyclePending(true);
+			setLifecycleError("");
+			await patchTeacherCaseLifecycle(fetch, {
+				caseId: activeCase.caseId,
+				lifecycle: "archived",
+			});
+			router.refresh();
+		} catch {
+			setLifecycleError("The case status could not be updated. Try again.");
+		} finally {
+			setLifecyclePending(false);
+		}
+	}
 
 	return (
 		<section
@@ -75,15 +105,32 @@ export function TeacherDashboardReview({
 										</span>
 									</div>
 									<ActiveCaseMetrics caseRecord={activeCase} />
-									<ButtonLink
-										className="mt-5 w-full sm:w-auto"
-										data-testid="teacher-active-case-review-link"
-										href={`/teacher/cases/${encodeURIComponent(activeCase.caseId)}`}
-										size="sm"
-										variant="inverse"
-									>
-										View Responses
-									</ButtonLink>
+									<div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+										<ButtonLink
+											className="w-full sm:w-auto"
+											data-testid="teacher-active-case-review-link"
+											href={`/teacher/cases/${encodeURIComponent(activeCase.caseId)}`}
+											size="sm"
+											variant="inverse"
+										>
+											View Responses
+										</ButtonLink>
+										{demoControlsEnabled ? (
+											<ActiveCaseLifecycleToggle
+												caseRecord={activeCase}
+												disabled={lifecyclePending}
+												onArchive={archiveActiveCase}
+											/>
+										) : null}
+									</div>
+									{lifecycleError ? (
+										<p
+											className="mt-4 border border-urgency-border bg-urgency-soft px-4 py-3 text-sm font-semibold text-urgency-text"
+											data-testid="teacher-dashboard-lifecycle-error"
+										>
+											{lifecycleError}
+										</p>
+									) : null}
 								</div>
 							) : (
 								<>
@@ -186,6 +233,48 @@ function ActiveCaseMetrics({
 				value={caseRecord.feedbackCount.toString()}
 			/>
 		</dl>
+	);
+}
+
+function ActiveCaseLifecycleToggle({
+	caseRecord,
+	disabled,
+	onArchive,
+}: {
+	caseRecord: TeacherDashboardCase;
+	disabled: boolean;
+	onArchive: () => void | Promise<void>;
+}) {
+	return (
+		<label
+			className="flex min-h-11 items-center justify-end border-t border-white/20 pt-3 text-white sm:border-t-0 sm:pt-0"
+			data-testid="teacher-dashboard-active-case-lifecycle-toggle-label"
+		>
+			<span className="relative inline-flex h-6 w-11 shrink-0 items-center">
+				<input
+					aria-label={`Archive ${caseRecord.title}`}
+					checked
+					className="peer sr-only"
+					data-testid="teacher-dashboard-active-case-lifecycle-toggle"
+					disabled={disabled}
+					onChange={(event) => {
+						if (!event.currentTarget.checked) {
+							void onArchive();
+						}
+					}}
+					role="switch"
+					type="checkbox"
+				/>
+				<span
+					aria-hidden="true"
+					className="h-6 w-11 border border-white/50 bg-white/20 transition peer-checked:border-white peer-checked:bg-white peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-teal peer-disabled:opacity-60"
+				/>
+				<span
+					aria-hidden="true"
+					className="absolute left-1 h-4 w-4 bg-white/70 transition peer-checked:translate-x-5 peer-checked:bg-primary-action peer-disabled:opacity-60"
+				/>
+			</span>
+		</label>
 	);
 }
 
