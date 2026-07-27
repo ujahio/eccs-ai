@@ -1,8 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button, ButtonLink } from "@/components/ui/button";
+import {
+	patchTeacherCaseLifecycle,
+	type TeacherLifecycleOverride,
+} from "@/features/teacher/cases/demo-case-lifecycle-client";
 import type {
 	TeacherCaseLibraryArchivedCase,
 	TeacherCaseLibrarySummary,
@@ -41,18 +46,29 @@ const CASE_MODE_DETAILS = {
 
 export function TeacherCaseLibrary({
 	archivedCases,
+	demoControlsEnabled,
 	draftCases,
 }: TeacherCaseLibrarySummary) {
+	const router = useRouter();
 	const [drafts, setDrafts] = useState(draftCases);
-	const [activeMode, setActiveMode] = useState<TeacherCaseMode>(
-		draftCases.length > 0 ? "draft" : "archived",
+	const [activeMode, setActiveMode] = useState<TeacherCaseMode>(() =>
+		initialCaseMode({
+			archivedCount: archivedCases.length,
+			draftCount: draftCases.length,
+		}),
 	);
 	const [draftPendingDelete, setDraftPendingDelete] =
 		useState<TeacherDraftCase | null>(null);
 	const [deleteStatus, setDeleteStatus] = useState<"idle" | "deleting">("idle");
 	const [deleteError, setDeleteError] = useState("");
+	const [lifecyclePendingCaseId, setLifecyclePendingCaseId] = useState("");
+	const [lifecycleError, setLifecycleError] = useState("");
 	const activeModeDetails = CASE_MODE_DETAILS[activeMode];
-	const cards = caseRecordsForMode(activeMode, drafts, archivedCases);
+	const cards = caseRecordsForMode({
+		activeMode,
+		archivedCases,
+		drafts,
+	});
 
 	async function confirmDeleteDraft() {
 		if (!draftPendingDelete) {
@@ -86,6 +102,29 @@ export function TeacherCaseLibrary({
 		}
 	}
 
+	async function updateCaseLifecycle(
+		caseRecord: TeacherCaseCardRecord,
+		lifecycle: TeacherLifecycleOverride,
+	) {
+		if (caseRecord.kind === "draft" || !demoControlsEnabled) {
+			return;
+		}
+
+		try {
+			setLifecyclePendingCaseId(caseRecord.caseId);
+			setLifecycleError("");
+			await patchTeacherCaseLifecycle(fetch, {
+				caseId: caseRecord.caseId,
+				lifecycle,
+			});
+			router.refresh();
+		} catch {
+			setLifecycleError("The case lifecycle could not be updated. Try again.");
+		} finally {
+			setLifecyclePendingCaseId("");
+		}
+	}
+
 	return (
 		<section
 			className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8"
@@ -98,6 +137,15 @@ export function TeacherCaseLibrary({
 				onModeChange={setActiveMode}
 			/>
 
+			{lifecycleError ? (
+				<p
+					className="mb-4 border border-urgency-border bg-urgency-soft px-4 py-3 text-sm font-semibold text-urgency-text"
+					data-testid="teacher-case-lifecycle-error"
+				>
+					{lifecycleError}
+				</p>
+			) : null}
+
 			{cards.length > 0 ? (
 				<div
 					className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
@@ -107,6 +155,9 @@ export function TeacherCaseLibrary({
 						<TeacherCaseCard
 							caseRecord={caseRecord}
 							key={caseRecord.caseId}
+							demoControlsEnabled={demoControlsEnabled}
+							lifecyclePending={lifecyclePendingCaseId === caseRecord.caseId}
+							onLifecycleChange={updateCaseLifecycle}
 							onRequestDelete={
 								caseRecord.kind === "draft"
 									? () => {
@@ -142,9 +193,15 @@ export function TeacherCaseLibrary({
 }
 
 function caseRecordsForMode(
-	activeMode: TeacherCaseMode,
-	drafts: TeacherDraftCase[],
-	archivedCases: TeacherCaseLibraryArchivedCase[],
+	{
+		activeMode,
+		archivedCases,
+		drafts,
+	}: {
+		activeMode: TeacherCaseMode;
+		archivedCases: TeacherCaseLibraryArchivedCase[];
+		drafts: TeacherDraftCase[];
+	},
 ): TeacherCaseCardRecord[] {
 	return activeMode === "draft"
 		? drafts.map((draft) => ({ ...draft, kind: "draft" as const }))
@@ -248,26 +305,37 @@ function CaseModeButton({
 
 function TeacherCaseCard({
 	caseRecord,
+	demoControlsEnabled,
+	lifecyclePending,
+	onLifecycleChange,
 	onRequestDelete,
 }: {
 	caseRecord: TeacherCaseCardRecord;
+	demoControlsEnabled: boolean;
+	lifecyclePending: boolean;
+	onLifecycleChange: (
+		caseRecord: TeacherCaseCardRecord,
+		lifecycle: TeacherLifecycleOverride,
+	) => void | Promise<void>;
 	onRequestDelete?: () => void;
 }) {
+	const isDraft = caseRecord.kind === "draft";
+
 	return (
 		<article
 			className={[
 				"relative flex min-h-52 flex-col border border-border-gray px-4 py-5 text-primary-text transition hover:border-primary-action",
-				caseRecord.kind === "draft"
+				isDraft
 					? "border-l-4 border-l-brand-teal bg-white"
 					: "border-l-4 border-l-primary-action bg-soft-section",
 			].join(" ")}
 			data-testid={
-				caseRecord.kind === "draft"
+				isDraft
 					? "teacher-draft-case-card"
 					: "teacher-library-archived-case-card"
 			}
 		>
-			{caseRecord.kind === "draft" ? (
+			{isDraft ? (
 				<Link
 					aria-label={`Edit ${caseRecord.title}`}
 					className="block flex-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-teal"
@@ -286,7 +354,7 @@ function TeacherCaseCard({
 				</Link>
 			)}
 
-			{caseRecord.kind === "draft" ? (
+			{isDraft ? (
 				<div className="mt-4 flex flex-col gap-2 border-t border-border-gray pt-3 sm:flex-row">
 					<ButtonLink
 						className="w-full sm:w-auto"
@@ -310,6 +378,16 @@ function TeacherCaseCard({
 					</Button>
 				</div>
 			) : null}
+
+			{!isDraft && demoControlsEnabled ? (
+				<LifecycleToggle
+					caseRecord={caseRecord}
+					disabled={lifecyclePending}
+					onLifecycleChange={(lifecycle) =>
+						onLifecycleChange(caseRecord, lifecycle)
+					}
+				/>
+			) : null}
 		</article>
 	);
 }
@@ -324,7 +402,7 @@ function TeacherCaseCardContent({
 			<div className="mb-4 flex items-start justify-between gap-4">
 				<CaseStudyIcon tone={caseRecord.kind} />
 				<CasePill
-					tone={caseRecord.kind === "draft" ? "draft" : "archived"}
+					tone={caseRecord.kind}
 					value={caseRecord.kind === "draft" ? "Draft" : "Archived"}
 				/>
 			</div>
@@ -419,6 +497,54 @@ function CasePill({
 		<span className={["border px-2 py-1 text-xs", toneClass].join(" ")}>
 			{value}
 		</span>
+	);
+}
+
+function LifecycleToggle({
+	caseRecord,
+	disabled,
+	onLifecycleChange,
+}: {
+	caseRecord: Exclude<TeacherCaseCardRecord, { kind: "draft" }>;
+	disabled: boolean;
+	onLifecycleChange: (lifecycle: TeacherLifecycleOverride) => void;
+}) {
+	return (
+		<label
+			className="mt-4 flex min-h-11 items-center justify-between gap-3 border-t border-border-gray pt-3 text-primary-text"
+			data-testid={`teacher-case-lifecycle-toggle-label-${caseRecord.caseId}`}
+		>
+			<span>
+				<span className="block text-sm font-semibold">Case Status</span>
+				<span className="block text-xs text-muted-gray">
+					Archived from students
+				</span>
+			</span>
+			<span className="relative inline-flex h-6 w-11 shrink-0 items-center">
+				<input
+					aria-label={`Publish ${caseRecord.title}`}
+					checked={false}
+					className="peer sr-only"
+					data-testid={`teacher-case-lifecycle-toggle-${caseRecord.caseId}`}
+					disabled={disabled}
+					onChange={(event) =>
+						onLifecycleChange(
+							event.currentTarget.checked ? "published" : "archived",
+						)
+					}
+					role="switch"
+					type="checkbox"
+				/>
+				<span
+					aria-hidden="true"
+					className="h-6 w-11 border border-border-gray bg-white transition peer-checked:border-primary-action peer-checked:bg-primary-action peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-teal peer-disabled:opacity-60"
+				/>
+				<span
+					aria-hidden="true"
+					className="absolute left-1 h-4 w-4 bg-disabled-gray transition peer-checked:translate-x-5 peer-checked:bg-white peer-disabled:opacity-60"
+				/>
+			</span>
+		</label>
 	);
 }
 
@@ -551,4 +677,14 @@ function formatDate(epochMilliseconds: number) {
 		year: "numeric",
 		timeZone: "Asia/Dubai",
 	}).format(new Date(epochMilliseconds));
+}
+
+function initialCaseMode({
+	archivedCount,
+	draftCount,
+}: {
+	archivedCount: number;
+	draftCount: number;
+}): TeacherCaseMode {
+	return draftCount > 0 || archivedCount === 0 ? "draft" : "archived";
 }

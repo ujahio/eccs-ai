@@ -24,6 +24,8 @@ export const client = new sst.aws.Nextjs("eccsfeweb", {
 		CASE_ARCHIVE_SCHEDULE_NAME: caseArchive.activeCaseArchiveScheduleName,
 		CASE_ARCHIVE_SCHEDULER_ROLE_ARN: caseArchive.archiveSchedulerRoleArn,
 		CASE_ARCHIVE_TARGET_ARN: caseArchive.archiveFunction.arn,
+		CASE_LIFECYCLE_DEMO_CONTROLS_ENABLED:
+			process.env.CASE_LIFECYCLE_DEMO_CONTROLS_ENABLED ?? "",
 		NEXT_PUBLIC_APP_URL:
 			process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001",
 	},

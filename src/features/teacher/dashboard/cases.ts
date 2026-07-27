@@ -9,6 +9,7 @@ import {
 	sortArchivedTeacherCases,
 	type TeacherCaseLifecycle,
 } from "@/features/teacher/cases/case-lifecycle";
+import { areDemoCaseLifecycleControlsEnabled } from "@/lib/env/demo-case-lifecycle-controls";
 
 export type TeacherDashboardCaseRecord = {
 	caseId: string;
@@ -23,7 +24,13 @@ export type TeacherDashboardCaseRecord = {
 export type TeacherDashboardSummary = {
 	activeCase: TeacherDashboardCaseRecord | null;
 	archivedCases: TeacherDashboardCaseRecord[];
+	demoControlsEnabled: boolean;
 };
+
+type TeacherDashboardCaseSummary = Omit<
+	TeacherDashboardSummary,
+	"demoControlsEnabled"
+>;
 
 type StoredTeacherCaseRecord = TeacherDashboardCaseRecord & {
 	lifecycle: TeacherCaseLifecycle;
@@ -40,12 +47,16 @@ export async function getTeacherDashboardSummary(): Promise<TeacherDashboardSumm
 	const repository = isE2EMode()
 		? new InMemoryTeacherDashboardRepository()
 		: new DynamoTeacherDashboardRepository(resources.teacherCaseTableName);
+	const summary = await repository.getSummary(Date.now());
 
-	return repository.getSummary(Date.now());
+	return {
+		...summary,
+		demoControlsEnabled: areDemoCaseLifecycleControlsEnabled(),
+	};
 }
 
 export class InMemoryTeacherDashboardRepository {
-	async getSummary(now: number): Promise<TeacherDashboardSummary> {
+	async getSummary(now: number): Promise<TeacherDashboardCaseSummary> {
 		const cases = getE2ETeacherCaseStore();
 
 		return summarizeCases(cases, now);
@@ -62,7 +73,7 @@ export class DynamoTeacherDashboardRepository {
 		this.documentClient = documentClient;
 	}
 
-	async getSummary(now: number): Promise<TeacherDashboardSummary> {
+	async getSummary(now: number): Promise<TeacherDashboardCaseSummary> {
 		const [published, archived, expiredPublished] = await Promise.all([
 			this.listActivePublishedCases(now),
 			this.listArchivedCases(),
@@ -140,7 +151,7 @@ export class DynamoTeacherDashboardRepository {
 function summarizeCases(
 	cases: StoredTeacherCaseRecord[],
 	now: number,
-): TeacherDashboardSummary {
+): TeacherDashboardCaseSummary {
 	const dashboardCases = cases.map(dashboardCaseRecord);
 	const activeCase =
 		dashboardCases

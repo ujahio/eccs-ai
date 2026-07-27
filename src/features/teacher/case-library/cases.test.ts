@@ -7,13 +7,18 @@ import {
 vi.mock("server-only", () => ({}));
 
 let InMemoryTeacherCaseLibraryRepository: typeof import("./cases").InMemoryTeacherCaseLibraryRepository;
+let areDemoCaseLifecycleControlsEnabled: typeof import("@/lib/env/demo-case-lifecycle-controls").areDemoCaseLifecycleControlsEnabled;
 
 beforeAll(async () => {
 	({ InMemoryTeacherCaseLibraryRepository } = await import("./cases"));
+	({ areDemoCaseLifecycleControlsEnabled } = await import(
+		"@/lib/env/demo-case-lifecycle-controls"
+	));
 });
 
 beforeEach(() => {
 	resetE2EAuthStore();
+	vi.unstubAllEnvs();
 });
 
 describe("InMemoryTeacherCaseLibraryRepository", () => {
@@ -90,5 +95,13 @@ describe("InMemoryTeacherCaseLibraryRepository", () => {
 				expect.objectContaining({ caseId: "active-case" }),
 			]),
 		);
+	});
+
+	it("reads the demo lifecycle controls flag from server environment", () => {
+		expect(areDemoCaseLifecycleControlsEnabled()).toBe(false);
+
+		vi.stubEnv("CASE_LIFECYCLE_DEMO_CONTROLS_ENABLED", "enabled");
+
+		expect(areDemoCaseLifecycleControlsEnabled()).toBe(true);
 	});
 });
