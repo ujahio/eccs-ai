@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   production_source_gate:
-    name: Require staging source
+    name: Require staging or deletion source
     runs-on: ubuntu-latest
     steps:
       - name: Validate production promotion source
@@ -28,8 +28,13 @@ jobs:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
-          if [[ "$HEAD_REPO" != "$GITHUB_REPOSITORY" || "$HEAD_REF" != "staging" ]]; then
-            echo "::error::Production PRs must be opened from the same-repository staging branch. Open feature and issue PRs against staging."
+          if [[ "$HEAD_REPO" != "$GITHUB_REPOSITORY" ]]; then
+            echo "::error::Production PRs must be opened from this repository."
+            exit 1
+          fi
+
+          if [[ "$HEAD_REF" != "staging" && "$HEAD_REF" != "production-deletion" ]]; then
+            echo "::error::Production PRs must be opened from the same-repository staging branch. Temporary production deletion PRs must use the production-deletion branch."
             exit 1
           fi
 
@@ -38,7 +43,7 @@ jobs:
     needs: production_source_gate
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    if: ${{ github.event.pull_request.draft == false }}
+    if: ${{ github.event.pull_request.draft == false && github.event.pull_request.head.ref != 'production-deletion' }}
     permissions:
       actions: read
       contents: read
@@ -98,7 +103,7 @@ jobs:
     needs: pr_checks_gate
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    if: ${{ github.event.pull_request.draft == false }}
+    if: ${{ github.event.pull_request.draft == false && github.event.pull_request.head.ref != 'production-deletion' }}
     permissions:
       actions: read
       contents: read
@@ -157,7 +162,7 @@ jobs:
     needs: staging_deploy_gate
     runs-on: ubuntu-latest
     timeout-minutes: 120
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.draft == false && github.event.pull_request.head.ref != 'production-deletion') }}
     permissions:
       contents: read
       id-token: write
