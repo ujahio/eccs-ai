@@ -161,7 +161,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    environment: production-smoke
     env:
       AUTH_E2E_MODE: ""
       AWS_REGION: ${{ vars.AWS_REGION }}

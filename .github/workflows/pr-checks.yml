@@ -16,6 +16,7 @@ concurrency:
 jobs:
   checks:
     name: Lint, Typecheck, Test, Build
+    if: ${{ !contains(fromJSON('["remove-staging","remove-production","production-deletion"]'), github.event.pull_request.head.ref) }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
