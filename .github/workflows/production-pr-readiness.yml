@@ -19,7 +19,8 @@ concurrency:
 
 jobs:
   production_source_gate:
-    name: Require staging or deletion source
+    name: Require staging source
+    if: ${{ github.event.pull_request.head.ref != 'production-deletion' }}
     runs-on: ubuntu-latest
     steps:
       - name: Validate production promotion source
@@ -28,13 +29,8 @@ jobs:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
-          if [[ "$HEAD_REPO" != "$GITHUB_REPOSITORY" ]]; then
-            echo "::error::Production PRs must be opened from this repository."
-            exit 1
-          fi
-
-          if [[ "$HEAD_REF" != "staging" && "$HEAD_REF" != "production-deletion" ]]; then
-            echo "::error::Production PRs must be opened from the same-repository staging branch. Temporary production deletion PRs must use the production-deletion branch."
+          if [[ "$HEAD_REPO" != "$GITHUB_REPOSITORY" || "$HEAD_REF" != "staging" ]]; then
+            echo "::error::Production PRs must be opened from the same-repository staging branch. Open feature and issue PRs against staging."
             exit 1
           fi
 
