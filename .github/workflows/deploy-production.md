@@ -1,37 +1,36 @@
 name: Deploy Production
 
 on:
-  push:
-    branches:
-      - production
+push:
+branches: - production
 
 run-name: Deploy production from ${{ github.ref_name }} by @${{ github.actor }}
 
 permissions:
-  contents: read
+contents: read
 
 concurrency:
-  group: deploy-production
-  cancel-in-progress: false
+group: deploy-production
+cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Deploy production
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    permissions:
-      contents: read
-      id-token: write
-    environment: production
-    env:
-      AUTH_E2E_MODE: ""
-      AWS_REGION: ${{ vars.AWS_REGION }}
+deploy:
+name: Deploy production
+runs-on: ubuntu-latest
+timeout-minutes: 60
+permissions:
+contents: read
+id-token: write
+environment: production
+env:
+AUTH_E2E_MODE: ""
+AWS_REGION: ${{ vars.AWS_REGION }}
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
-      BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
       BETTER_AUTH_URL: ${{ vars.BETTER_AUTH_URL || vars.NEXT_PUBLIC_APP_URL }}
-      ECCS_EMAIL_SENDER: ${{ vars.ECCS_EMAIL_SENDER }}
+ECCS_EMAIL_SENDER: ${{ vars.ECCS_EMAIL_SENDER }}
       NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
-      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
 
     steps:
       - name: Validate production configuration
