@@ -1,10 +1,9 @@
 export default $config({
-	app(input) {
+	app() {
 		return {
 			name: "eccs-ai",
 			home: "aws",
-			removal: input?.stage === "production" ? "retain" : "remove",
-			protect: input?.stage === "production",
+			removal: "remove",
 		};
 	},
 	async run() {
