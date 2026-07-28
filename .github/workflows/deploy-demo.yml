@@ -25,7 +25,7 @@ jobs:
     environment: demo
     env:
       AUTH_E2E_MODE: ""
-      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
       BETTER_AUTH_URL: ${{ vars.BETTER_AUTH_URL || vars.NEXT_PUBLIC_APP_URL }}
