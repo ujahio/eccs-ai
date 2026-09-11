@@ -34,7 +34,7 @@ jobs:
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
 
     steps:
-      - name: Validate stage configuration
+      - name: Validate production configuration
         shell: bash
         run: |
           missing=()
@@ -63,7 +63,6 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6.1.0
         with:
-          aws-region: ${{ env.AWS_REGION }}
           role-session-name: eccs-ai-staging-${{ github.run_id }}
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           action-timeout-s: 120
