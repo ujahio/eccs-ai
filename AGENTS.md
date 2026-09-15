@@ -4,13 +4,13 @@
 
 ### Environment
 
-Keep secrets local. Do not commit and environment variable starting with `.env.*` unless `.env.sample`.
+Keep secrets local. Do not commit an environment file matching `.env.*` unless it is `.env.sample`.
 
-Read `.env.sample` for required local environment varibales.
+Read `.env.sample` for required local environment variables.
 
 ### Issue tracker
 
-Issues and PRDs are tracked in GitHub Issues for `otktechnologies/eccs-ai`. See `docs/agents/issue-tracker.md`.
+Issues and PRDs are tracked in GitHub Issues for `ujahio/eccs-ai`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
@@ -20,6 +20,8 @@ Use the default five-label triage vocabulary. See `docs/agents/triage-labels.md`
 
 Single-context repo. Read `PRD.md` for product scope and `DESIGN.md` for UI rules before planning implementation work. See `docs/agents/domain.md`.
 
+Read `docs/adr/README.md` and the ADRs relevant to an area before planning or implementing architecture-affecting work. Accepted ADRs are architectural constraints. Preserve them as history; replace a decision only with a new ADR that supersedes the previous one.
+
 ## Implementation Details
 
 ### Tech Stack
@@ -28,11 +30,10 @@ Single-context repo. Read `PRD.md` for product scope and `DESIGN.md` for UI rule
 
 - **Full-stack TypeScript** using React.js and Next.js
 - **UI/UX** with tailwind, radix-ui
-- **SST ION** to write components to deploy AWS (other). Do not use any other SDK or IAC.
+- **SST Ion** as the sole infrastructure-as-code and deployment system. Do not introduce another infrastructure control plane. AWS SDK v3 is allowed for application runtime access to AWS services.
 - **EMAIL Services** Resend for application email delivery; local Playwright auth flows use the isolated in-memory e2e harness
 - **Client Authentication** with better-auth (no database, use cognito for user management)
 - **AWS** for backend resources
-- **DynamoDB** use SST
 - **Bun** runtime
 - **Playwright** for end-to-end integration AND smoketests tests
 - **vitest** for unit testing
@@ -40,29 +41,25 @@ Single-context repo. Read `PRD.md` for product scope and `DESIGN.md` for UI rule
 
 #### Architecture Notes
 
-- **Clean Architecture** with appropriate abstractions and coherent typescripit types throughout the application
-- **Serverless** architecture for low-cost operations. API Gateway + Lambda. No need for API application layer like express.js or related tech.
+- ECCS is currently a feature-oriented Next.js modular monolith.
+- Keep route handlers and server actions thin, place business behavior in `src/features/*`, and preserve established feature-owned interfaces to external systems.
+- Do not change an accepted architectural decision without creating a new ADR that supersedes it.
 
-#### Harness
+### Architecture changes
 
-- **Graphify** knowledge graphs (setup for codex, do not commit to upstream branch)
+Create a `Proposed` ADR before implementing a consequential change to system or feature boundaries, infrastructure or deployment topology, authentication or authorization, persistence or data ownership, public APIs or integration contracts, external providers or major dependencies, or background processing and operational behavior. Routine implementation details do not require an ADR.
+
+Use the lifecycle `Proposed` → `Accepted` → `Superseded` or `Deprecated`. A change to an accepted decision requires a new ADR that supersedes it; do not rewrite or delete the earlier ADR.
 
 ### Tech consideration
 
 - Pin dependencies versions
-- caching when necessary
 - start with one local stage and inform the user of the manual steps to implement
 - Testing selectors must use `data-testid` first. Use stable `id` attributes as a close second when a test id would duplicate an existing semantic anchor. Avoid relying on visible text, ARIA roles, CSS classes, or layout structure for automated test targeting unless no stable selector is available.
 
 ## UI DESIGN
 
-- Always follow the UI design system when creating or reviewing components or pages.
-- Design System: @DESIGN.md
-- All images used by components must live under `public/images` and be referenced from that public path. If an image starts elsewhere, move it into `public/images` before using it in UI code.
-
-## RESPONSES
-
-- Keep responses concise and to the point - unless the user asks otherwise
+- Always follow the UI design system when creating or reviewing components or pages @DESIGN.md
 
 ## PLANNING MODE
 
@@ -76,13 +73,14 @@ Single-context repo. Read `PRD.md` for product scope and `DESIGN.md` for UI rule
 - Never implement features yourself when possible - use sub-agents!
 - Identify changes from the plan that can be implemented in parallel, and use sub-agents to implement the features efficiently
 - When using sub-agents to implement features, act as a coordinator only
-- Use the best model for the task - premium models for complex tasks (like coding) and mid-tier models for simpler tasks, like documentation
 - Run lint, typecheck, and build as PR-preparation checks before pushing or opening a PR, or earlier when the user explicitly asks for those checks.
-- When code is ready for manual testing, ask the user to manually test it before staging or committing.
+- When code is ready to commit, ask the user to manually test it before staging or committing.
 
-## Context7
+## Documentation
 
-When you need to search for up to date documentation, use `context7` tools.
+- if there is an MCP for a package, use the MCP
+- if you need documentation on AWS, use agent-toolkit
+- use `context7` tools any other documentation tools with no MCP
 
 ## Runtime
 
@@ -99,6 +97,7 @@ SST dev locally after authenticating to AWS.
 - Do not ask for separate approval before routine `gh` operations in this repository.
 - Use the currently authenticated GitHub session. If authentication is missing or insufficient, report the blocker and ask the user to authenticate.
 - Do not read or modify secrets. Treat `.github` workflow/config files as normal repo files only when they are relevant to the task.
+- Do not assume GitHub deployment workflows are operational. Their definitions currently use `.md` extensions and are disabled; see ADR 0009.
 
 ### Branch, PR, And Issue Closeout Workflow
 
