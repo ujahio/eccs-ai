@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	isStudentCaseDeadlineStep,
 	StudentCaseFlow,
@@ -8,6 +8,15 @@ import {
 import type { StudentCasePresentation } from "./student-case";
 
 describe("StudentCaseFlow", () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+		vi.setSystemTime(Date.UTC(2026, 6, 20, 12));
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
 	it("treats the certificate step as post-deadline-display", () => {
 		const deadlineSteps: CaseFlowStep[] = [
 			"presentation",
