@@ -7,10 +7,17 @@ import {
 } from "./student-case-flow";
 import type { StudentCasePresentation } from "./student-case";
 
+// Arbitrary fixed reference instant. Time is faked for these tests, so the
+// absolute date is irrelevant — only the relative deltas below matter. Do not
+// "refresh" this to today's date when the suite is run later.
+const FIXED_NOW = Date.UTC(2026, 6, 20, 12);
+const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+
 describe("StudentCaseFlow", () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
-		vi.setSystemTime(Date.UTC(2026, 6, 20, 12));
+		vi.setSystemTime(FIXED_NOW);
 	});
 
 	afterEach(() => {
@@ -61,31 +68,26 @@ describe("StudentCaseFlow", () => {
 	});
 
 	it("shows a due-soon deadline indicator inside the two-day reminder window", () => {
-		const dateNowSpy = vi
-			.spyOn(Date, "now")
-			.mockReturnValue(Date.UTC(2026, 6, 29, 12));
+		// Now = FIXED_NOW + 9 days; deadline = FIXED_NOW + 11 days minus 1 hour
+		// (47 hours out, inside the 48-hour reminder window).
+		vi.setSystemTime(FIXED_NOW + 9 * DAY_MS);
 
-		let markup = "";
-		try {
-			markup = renderToStaticMarkup(
-				<StudentCaseFlow
-					caseRecord={caseRecordFixture({
-						deadlineAt: Date.UTC(2026, 6, 31, 11),
-					})}
-					feedbackAction={feedbackActionStub}
-					quizAction={async () => ({
-						message: "",
-						status: "idle",
-					})}
-					quizReviewAction={async () => ({
-						message: "",
-						status: "ready",
-					})}
-				/>,
-			);
-		} finally {
-			dateNowSpy.mockRestore();
-		}
+		const markup = renderToStaticMarkup(
+			<StudentCaseFlow
+				caseRecord={caseRecordFixture({
+					deadlineAt: FIXED_NOW + 11 * DAY_MS - HOUR_MS,
+				})}
+				feedbackAction={feedbackActionStub}
+				quizAction={async () => ({
+					message: "",
+					status: "idle",
+				})}
+				quizReviewAction={async () => ({
+					message: "",
+					status: "ready",
+				})}
+			/>,
+		);
 
 		expect(markup).toContain('data-testid="student-case-deadline-date"');
 		expect(markup).toContain('data-testid="student-case-deadline-reminder"');
@@ -98,31 +100,26 @@ describe("StudentCaseFlow", () => {
 	});
 
 	it("does not show the due-soon indicator outside the two-day reminder window", () => {
-		const dateNowSpy = vi
-			.spyOn(Date, "now")
-			.mockReturnValue(Date.UTC(2026, 6, 20, 12));
+		// Same deadline as the due-soon test; now = FIXED_NOW (10 days 23 hours
+		// out, outside the 48-hour reminder window).
+		vi.setSystemTime(FIXED_NOW);
 
-		let markup = "";
-		try {
-			markup = renderToStaticMarkup(
-				<StudentCaseFlow
-					caseRecord={caseRecordFixture({
-						deadlineAt: Date.UTC(2026, 6, 31, 11),
-					})}
-					feedbackAction={feedbackActionStub}
-					quizAction={async () => ({
-						message: "",
-						status: "idle",
-					})}
-					quizReviewAction={async () => ({
-						message: "",
-						status: "ready",
-					})}
-				/>,
-			);
-		} finally {
-			dateNowSpy.mockRestore();
-		}
+		const markup = renderToStaticMarkup(
+			<StudentCaseFlow
+				caseRecord={caseRecordFixture({
+					deadlineAt: FIXED_NOW + 11 * DAY_MS - HOUR_MS,
+				})}
+				feedbackAction={feedbackActionStub}
+				quizAction={async () => ({
+					message: "",
+					status: "idle",
+				})}
+				quizReviewAction={async () => ({
+					message: "",
+					status: "ready",
+				})}
+			/>,
+		);
 
 		expect(markup).toContain('data-testid="student-case-deadline-date"');
 		expect(markup).not.toContain('data-testid="student-case-deadline-reminder"');
@@ -164,7 +161,7 @@ function caseRecordFixture(
 				],
 			},
 		],
-		deadlineAt: Date.UTC(2026, 6, 31),
+		deadlineAt: FIXED_NOW + 10 * DAY_MS,
 		lectureText: "Teacher lecture text for resources.",
 		modelAnswer: "Teacher model answer for comparison.",
 		presentation: "Patient presentation and clinical context.",
