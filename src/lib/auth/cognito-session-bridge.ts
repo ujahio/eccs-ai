@@ -346,7 +346,7 @@ async function upsertBetterAuthUser(
 		);
 	}
 
-	return ctx.context.internalAdapter.createUser(userData);
+	return ctx.context.internalAdapter.createUser(userData, { method: "cognito" });
 }
 
 function bridgeResponse(
